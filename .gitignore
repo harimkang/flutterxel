@@ -1,0 +1,18 @@
+# Source mirrors and local references
+reference/
+
+# Dart / Flutter
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/pubspec.lock
+**/pubspec_overrides.yaml
+**/generated_plugin_registrant.dart
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store

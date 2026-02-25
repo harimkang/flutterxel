@@ -1,0 +1,26 @@
+name: flutterxel_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+workspace:
+  - packages/flutterxel
+  - packages/flutterxel_tools
+
+dev_dependencies:
+  melos: ^7.3.0
+
+melos:
+  packages:
+    - packages/**
+  command:
+    bootstrap:
+      usePubspecOverrides: true
+  scripts:
+    analyze:
+      run: dart run melos exec --concurrency=1 -- "flutter analyze"
+      description: Run static analysis for all packages.
+    test:
+      run: dart run melos exec --concurrency=1 --dir-exists=test -- "flutter test"
+      description: Run tests for all packages.

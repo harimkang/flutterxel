@@ -1,0 +1,13 @@
+[package]
+name = "flutterxel_core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rust core runtime for flutterxel (FFI)"
+
+[lib]
+name = "flutterxel_core"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+
