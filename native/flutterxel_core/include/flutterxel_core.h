@@ -15,21 +15,93 @@
 extern "C" {
 #endif
 
+// Optional parameter encoding in ABI:
+// - optional int32: INT32_MIN means None
+// - optional float64: NaN means None
+// - optional bool: -1 means None, 0 means false, 1 means true
+
+typedef enum FlutterxelCorePlaySndKind {
+  FLUTTERXEL_CORE_PLAY_SND_INT = 0,
+  FLUTTERXEL_CORE_PLAY_SND_INT_LIST = 1,
+  FLUTTERXEL_CORE_PLAY_SND_STRING = 2,
+} FlutterxelCorePlaySndKind;
+
+typedef void (*FlutterxelCoreFrameCallback)(void* user_data);
+
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_major(void);
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_minor(void);
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_patch(void);
 
-FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_engine_new(uint32_t width, uint32_t height,
-                                                           uint32_t fps);
-FLUTTERXEL_CORE_EXPORT bool flutterxel_core_engine_free(uint64_t handle);
-FLUTTERXEL_CORE_EXPORT bool flutterxel_core_engine_tick(uint64_t handle, float delta_ms);
-FLUTTERXEL_CORE_EXPORT const uint8_t* flutterxel_core_engine_frame_ptr(uint64_t handle);
-FLUTTERXEL_CORE_EXPORT size_t flutterxel_core_engine_frame_len(uint64_t handle);
-FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_engine_frame_count(uint64_t handle);
+// pyxel.init(width, height, *, title=None, fps=None, quit_key=None,
+//            display_scale=None, capture_scale=None, capture_sec=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_init(
+    int32_t width,
+    int32_t height,
+    const char* title,
+    int32_t fps,
+    int32_t quit_key,
+    int32_t display_scale,
+    int32_t capture_scale,
+    int32_t capture_sec);
+
+// pyxel.run(update, draw)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_run(
+    FlutterxelCoreFrameCallback update,
+    void* update_user_data,
+    FlutterxelCoreFrameCallback draw,
+    void* draw_user_data);
+
+// pyxel.btn(key)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btn(int32_t key);
+
+// pyxel.cls(col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_cls(int32_t col);
+
+// pyxel.blt(x, y, img, u, v, w, h, colkey=None, *, rotate=None, scale=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_blt(
+    double x,
+    double y,
+    int32_t img,
+    double u,
+    double v,
+    double w,
+    double h,
+    int32_t colkey,
+    double rotate,
+    double scale);
+
+// pyxel.play(ch, snd, *, sec=None, loop=None, resume=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_play(
+    int32_t ch,
+    int32_t snd_kind,
+    int32_t snd_value,
+    const int32_t* snd_sequence_ptr,
+    size_t snd_sequence_len,
+    const char* snd_string,
+    double sec,
+    int8_t loop,
+    int8_t resume);
+
+// pyxel.load(filename, *, exclude_images=None, exclude_tilemaps=None,
+//            exclude_sounds=None, exclude_musics=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_load(
+    const char* filename,
+    int8_t exclude_images,
+    int8_t exclude_tilemaps,
+    int8_t exclude_sounds,
+    int8_t exclude_musics);
+
+// pyxel.save(filename, *, exclude_images=None, exclude_tilemaps=None,
+//            exclude_sounds=None, exclude_musics=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_save(
+    const char* filename,
+    int8_t exclude_images,
+    int8_t exclude_tilemaps,
+    int8_t exclude_sounds,
+    int8_t exclude_musics);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
 #endif  // FLUTTERXEL_CORE_H_
-

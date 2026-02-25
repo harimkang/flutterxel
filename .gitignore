@@ -11,6 +11,10 @@ reference/
 **/pubspec_overrides.yaml
 **/generated_plugin_registrant.dart
 
+# Rust
+**/target/
+**/Cargo.lock
+
 # IDE / OS
 .idea/
 .vscode/

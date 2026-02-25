@@ -26,32 +26,324 @@ class FlutterxelBindings {
     ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
   ) : _lookup = lookup;
 
-  /// A very short-lived native function.
-  ///
-  /// For very short-lived functions, it is fine to call them on the main isolate.
-  /// They will block the Dart execution while running the native function, so
-  /// only do this for native functions which are guaranteed to be short-lived.
-  int sum(int a, int b) {
-    return _sum(a, b);
+  int flutterxel_core_version_major() {
+    return _flutterxel_core_version_major();
   }
 
-  late final _sumPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>('sum');
-  late final _sum = _sumPtr.asFunction<int Function(int, int)>();
-
-  /// A longer lived native function, which occupies the thread calling it.
-  ///
-  /// Do not call these kind of native functions in the main isolate. They will
-  /// block Dart execution. This will cause dropped frames in Flutter applications.
-  /// Instead, call these native functions on a separate isolate.
-  int sum_long_running(int a, int b) {
-    return _sum_long_running(a, b);
-  }
-
-  late final _sum_long_runningPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
-        'sum_long_running',
+  late final _flutterxel_core_version_majorPtr =
+      _lookup<ffi.NativeFunction<ffi.Uint32 Function()>>(
+        'flutterxel_core_version_major',
       );
-  late final _sum_long_running = _sum_long_runningPtr
-      .asFunction<int Function(int, int)>();
+  late final _flutterxel_core_version_major = _flutterxel_core_version_majorPtr
+      .asFunction<int Function()>();
+
+  int flutterxel_core_version_minor() {
+    return _flutterxel_core_version_minor();
+  }
+
+  late final _flutterxel_core_version_minorPtr =
+      _lookup<ffi.NativeFunction<ffi.Uint32 Function()>>(
+        'flutterxel_core_version_minor',
+      );
+  late final _flutterxel_core_version_minor = _flutterxel_core_version_minorPtr
+      .asFunction<int Function()>();
+
+  int flutterxel_core_version_patch() {
+    return _flutterxel_core_version_patch();
+  }
+
+  late final _flutterxel_core_version_patchPtr =
+      _lookup<ffi.NativeFunction<ffi.Uint32 Function()>>(
+        'flutterxel_core_version_patch',
+      );
+  late final _flutterxel_core_version_patch = _flutterxel_core_version_patchPtr
+      .asFunction<int Function()>();
+
+  bool flutterxel_core_init(
+    int width,
+    int height,
+    ffi.Pointer<ffi.Char> title,
+    int fps,
+    int quit_key,
+    int display_scale,
+    int capture_scale,
+    int capture_sec,
+  ) {
+    return _flutterxel_core_init(
+      width,
+      height,
+      title,
+      fps,
+      quit_key,
+      display_scale,
+      capture_scale,
+      capture_sec,
+    );
+  }
+
+  late final _flutterxel_core_initPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.Char>,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_init');
+  late final _flutterxel_core_init = _flutterxel_core_initPtr
+      .asFunction<
+        bool Function(int, int, ffi.Pointer<ffi.Char>, int, int, int, int, int)
+      >();
+
+  bool flutterxel_core_run(
+    FlutterxelCoreFrameCallback update,
+    ffi.Pointer<ffi.Void> update_user_data,
+    FlutterxelCoreFrameCallback draw,
+    ffi.Pointer<ffi.Void> draw_user_data,
+  ) {
+    return _flutterxel_core_run(update, update_user_data, draw, draw_user_data);
+  }
+
+  late final _flutterxel_core_runPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            FlutterxelCoreFrameCallback,
+            ffi.Pointer<ffi.Void>,
+            FlutterxelCoreFrameCallback,
+            ffi.Pointer<ffi.Void>,
+          )
+        >
+      >('flutterxel_core_run');
+  late final _flutterxel_core_run = _flutterxel_core_runPtr
+      .asFunction<
+        bool Function(
+          FlutterxelCoreFrameCallback,
+          ffi.Pointer<ffi.Void>,
+          FlutterxelCoreFrameCallback,
+          ffi.Pointer<ffi.Void>,
+        )
+      >();
+
+  bool flutterxel_core_btn(int key) {
+    return _flutterxel_core_btn(key);
+  }
+
+  late final _flutterxel_core_btnPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_btn',
+      );
+  late final _flutterxel_core_btn = _flutterxel_core_btnPtr
+      .asFunction<bool Function(int)>();
+
+  bool flutterxel_core_cls(int col) {
+    return _flutterxel_core_cls(col);
+  }
+
+  late final _flutterxel_core_clsPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_cls',
+      );
+  late final _flutterxel_core_cls = _flutterxel_core_clsPtr
+      .asFunction<bool Function(int)>();
+
+  bool flutterxel_core_blt(
+    double x,
+    double y,
+    int img,
+    double u,
+    double v,
+    double w,
+    double h,
+    int colkey,
+    double rotate,
+    double scale,
+  ) {
+    return _flutterxel_core_blt(x, y, img, u, v, w, h, colkey, rotate, scale);
+  }
+
+  late final _flutterxel_core_bltPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Double,
+            ffi.Double,
+            ffi.Int32,
+            ffi.Double,
+            ffi.Double,
+            ffi.Double,
+            ffi.Double,
+            ffi.Int32,
+            ffi.Double,
+            ffi.Double,
+          )
+        >
+      >('flutterxel_core_blt');
+  late final _flutterxel_core_blt = _flutterxel_core_bltPtr
+      .asFunction<
+        bool Function(
+          double,
+          double,
+          int,
+          double,
+          double,
+          double,
+          double,
+          int,
+          double,
+          double,
+        )
+      >();
+
+  bool flutterxel_core_play(
+    int ch,
+    int snd_kind,
+    int snd_value,
+    ffi.Pointer<ffi.Int32> snd_sequence_ptr,
+    int snd_sequence_len,
+    ffi.Pointer<ffi.Char> snd_string,
+    double sec,
+    int loop,
+    int resume,
+  ) {
+    return _flutterxel_core_play(
+      ch,
+      snd_kind,
+      snd_value,
+      snd_sequence_ptr,
+      snd_sequence_len,
+      snd_string,
+      sec,
+      loop,
+      resume,
+    );
+  }
+
+  late final _flutterxel_core_playPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.Int32>,
+            ffi.Size,
+            ffi.Pointer<ffi.Char>,
+            ffi.Double,
+            ffi.Int8,
+            ffi.Int8,
+          )
+        >
+      >('flutterxel_core_play');
+  late final _flutterxel_core_play = _flutterxel_core_playPtr
+      .asFunction<
+        bool Function(
+          int,
+          int,
+          int,
+          ffi.Pointer<ffi.Int32>,
+          int,
+          ffi.Pointer<ffi.Char>,
+          double,
+          int,
+          int,
+        )
+      >();
+
+  bool flutterxel_core_load(
+    ffi.Pointer<ffi.Char> filename,
+    int exclude_images,
+    int exclude_tilemaps,
+    int exclude_sounds,
+    int exclude_musics,
+  ) {
+    return _flutterxel_core_load(
+      filename,
+      exclude_images,
+      exclude_tilemaps,
+      exclude_sounds,
+      exclude_musics,
+    );
+  }
+
+  late final _flutterxel_core_loadPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Pointer<ffi.Char>,
+            ffi.Int8,
+            ffi.Int8,
+            ffi.Int8,
+            ffi.Int8,
+          )
+        >
+      >('flutterxel_core_load');
+  late final _flutterxel_core_load = _flutterxel_core_loadPtr
+      .asFunction<bool Function(ffi.Pointer<ffi.Char>, int, int, int, int)>();
+
+  bool flutterxel_core_save(
+    ffi.Pointer<ffi.Char> filename,
+    int exclude_images,
+    int exclude_tilemaps,
+    int exclude_sounds,
+    int exclude_musics,
+  ) {
+    return _flutterxel_core_save(
+      filename,
+      exclude_images,
+      exclude_tilemaps,
+      exclude_sounds,
+      exclude_musics,
+    );
+  }
+
+  late final _flutterxel_core_savePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Pointer<ffi.Char>,
+            ffi.Int8,
+            ffi.Int8,
+            ffi.Int8,
+            ffi.Int8,
+          )
+        >
+      >('flutterxel_core_save');
+  late final _flutterxel_core_save = _flutterxel_core_savePtr
+      .asFunction<bool Function(ffi.Pointer<ffi.Char>, int, int, int, int)>();
 }
+
+/// Optional parameter encoding in ABI:
+/// - optional int32: INT32_MIN means None
+/// - optional float64: NaN means None
+/// - optional bool: -1 means None, 0 means false, 1 means true
+enum FlutterxelCorePlaySndKind {
+  FLUTTERXEL_CORE_PLAY_SND_INT(0),
+  FLUTTERXEL_CORE_PLAY_SND_INT_LIST(1),
+  FLUTTERXEL_CORE_PLAY_SND_STRING(2);
+
+  final int value;
+  const FlutterxelCorePlaySndKind(this.value);
+
+  static FlutterxelCorePlaySndKind fromValue(int value) => switch (value) {
+    0 => FLUTTERXEL_CORE_PLAY_SND_INT,
+    1 => FLUTTERXEL_CORE_PLAY_SND_INT_LIST,
+    2 => FLUTTERXEL_CORE_PLAY_SND_STRING,
+    _ => throw ArgumentError(
+      "Unknown value for FlutterxelCorePlaySndKind: $value",
+    ),
+  };
+}
+
+typedef FlutterxelCoreFrameCallback =
+    ffi.Pointer<ffi.NativeFunction<FlutterxelCoreFrameCallbackFunction>>;
+typedef FlutterxelCoreFrameCallbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef DartFlutterxelCoreFrameCallbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
