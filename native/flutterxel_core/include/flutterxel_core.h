@@ -60,6 +60,16 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_flip(void);
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_show(void);
 // pyxel.title(title)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_title(const char* title);
+// pyxel.reset()
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_reset(void);
+// pyxel.perf_monitor(enabled)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_perf_monitor(bool enabled);
+// pyxel.integer_scale(enabled)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_integer_scale(bool enabled);
+// pyxel.screen_mode(scr)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_screen_mode(int32_t scr);
+// pyxel.fullscreen(enabled)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_fullscreen(bool enabled);
 
 FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_frame_count(void);
 FLUTTERXEL_CORE_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);

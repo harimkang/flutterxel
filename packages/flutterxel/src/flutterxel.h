@@ -53,6 +53,11 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
 FFI_PLUGIN_EXPORT bool flutterxel_core_flip(void);
 FFI_PLUGIN_EXPORT bool flutterxel_core_show(void);
 FFI_PLUGIN_EXPORT bool flutterxel_core_title(const char* title);
+FFI_PLUGIN_EXPORT bool flutterxel_core_reset(void);
+FFI_PLUGIN_EXPORT bool flutterxel_core_perf_monitor(bool enabled);
+FFI_PLUGIN_EXPORT bool flutterxel_core_integer_scale(bool enabled);
+FFI_PLUGIN_EXPORT bool flutterxel_core_screen_mode(int32_t scr);
+FFI_PLUGIN_EXPORT bool flutterxel_core_fullscreen(bool enabled);
 
 FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void);
 FFI_PLUGIN_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);

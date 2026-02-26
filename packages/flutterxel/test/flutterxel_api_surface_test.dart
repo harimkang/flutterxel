@@ -7,14 +7,19 @@ void main() {
   });
 
   test(
-    'exposes init/run/show/flip/quit/title/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise API surface',
+    'exposes init/run/show/flip/quit/reset/title/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
       expect(flutterxel.show, isA<Function>());
       expect(flutterxel.flip, isA<Function>());
       expect(flutterxel.quit, isA<Function>());
+      expect(flutterxel.reset, isA<Function>());
       expect(flutterxel.title, isA<Function>());
+      expect(flutterxel.perfMonitor, isA<Function>());
+      expect(flutterxel.integerScale, isA<Function>());
+      expect(flutterxel.screenMode, isA<Function>());
+      expect(flutterxel.fullscreen, isA<Function>());
       expect(flutterxel.camera, isA<Function>());
       expect(flutterxel.clip, isA<Function>());
       expect(flutterxel.pal, isA<Function>());
@@ -393,4 +398,18 @@ void main() {
 
     expect(() => flutterxel.title('Flutterxel Game'), returnsNormally);
   });
+
+  test(
+    'perfMonitor/integerScale/screenMode/fullscreen are callable and reset clears runtime state',
+    () {
+      flutterxel.init(8, 8);
+      expect(() => flutterxel.perfMonitor(true), returnsNormally);
+      expect(() => flutterxel.integerScale(true), returnsNormally);
+      expect(() => flutterxel.screenMode(1), returnsNormally);
+      expect(() => flutterxel.fullscreen(true), returnsNormally);
+
+      flutterxel.reset();
+      expect(() => flutterxel.cls(0), throwsStateError);
+    },
+  );
 }

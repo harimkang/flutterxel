@@ -28,6 +28,10 @@ typedef struct FlutterxelState {
   int32_t height;
   uint64_t frame_count;
   char title[256];
+  bool perf_monitor_enabled;
+  bool integer_scale_enabled;
+  int32_t screen_mode;
+  bool fullscreen_enabled;
   int32_t clear_color;
   int32_t camera_x;
   int32_t camera_y;
@@ -274,6 +278,10 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.height = height;
   g_state.frame_count = 0;
   memset(g_state.title, 0, sizeof(g_state.title));
+  g_state.perf_monitor_enabled = false;
+  g_state.integer_scale_enabled = true;
+  g_state.screen_mode = 0;
+  g_state.fullscreen_enabled = false;
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -312,6 +320,10 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.height = 0;
   g_state.frame_count = 0;
   memset(g_state.title, 0, sizeof(g_state.title));
+  g_state.perf_monitor_enabled = false;
+  g_state.integer_scale_enabled = true;
+  g_state.screen_mode = 0;
+  g_state.fullscreen_enabled = false;
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -383,6 +395,45 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_title(const char* title) {
   }
   strncpy(g_state.title, title, sizeof(g_state.title) - 1);
   g_state.title[sizeof(g_state.title) - 1] = '\0';
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_reset(void) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  return flutterxel_core_quit();
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_perf_monitor(bool enabled) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.perf_monitor_enabled = enabled;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_integer_scale(bool enabled) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.integer_scale_enabled = enabled;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_screen_mode(int32_t scr) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.screen_mode = scr;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_fullscreen(bool enabled) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.fullscreen_enabled = enabled;
   return true;
 }
 

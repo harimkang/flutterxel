@@ -12,6 +12,11 @@ SYMBOLS=(
   flutterxel_core_flip
   flutterxel_core_show
   flutterxel_core_title
+  flutterxel_core_reset
+  flutterxel_core_perf_monitor
+  flutterxel_core_integer_scale
+  flutterxel_core_screen_mode
+  flutterxel_core_fullscreen
   flutterxel_core_btn
   flutterxel_core_btnp
   flutterxel_core_btnr

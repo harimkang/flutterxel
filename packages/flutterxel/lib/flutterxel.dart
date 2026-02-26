@@ -90,6 +90,10 @@ int _fallbackClipW = 0;
 int _fallbackClipH = 0;
 bool _fallbackMouseVisible = true;
 String _fallbackTitle = '';
+bool _fallbackPerfMonitorEnabled = false;
+bool _fallbackIntegerScaleEnabled = true;
+int _fallbackScreenMode = 0;
+bool _fallbackFullscreenEnabled = false;
 List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
 int _fallbackImageBankSize = 16;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
@@ -356,6 +360,10 @@ void init(
     _fallbackClipH = height;
     _fallbackMouseVisible = true;
     _fallbackTitle = title ?? '';
+    _fallbackPerfMonitorEnabled = false;
+    _fallbackIntegerScaleEnabled = true;
+    _fallbackScreenMode = 0;
+    _fallbackFullscreenEnabled = false;
     _fallbackPaletteMap = List<int>.generate(16, (index) => index);
     _seedFallbackResources();
     _fallbackRngState = _fallbackRngDefaultState;
@@ -379,6 +387,10 @@ void quit() {
     throw StateError('flutterxel_core_quit failed.');
   }
 
+  _clearLocalRuntimeState();
+}
+
+void _clearLocalRuntimeState() {
   width = 0;
   height = 0;
   frameCount = 0;
@@ -398,6 +410,10 @@ void quit() {
   _fallbackClipH = 0;
   _fallbackMouseVisible = true;
   _fallbackTitle = '';
+  _fallbackPerfMonitorEnabled = false;
+  _fallbackIntegerScaleEnabled = true;
+  _fallbackScreenMode = 0;
+  _fallbackFullscreenEnabled = false;
   _fallbackPaletteMap = List<int>.generate(16, (index) => index);
   _fallbackImageBankSize = 16;
   _fallbackImageBanks.clear();
@@ -405,6 +421,20 @@ void quit() {
   _fallbackRngState = _fallbackRngDefaultState;
   _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
   _isInitialized = false;
+}
+
+/// Pyxel-compatible reset API.
+void reset() {
+  _ensureInitialized('reset');
+  stopRunLoop();
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_reset() ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_reset failed.');
+  }
+
+  _clearLocalRuntimeState();
 }
 
 /// Pyxel-compatible run API.
@@ -485,6 +515,66 @@ void title(String value) {
   }
 }
 
+/// Pyxel-compatible perf_monitor API.
+void perfMonitor(bool enabled) {
+  _ensureInitialized('perf_monitor');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_perf_monitor(enabled) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_perf_monitor failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackPerfMonitorEnabled = enabled;
+  }
+}
+
+/// Pyxel-compatible integer_scale API.
+void integerScale(bool enabled) {
+  _ensureInitialized('integer_scale');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_integer_scale(enabled) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_integer_scale failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackIntegerScaleEnabled = enabled;
+  }
+}
+
+/// Pyxel-compatible screen_mode API.
+void screenMode(int scr) {
+  _ensureInitialized('screen_mode');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_screen_mode(scr) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_screen_mode failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackScreenMode = scr;
+  }
+}
+
+/// Pyxel-compatible fullscreen API.
+void fullscreen(bool enabled) {
+  _ensureInitialized('fullscreen');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_fullscreen(enabled) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_fullscreen failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackFullscreenEnabled = enabled;
+  }
+}
+
 void _clearTransientInputValues() {
   if (!_isInitialized) {
     return;
@@ -500,6 +590,10 @@ void _clearTransientInputValues() {
 bool get isRunning => _runLoopTimer?.isActive ?? false;
 bool get isMouseVisible => _fallbackMouseVisible;
 String get runtimeTitle => _fallbackTitle;
+bool get isPerfMonitorEnabled => _fallbackPerfMonitorEnabled;
+bool get isIntegerScaleEnabled => _fallbackIntegerScaleEnabled;
+int get runtimeScreenMode => _fallbackScreenMode;
+bool get isFullscreenEnabled => _fallbackFullscreenEnabled;
 
 void stopRunLoop() {
   _runLoopTimer?.cancel();

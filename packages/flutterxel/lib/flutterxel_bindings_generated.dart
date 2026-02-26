@@ -169,6 +169,59 @@ class FlutterxelBindings {
   late final _flutterxel_core_title = _flutterxel_core_titlePtr
       .asFunction<bool Function(ffi.Pointer<ffi.Char>)>();
 
+  bool flutterxel_core_reset() {
+    return _flutterxel_core_reset();
+  }
+
+  late final _flutterxel_core_resetPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function()>>('flutterxel_core_reset');
+  late final _flutterxel_core_reset = _flutterxel_core_resetPtr
+      .asFunction<bool Function()>();
+
+  bool flutterxel_core_perf_monitor(bool enabled) {
+    return _flutterxel_core_perf_monitor(enabled);
+  }
+
+  late final _flutterxel_core_perf_monitorPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Bool)>>(
+        'flutterxel_core_perf_monitor',
+      );
+  late final _flutterxel_core_perf_monitor = _flutterxel_core_perf_monitorPtr
+      .asFunction<bool Function(bool)>();
+
+  bool flutterxel_core_integer_scale(bool enabled) {
+    return _flutterxel_core_integer_scale(enabled);
+  }
+
+  late final _flutterxel_core_integer_scalePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Bool)>>(
+        'flutterxel_core_integer_scale',
+      );
+  late final _flutterxel_core_integer_scale = _flutterxel_core_integer_scalePtr
+      .asFunction<bool Function(bool)>();
+
+  bool flutterxel_core_screen_mode(int scr) {
+    return _flutterxel_core_screen_mode(scr);
+  }
+
+  late final _flutterxel_core_screen_modePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_screen_mode',
+      );
+  late final _flutterxel_core_screen_mode = _flutterxel_core_screen_modePtr
+      .asFunction<bool Function(int)>();
+
+  bool flutterxel_core_fullscreen(bool enabled) {
+    return _flutterxel_core_fullscreen(enabled);
+  }
+
+  late final _flutterxel_core_fullscreenPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Bool)>>(
+        'flutterxel_core_fullscreen',
+      );
+  late final _flutterxel_core_fullscreen = _flutterxel_core_fullscreenPtr
+      .asFunction<bool Function(bool)>();
+
   int flutterxel_core_frame_count() {
     return _flutterxel_core_frame_count();
   }

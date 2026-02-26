@@ -96,6 +96,10 @@ struct RuntimeState {
     display_scale: Option<i32>,
     capture_scale: Option<i32>,
     capture_sec: Option<i32>,
+    perf_monitor_enabled: bool,
+    integer_scale_enabled: bool,
+    screen_mode: i32,
+    fullscreen_enabled: bool,
     clear_color: i32,
     camera_x: i32,
     camera_y: i32,
@@ -137,6 +141,10 @@ impl Default for RuntimeState {
             display_scale: None,
             capture_scale: None,
             capture_sec: None,
+            perf_monitor_enabled: false,
+            integer_scale_enabled: true,
+            screen_mode: 0,
+            fullscreen_enabled: false,
             clear_color: 0,
             camera_x: 0,
             camera_y: 0,
@@ -1509,6 +1517,10 @@ pub extern "C" fn flutterxel_core_init(
     state.display_scale = decode_optional_i32(display_scale);
     state.capture_scale = decode_optional_i32(capture_scale);
     state.capture_sec = decode_optional_i32(capture_sec);
+    state.perf_monitor_enabled = false;
+    state.integer_scale_enabled = true;
+    state.screen_mode = 0;
+    state.fullscreen_enabled = false;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1555,6 +1567,10 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.display_scale = None;
     state.capture_scale = None;
     state.capture_sec = None;
+    state.perf_monitor_enabled = false;
+    state.integer_scale_enabled = true;
+    state.screen_mode = 0;
+    state.fullscreen_enabled = false;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1638,6 +1654,96 @@ pub extern "C" fn flutterxel_core_title(title: *const c_char) -> bool {
         return false;
     }
     state.title = Some(value.to_string());
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_reset() -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    state.initialized = false;
+    state.width = 0;
+    state.height = 0;
+    state.frame_count = 0;
+    state.title = None;
+    state.fps = None;
+    state.quit_key = None;
+    state.display_scale = None;
+    state.capture_scale = None;
+    state.capture_sec = None;
+    state.perf_monitor_enabled = false;
+    state.integer_scale_enabled = true;
+    state.screen_mode = 0;
+    state.fullscreen_enabled = false;
+    state.clear_color = 0;
+    state.camera_x = 0;
+    state.camera_y = 0;
+    state.clip_x = 0;
+    state.clip_y = 0;
+    state.clip_w = 0;
+    state.clip_h = 0;
+    state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    state.pressed_keys.clear();
+    state.pressed_key_frame.clear();
+    state.released_key_frame.clear();
+    state.input_values.clear();
+    state.mouse_visible = true;
+    state.frame_buffer.clear();
+    state.image_banks.clear();
+    state.image_bank_size = 16;
+    state.tilemaps.clear();
+    state.sounds.clear();
+    state.musics.clear();
+    state.channel_playback.clear();
+    state.rng_state = RNG_DEFAULT_STATE;
+    state.noise_seed = NOISE_DEFAULT_SEED;
+    state.last_blt = None;
+    state.last_play = None;
+    state.last_loaded = None;
+    state.last_saved = None;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_perf_monitor(enabled: bool) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.perf_monitor_enabled = enabled;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_integer_scale(enabled: bool) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.integer_scale_enabled = enabled;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_screen_mode(scr: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.screen_mode = scr;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_fullscreen(enabled: bool) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.fullscreen_enabled = enabled;
     true
 }
 
@@ -2924,6 +3030,29 @@ mod tests {
         assert!(flutterxel_core_title(title.as_ptr()));
         let state = runtime_state().lock().expect("runtime state poisoned");
         assert_eq!(state.title.as_deref(), Some("Flutterxel Game"));
+    }
+
+    #[test]
+    fn runtime_control_apis_update_flags_and_reset_clears_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_perf_monitor(true));
+        assert!(flutterxel_core_integer_scale(false));
+        assert!(flutterxel_core_screen_mode(2));
+        assert!(flutterxel_core_fullscreen(true));
+
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert!(state.perf_monitor_enabled);
+            assert!(!state.integer_scale_enabled);
+            assert_eq!(state.screen_mode, 2);
+            assert!(state.fullscreen_enabled);
+        }
+
+        assert!(flutterxel_core_reset());
+        assert_eq!(flutterxel_core_frame_count(), 0);
+        assert!(!flutterxel_core_show());
     }
 
     #[test]
