@@ -3995,18 +3995,129 @@ final List<Channel> channels = List<Channel>.unmodifiable(
   List<Channel>.generate(NUM_CHANNELS, Channel._, growable: false),
 );
 
-List<int> _parseSoundField(String source) {
-  final trimmed = source.trim();
-  if (trimmed.isEmpty) {
-    return const <int>[];
+String _simplifySoundString(String source) {
+  return source.replaceAll(RegExp(r'[\s\t\r\n]+'), '').toLowerCase();
+}
+
+List<int> _parseSoundNotes(String notes) {
+  final source = _simplifySoundString(notes);
+  final parsed = <int>[];
+  var i = 0;
+  while (i < source.length) {
+    final c = source[i];
+    if (c == 'r') {
+      parsed.add(-1);
+      i += 1;
+      continue;
+    }
+
+    int? base;
+    switch (c) {
+      case 'c':
+        base = 0;
+      case 'd':
+        base = 2;
+      case 'e':
+        base = 4;
+      case 'f':
+        base = 5;
+      case 'g':
+        base = 7;
+      case 'a':
+        base = 9;
+      case 'b':
+        base = 11;
+      default:
+        throw FormatException("Invalid sound note '$c'.");
+    }
+    i += 1;
+
+    if (i < source.length) {
+      final accidental = source[i];
+      if (accidental == '#') {
+        base += 1;
+        i += 1;
+      } else if (accidental == '-') {
+        base -= 1;
+        i += 1;
+      }
+    }
+
+    if (i >= source.length) {
+      throw const FormatException('Invalid sound note: missing octave.');
+    }
+    final octave = source.codeUnitAt(i) - 0x30;
+    if (octave < 0 || octave > 4) {
+      throw FormatException("Invalid sound note '${source[i]}'.");
+    }
+    i += 1;
+    parsed.add(base + octave * 12);
   }
-  final tokens = trimmed.split(RegExp(r'[\s,]+'));
-  if (tokens.length > 1) {
-    return tokens
-        .map((token) => int.tryParse(token) ?? token.runes.first)
-        .toList();
+  return parsed;
+}
+
+List<int> _parseSoundTones(String tones) {
+  final source = _simplifySoundString(tones);
+  final parsed = <int>[];
+  for (var i = 0; i < source.length; i++) {
+    final c = source[i];
+    switch (c) {
+      case 't':
+        parsed.add(TONE_TRIANGLE);
+      case 's':
+        parsed.add(TONE_SQUARE);
+      case 'p':
+        parsed.add(TONE_PULSE);
+      case 'n':
+        parsed.add(TONE_NOISE);
+      default:
+        final digit = int.tryParse(c);
+        if (digit == null) {
+          throw FormatException("Invalid sound tone '$c'.");
+        }
+        parsed.add(digit);
+    }
   }
-  return trimmed.runes.toList(growable: false);
+  return parsed;
+}
+
+List<int> _parseSoundVolumes(String volumes) {
+  final source = _simplifySoundString(volumes);
+  final parsed = <int>[];
+  for (var i = 0; i < source.length; i++) {
+    final c = source[i];
+    final digit = int.tryParse(c);
+    if (digit == null || digit < 0 || digit > 7) {
+      throw FormatException("Invalid sound volume '$c'.");
+    }
+    parsed.add(digit);
+  }
+  return parsed;
+}
+
+List<int> _parseSoundEffects(String effects) {
+  final source = _simplifySoundString(effects);
+  final parsed = <int>[];
+  for (var i = 0; i < source.length; i++) {
+    final c = source[i];
+    switch (c) {
+      case 'n':
+        parsed.add(EFFECT_NONE);
+      case 's':
+        parsed.add(EFFECT_SLIDE);
+      case 'v':
+        parsed.add(EFFECT_VIBRATO);
+      case 'f':
+        parsed.add(EFFECT_FADEOUT);
+      case 'h':
+        parsed.add(EFFECT_HALF_FADEOUT);
+      case 'q':
+        parsed.add(EFFECT_QUARTER_FADEOUT);
+      default:
+        throw FormatException("Invalid sound effect '$c'.");
+    }
+  }
+  return parsed;
 }
 
 class Tone {
@@ -4041,6 +4152,7 @@ class Sound {
   late final Seq<int> volumes;
   late final Seq<int> effects;
   int speed = 30;
+  String? _mmlCode;
 
   void set(
     String notes,
@@ -4059,31 +4171,49 @@ class Sound {
   void set_notes(String notes) {
     _notesData
       ..clear()
-      ..addAll(_parseSoundField(notes));
+      ..addAll(_parseSoundNotes(notes));
+  }
+
+  void note(String notes) {
+    set_notes(notes);
   }
 
   void set_tones(String tones) {
     _tonesData
       ..clear()
-      ..addAll(_parseSoundField(tones));
+      ..addAll(_parseSoundTones(tones));
+  }
+
+  void tone(String tones) {
+    set_tones(tones);
   }
 
   void set_volumes(String volumes) {
     _volumesData
       ..clear()
-      ..addAll(_parseSoundField(volumes));
+      ..addAll(_parseSoundVolumes(volumes));
+  }
+
+  void volume(String volumes) {
+    set_volumes(volumes);
   }
 
   void set_effects(String effects) {
     _effectsData
       ..clear()
-      ..addAll(_parseSoundField(effects));
+      ..addAll(_parseSoundEffects(effects));
+  }
+
+  void effect(String effects) {
+    set_effects(effects);
   }
 
   void mml([String? code, bool? old_syntax]) {
-    if (code != null) {
-      set_notes(code);
+    if (code == null) {
+      _mmlCode = null;
+      return;
     }
+    _mmlCode = code;
   }
 
   void pcm([String? filename]) {}
@@ -4091,6 +4221,9 @@ class Sound {
   void save(String filename, double sec, {bool? ffmpeg}) {}
 
   double? total_sec() {
+    if (_mmlCode != null) {
+      return null;
+    }
     if (speed <= 0 || _notesData.isEmpty) {
       return null;
     }

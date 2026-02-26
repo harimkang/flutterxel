@@ -268,9 +268,9 @@ void main() {
 
     final sound0 = flutterxel.sounds.first;
     sound0.set_notes('c3e3g3');
-    sound0.set_tones('0123');
+    sound0.set_tones('tspn');
     sound0.set_volumes('7654');
-    sound0.set_effects('0123');
+    sound0.set_effects('nsvf');
     expect(sound0.notes.isNotEmpty, isTrue);
     expect(sound0.total_sec(), isA<double>());
 
@@ -281,6 +281,43 @@ void main() {
     final generated = flutterxel.gen_bgm(0, 0, seed: 7, play: true);
     expect(generated.length, flutterxel.NUM_CHANNELS);
     expect(flutterxel.isChannelPlaying(0), isTrue);
+  });
+
+  test('sound parsing helpers and mml mode update runtime sound state', () {
+    flutterxel.init(8, 8);
+    final sound = flutterxel.Sound();
+
+    sound.set('c3 d#3 e-3 r', 'tspn', '7654', 'nsvf', 24);
+    expect(sound.notes.toList(), <int>[36, 39, 39, -1]);
+    expect(sound.tones.toList(), <int>[0, 1, 2, 3]);
+    expect(sound.volumes.toList(), <int>[7, 6, 5, 4]);
+    expect(sound.effects.toList(), <int>[0, 1, 2, 3]);
+    expect(sound.speed, 24);
+
+    sound.note('g2 b-2 d3 r');
+    expect(sound.notes.toList(), <int>[31, 34, 38, -1]);
+
+    sound.tone('TSPN0123');
+    expect(sound.tones.toList(), <int>[0, 1, 2, 3, 0, 1, 2, 3]);
+
+    sound.volume('7 5 3 1');
+    expect(sound.volumes.toList(), <int>[7, 5, 3, 1]);
+
+    sound.effect('N S V F H Q');
+    expect(sound.effects.toList(), <int>[0, 1, 2, 3, 4, 5]);
+
+    sound.set_notes('c3c3');
+    sound.speed = 2;
+    expect(sound.total_sec(), 1.0);
+    sound.mml('T120 CDE');
+    expect(sound.total_sec(), isNull);
+    sound.mml();
+    expect(sound.total_sec(), 1.0);
+
+    expect(() => sound.set_notes('c'), throwsFormatException);
+    expect(() => sound.set_tones('x'), throwsFormatException);
+    expect(() => sound.set_volumes('9'), throwsFormatException);
+    expect(() => sound.set_effects('z'), throwsFormatException);
   });
 
   test('tilemap primitives, blt and collide update tile data', () {
