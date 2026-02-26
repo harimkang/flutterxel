@@ -725,6 +725,112 @@ class FlutterxelBindings {
         )
       >();
 
+  bool flutterxel_core_sound_set_notes(
+    int snd,
+    ffi.Pointer<ffi.Int32> notes_ptr,
+    int notes_len,
+  ) {
+    return _flutterxel_core_sound_set_notes(snd, notes_ptr, notes_len);
+  }
+
+  late final _flutterxel_core_sound_set_notesPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Pointer<ffi.Int32>, ffi.Size)
+        >
+      >('flutterxel_core_sound_set_notes');
+  late final _flutterxel_core_sound_set_notes =
+      _flutterxel_core_sound_set_notesPtr
+          .asFunction<bool Function(int, ffi.Pointer<ffi.Int32>, int)>();
+
+  bool flutterxel_core_sound_set_tones(
+    int snd,
+    ffi.Pointer<ffi.Int32> tones_ptr,
+    int tones_len,
+  ) {
+    return _flutterxel_core_sound_set_tones(snd, tones_ptr, tones_len);
+  }
+
+  late final _flutterxel_core_sound_set_tonesPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Pointer<ffi.Int32>, ffi.Size)
+        >
+      >('flutterxel_core_sound_set_tones');
+  late final _flutterxel_core_sound_set_tones =
+      _flutterxel_core_sound_set_tonesPtr
+          .asFunction<bool Function(int, ffi.Pointer<ffi.Int32>, int)>();
+
+  bool flutterxel_core_sound_set_volumes(
+    int snd,
+    ffi.Pointer<ffi.Int32> volumes_ptr,
+    int volumes_len,
+  ) {
+    return _flutterxel_core_sound_set_volumes(snd, volumes_ptr, volumes_len);
+  }
+
+  late final _flutterxel_core_sound_set_volumesPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Pointer<ffi.Int32>, ffi.Size)
+        >
+      >('flutterxel_core_sound_set_volumes');
+  late final _flutterxel_core_sound_set_volumes =
+      _flutterxel_core_sound_set_volumesPtr
+          .asFunction<bool Function(int, ffi.Pointer<ffi.Int32>, int)>();
+
+  bool flutterxel_core_sound_set_effects(
+    int snd,
+    ffi.Pointer<ffi.Int32> effects_ptr,
+    int effects_len,
+  ) {
+    return _flutterxel_core_sound_set_effects(snd, effects_ptr, effects_len);
+  }
+
+  late final _flutterxel_core_sound_set_effectsPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Pointer<ffi.Int32>, ffi.Size)
+        >
+      >('flutterxel_core_sound_set_effects');
+  late final _flutterxel_core_sound_set_effects =
+      _flutterxel_core_sound_set_effectsPtr
+          .asFunction<bool Function(int, ffi.Pointer<ffi.Int32>, int)>();
+
+  bool flutterxel_core_sound_set_speed(int snd, int speed) {
+    return _flutterxel_core_sound_set_speed(snd, speed);
+  }
+
+  late final _flutterxel_core_sound_set_speedPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_sound_set_speed',
+      );
+  late final _flutterxel_core_sound_set_speed =
+      _flutterxel_core_sound_set_speedPtr.asFunction<bool Function(int, int)>();
+
+  bool flutterxel_core_music_set_seq(
+    int msc,
+    int ch,
+    ffi.Pointer<ffi.Int32> seq_ptr,
+    int seq_len,
+  ) {
+    return _flutterxel_core_music_set_seq(msc, ch, seq_ptr, seq_len);
+  }
+
+  late final _flutterxel_core_music_set_seqPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.Int32>,
+            ffi.Size,
+          )
+        >
+      >('flutterxel_core_music_set_seq');
+  late final _flutterxel_core_music_set_seq = _flutterxel_core_music_set_seqPtr
+      .asFunction<bool Function(int, int, ffi.Pointer<ffi.Int32>, int)>();
+
   bool flutterxel_core_play(
     int ch,
     int snd_kind,

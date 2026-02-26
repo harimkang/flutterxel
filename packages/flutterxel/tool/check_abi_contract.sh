@@ -46,6 +46,12 @@ SYMBOLS=(
   flutterxel_core_text
   flutterxel_core_bltm
   flutterxel_core_blt
+  flutterxel_core_sound_set_notes
+  flutterxel_core_sound_set_tones
+  flutterxel_core_sound_set_volumes
+  flutterxel_core_sound_set_effects
+  flutterxel_core_sound_set_speed
+  flutterxel_core_music_set_seq
   flutterxel_core_play
   flutterxel_core_playm
   flutterxel_core_stop

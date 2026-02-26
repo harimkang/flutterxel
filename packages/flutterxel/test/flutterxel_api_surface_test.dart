@@ -71,6 +71,13 @@ String _writeTestPcm16Wav(
   return file.path;
 }
 
+bool _hasCommand(String command) {
+  final result = Platform.isWindows
+      ? Process.runSync('where', <String>[command], runInShell: true)
+      : Process.runSync('sh', <String>['-lc', 'command -v $command']);
+  return result.exitCode == 0;
+}
+
 void main() {
   tearDown(() {
     flutterxel.stopRunLoop();
@@ -440,6 +447,90 @@ void main() {
     expect(musicBytes.length, greaterThanOrEqualTo(44));
     expect(String.fromCharCodes(musicBytes.sublist(0, 4)), 'RIFF');
     expect(String.fromCharCodes(musicBytes.sublist(8, 12)), 'WAVE');
+  });
+
+  test(
+    'sound save with ffmpeg true produces mp4 or throws when unavailable',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync('flutterxel-ffmpeg-');
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final sound = flutterxel.Sound();
+      sound.set_notes('c3');
+      sound.speed = 30;
+      final wavBase = '${tempDir.path}/sound_capture.wav';
+      final mp4Path = '${tempDir.path}/sound_capture.mp4';
+
+      if (_hasCommand('ffmpeg')) {
+        sound.save(wavBase, 0.05, ffmpeg: true);
+        expect(File(wavBase).existsSync(), isTrue);
+        expect(File(mp4Path).existsSync(), isTrue);
+      } else {
+        expect(
+          () => sound.save(wavBase, 0.05, ffmpeg: true),
+          throwsA(isA<UnsupportedError>()),
+        );
+      }
+    },
+  );
+
+  test(
+    'sound pcm can read compressed audio duration when ffmpeg is available',
+    () {
+      if (!_hasCommand('ffmpeg')) {
+        return;
+      }
+
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync(
+        'flutterxel-compressed-',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final wavPath = _writeTestPcm16Wav(
+        tempDir,
+        name: 'source.wav',
+        sampleRate: 22050,
+        channels: 1,
+        frames: 2205,
+      );
+      final mp3Path = '${tempDir.path}/source.mp3';
+      final encode = Process.runSync('ffmpeg', <String>[
+        '-y',
+        '-v',
+        'error',
+        '-i',
+        wavPath,
+        mp3Path,
+      ]);
+      if (encode.exitCode != 0 || !File(mp3Path).existsSync()) {
+        return;
+      }
+
+      final sound = flutterxel.Sound();
+      sound.pcm(mp3Path);
+      expect(sound.total_sec(), closeTo(0.1, 0.02));
+    },
+  );
+
+  test('old mml tokens x/X/~ are accepted for duration parsing', () {
+    flutterxel.init(8, 8);
+    final sound = flutterxel.Sound();
+
+    sound.mml('T120 X2 C~C');
+    expect(sound.total_sec(), closeTo(0.99997, 1e-4));
+
+    sound.mml('t120 x1 c~r', true);
+    expect(sound.total_sec(), closeTo(0.99997, 1e-4));
   });
 
   test('tilemap primitives, blt and collide update tile data', () {

@@ -85,6 +85,20 @@ struct MusicResource {
     seqs: Vec<Vec<i32>>,
 }
 
+fn default_sound_resource() -> SoundResource {
+    SoundResource {
+        notes: Vec::new(),
+        tones: Vec::new(),
+        volumes: Vec::new(),
+        effects: Vec::new(),
+        speed: 30,
+    }
+}
+
+fn default_music_resource() -> MusicResource {
+    MusicResource { seqs: Vec::new() }
+}
+
 #[derive(Debug)]
 struct RuntimeState {
     initialized: bool,
@@ -819,13 +833,7 @@ fn build_resource_sounds_value(state: &RuntimeState, exclude_sounds: bool) -> Op
             .sounds
             .get(&sound_index)
             .cloned()
-            .unwrap_or(SoundResource {
-                notes: Vec::new(),
-                tones: Vec::new(),
-                volumes: Vec::new(),
-                effects: Vec::new(),
-                speed: 30,
-            });
+            .unwrap_or_else(default_sound_resource);
 
         let mut table = toml::map::Map::new();
         table.insert(
@@ -955,7 +963,7 @@ fn build_resource_musics_value(state: &RuntimeState, exclude_musics: bool) -> Op
             .musics
             .get(&music_index)
             .cloned()
-            .unwrap_or(MusicResource { seqs: Vec::new() });
+            .unwrap_or_else(default_music_resource);
 
         let mut table = toml::map::Map::new();
         table.insert(
@@ -2291,6 +2299,169 @@ pub extern "C" fn flutterxel_core_blt(
         state.last_blt = Some(call);
     }
     ok
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sound_set_notes(
+    snd: i32,
+    notes_ptr: *const i32,
+    notes_len: usize,
+) -> bool {
+    let notes = if notes_len == 0 {
+        &[][..]
+    } else {
+        if notes_ptr.is_null() {
+            return false;
+        }
+        unsafe { std::slice::from_raw_parts(notes_ptr, notes_len) }
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || snd < 0 {
+        return false;
+    }
+
+    let sound = state
+        .sounds
+        .entry(snd)
+        .or_insert_with(default_sound_resource);
+    sound.notes = notes.to_vec();
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sound_set_tones(
+    snd: i32,
+    tones_ptr: *const i32,
+    tones_len: usize,
+) -> bool {
+    let tones = if tones_len == 0 {
+        &[][..]
+    } else {
+        if tones_ptr.is_null() {
+            return false;
+        }
+        unsafe { std::slice::from_raw_parts(tones_ptr, tones_len) }
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || snd < 0 {
+        return false;
+    }
+
+    let sound = state
+        .sounds
+        .entry(snd)
+        .or_insert_with(default_sound_resource);
+    sound.tones = tones.to_vec();
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sound_set_volumes(
+    snd: i32,
+    volumes_ptr: *const i32,
+    volumes_len: usize,
+) -> bool {
+    let volumes = if volumes_len == 0 {
+        &[][..]
+    } else {
+        if volumes_ptr.is_null() {
+            return false;
+        }
+        unsafe { std::slice::from_raw_parts(volumes_ptr, volumes_len) }
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || snd < 0 {
+        return false;
+    }
+
+    let sound = state
+        .sounds
+        .entry(snd)
+        .or_insert_with(default_sound_resource);
+    sound.volumes = volumes.to_vec();
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sound_set_effects(
+    snd: i32,
+    effects_ptr: *const i32,
+    effects_len: usize,
+) -> bool {
+    let effects = if effects_len == 0 {
+        &[][..]
+    } else {
+        if effects_ptr.is_null() {
+            return false;
+        }
+        unsafe { std::slice::from_raw_parts(effects_ptr, effects_len) }
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || snd < 0 {
+        return false;
+    }
+
+    let sound = state
+        .sounds
+        .entry(snd)
+        .or_insert_with(default_sound_resource);
+    sound.effects = effects.to_vec();
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sound_set_speed(snd: i32, speed: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || snd < 0 || speed < 0 {
+        return false;
+    }
+
+    let sound = state
+        .sounds
+        .entry(snd)
+        .or_insert_with(default_sound_resource);
+    sound.speed = speed;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_music_set_seq(
+    msc: i32,
+    ch: i32,
+    seq_ptr: *const i32,
+    seq_len: usize,
+) -> bool {
+    if !(0..4).contains(&ch) || msc < 0 {
+        return false;
+    }
+    let seq = if seq_len == 0 {
+        &[][..]
+    } else {
+        if seq_ptr.is_null() {
+            return false;
+        }
+        unsafe { std::slice::from_raw_parts(seq_ptr, seq_len) }
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    let music = state
+        .musics
+        .entry(msc)
+        .or_insert_with(default_music_resource);
+    let channel_index = ch as usize;
+    while music.seqs.len() <= channel_index {
+        music.seqs.push(Vec::new());
+    }
+    music.seqs[channel_index] = seq.to_vec();
+    true
 }
 
 #[no_mangle]
@@ -4039,5 +4210,83 @@ mod tests {
         assert!(flutterxel_core_stop(OPTIONAL_I32_NONE));
         assert!(!flutterxel_core_is_channel_playing(1));
         assert!(!flutterxel_core_is_channel_playing(2));
+    }
+
+    #[test]
+    fn sound_resource_mutation_abi_updates_runtime_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        let notes = [12, 24, -1];
+        let tones = [0, 1, 2];
+        let volumes = [7, 6, 5];
+        let effects = [0, 2, 3];
+        assert!(flutterxel_core_sound_set_notes(
+            5,
+            notes.as_ptr(),
+            notes.len()
+        ));
+        assert!(flutterxel_core_sound_set_tones(
+            5,
+            tones.as_ptr(),
+            tones.len()
+        ));
+        assert!(flutterxel_core_sound_set_volumes(
+            5,
+            volumes.as_ptr(),
+            volumes.len()
+        ));
+        assert!(flutterxel_core_sound_set_effects(
+            5,
+            effects.as_ptr(),
+            effects.len()
+        ));
+        assert!(flutterxel_core_sound_set_speed(5, 42));
+
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            let sound = state.sounds.get(&5).expect("sound should exist");
+            assert_eq!(sound.notes, notes);
+            assert_eq!(sound.tones, tones);
+            assert_eq!(sound.volumes, volumes);
+            assert_eq!(sound.effects, effects);
+            assert_eq!(sound.speed, 42);
+        }
+
+        assert!(!flutterxel_core_sound_set_notes(5, std::ptr::null(), 1));
+    }
+
+    #[test]
+    fn music_resource_mutation_abi_updates_runtime_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        let seq0 = [1, 3, 5];
+        let seq2 = [2, 4];
+        assert!(flutterxel_core_music_set_seq(
+            2,
+            0,
+            seq0.as_ptr(),
+            seq0.len()
+        ));
+        assert!(flutterxel_core_music_set_seq(
+            2,
+            2,
+            seq2.as_ptr(),
+            seq2.len()
+        ));
+        assert!(flutterxel_core_music_set_seq(2, 3, std::ptr::null(), 0));
+
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            let music = state.musics.get(&2).expect("music should exist");
+            assert_eq!(music.seqs.len(), 4);
+            assert_eq!(music.seqs[0], seq0);
+            assert_eq!(music.seqs[1], Vec::<i32>::new());
+            assert_eq!(music.seqs[2], seq2);
+            assert_eq!(music.seqs[3], Vec::<i32>::new());
+        }
+
+        assert!(!flutterxel_core_music_set_seq(2, 1, std::ptr::null(), 2));
     }
 }

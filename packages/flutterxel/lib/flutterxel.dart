@@ -4288,7 +4288,9 @@ int _parseMmlLengthAsTicks(_MmlCharStream stream, int currentNoteTicks) {
   return noteTicks;
 }
 
-List<_MmlEvent> _parseMmlEvents(String code) {
+bool _looksLikeOldMml(String code) => RegExp(r'[xX~]').hasMatch(code);
+
+List<_MmlEvent> _parseMmlEvents(String code, {bool oldSyntax = false}) {
   final stream = _MmlCharStream(code);
   final events = <_MmlEvent>[];
   var octave = _mmlDefaultOctave;
@@ -4388,6 +4390,10 @@ List<_MmlEvent> _parseMmlEvents(String code) {
       stream.parseRequiredInt('tone', min: 0);
       continue;
     }
+    if (oldSyntax && stream.consumeStringIgnoreCase('X')) {
+      stream.parseRequiredInt('tone', min: 0);
+      continue;
+    }
     if (stream.consumeStringIgnoreCase('O')) {
       octave = stream.parseRequiredInt('oct', min: -1, max: 9);
       continue;
@@ -4425,7 +4431,8 @@ List<_MmlEvent> _parseMmlEvents(String code) {
         stream.next();
       }
       var durationTicks = _parseMmlLengthAsTicks(stream, noteTicks);
-      while (stream.consumeChar('&')) {
+      while (stream.consumeChar('&') ||
+          (oldSyntax && stream.consumeChar('~'))) {
         stream.skipWhitespace();
         final next = stream.peek();
         if (next != null) {
@@ -4445,7 +4452,8 @@ List<_MmlEvent> _parseMmlEvents(String code) {
     if (head == 'r') {
       stream.next();
       var durationTicks = _parseMmlLengthAsTicks(stream, noteTicks);
-      while (stream.consumeChar('&')) {
+      while (stream.consumeChar('&') ||
+          (oldSyntax && stream.consumeChar('~'))) {
         durationTicks += _parseMmlLengthAsTicks(stream, noteTicks);
       }
       events.add(_MmlDurationEvent(durationTicks));
@@ -4457,8 +4465,8 @@ List<_MmlEvent> _parseMmlEvents(String code) {
   return events;
 }
 
-double? _calcMmlDurationSec(String code) {
-  final events = _parseMmlEvents(code);
+double? _calcMmlDurationSec(String code, {bool oldSyntax = false}) {
+  final events = _parseMmlEvents(code, oldSyntax: oldSyntax);
   var clocksPerTick = _bpmToMmlClocksPerTick(_mmlDefaultTempo);
   var totalClocks = 0;
   final repeatPoints = <(int, int)>[];
@@ -4510,6 +4518,17 @@ int _readU32Le(List<int> bytes, int offset) {
       (bytes[offset + 1] << 8) |
       (bytes[offset + 2] << 16) |
       (bytes[offset + 3] << 24);
+}
+
+bool _commandExists(String command) {
+  try {
+    final result = Platform.isWindows
+        ? Process.runSync('where', <String>[command], runInShell: true)
+        : Process.runSync('sh', <String>['-lc', 'command -v $command']);
+    return result.exitCode == 0;
+  } catch (_) {
+    return false;
+  }
 }
 
 double _loadWavDurationSec(String filename) {
@@ -4571,6 +4590,92 @@ double _loadWavDurationSec(String filename) {
   return frameCount / sampleRate;
 }
 
+double? _probeAudioDurationWithFfprobe(String filename) {
+  if (!_commandExists('ffprobe')) {
+    return null;
+  }
+  try {
+    final result = Process.runSync('ffprobe', <String>[
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      filename,
+    ]);
+    if (result.exitCode != 0) {
+      return null;
+    }
+    final output = '${result.stdout}'.trim();
+    final duration = double.tryParse(output);
+    if (duration == null || !duration.isFinite || duration <= 0) {
+      return null;
+    }
+    return duration;
+  } catch (_) {
+    return null;
+  }
+}
+
+double? _probeAudioDurationWithFfmpegDecode(String filename) {
+  if (!_commandExists('ffmpeg')) {
+    return null;
+  }
+  final workDir = Directory.systemTemp.createTempSync(
+    'flutterxel-audio-probe-',
+  );
+  try {
+    final wavPath = '${workDir.path}${Platform.pathSeparator}decoded.wav';
+    final result = Process.runSync('ffmpeg', <String>[
+      '-y',
+      '-v',
+      'error',
+      '-i',
+      filename,
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      '22050',
+      wavPath,
+    ]);
+    if (result.exitCode != 0) {
+      return null;
+    }
+    return _loadWavDurationSec(wavPath);
+  } catch (_) {
+    return null;
+  } finally {
+    if (workDir.existsSync()) {
+      workDir.deleteSync(recursive: true);
+    }
+  }
+}
+
+double _loadAudioDurationSec(String filename) {
+  try {
+    return _loadWavDurationSec(filename);
+  } on FileSystemException {
+    rethrow;
+  } on FormatException {
+    final probedDuration =
+        _probeAudioDurationWithFfprobe(filename) ??
+        _probeAudioDurationWithFfmpegDecode(filename);
+    if (probedDuration != null) {
+      return probedDuration;
+    }
+    rethrow;
+  }
+}
+
+String _addFileExtension(String filename, String ext) {
+  if (filename.toLowerCase().endsWith(ext.toLowerCase())) {
+    return filename;
+  }
+  return '$filename$ext';
+}
+
 void _appendU16Le(BytesBuilder builder, int value) {
   builder.add(<int>[value & 0xFF, (value >> 8) & 0xFF]);
 }
@@ -4616,6 +4721,44 @@ void _writeSilentPcm16Wav(String filename, double sec) {
   File(filename).writeAsBytesSync(builder.takeBytes(), flush: true);
 }
 
+void _saveAudioCapture(String filename, double sec, {bool ffmpeg = false}) {
+  final wavPath = _addFileExtension(filename, '.wav');
+  _writeSilentPcm16Wav(wavPath, sec);
+  if (!ffmpeg) {
+    return;
+  }
+
+  if (!_commandExists('ffmpeg')) {
+    throw UnsupportedError('ffmpeg command is required when ffmpeg=true.');
+  }
+
+  final mp4Path = wavPath.toLowerCase().endsWith('.wav')
+      ? '${wavPath.substring(0, wavPath.length - 4)}.mp4'
+      : '$wavPath.mp4';
+  final result = Process.runSync('ffmpeg', <String>[
+    '-y',
+    '-v',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'color=c=black:s=480x360',
+    '-i',
+    wavPath,
+    '-c:v',
+    'libx264',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '192k',
+    '-shortest',
+    mp4Path,
+  ]);
+  if (result.exitCode != 0) {
+    throw StateError('Failed to execute ffmpeg for audio capture.');
+  }
+}
+
 class Tone {
   Tone() {
     wavetable = Seq<int>.proxy(() => _wavetableData);
@@ -4631,13 +4774,21 @@ class Tone {
 }
 
 class Sound {
-  Sound() {
+  Sound() : _soundId = null {
     notes = Seq<int>.proxy(() => _notesData);
     tones = Seq<int>.proxy(() => _tonesData);
     volumes = Seq<int>.proxy(() => _volumesData);
     effects = Seq<int>.proxy(() => _effectsData);
   }
 
+  Sound._resource(int soundId) : _soundId = soundId {
+    notes = Seq<int>.proxy(() => _notesData);
+    tones = Seq<int>.proxy(() => _tonesData);
+    volumes = Seq<int>.proxy(() => _volumesData);
+    effects = Seq<int>.proxy(() => _effectsData);
+  }
+
+  final int? _soundId;
   final List<int> _notesData = <int>[];
   final List<int> _tonesData = <int>[];
   final List<int> _volumesData = <int>[];
@@ -4647,10 +4798,67 @@ class Sound {
   late final Seq<int> tones;
   late final Seq<int> volumes;
   late final Seq<int> effects;
-  int speed = 30;
+  int _speed = 30;
+  int get speed => _speed;
+  set speed(int value) {
+    _speed = value;
+    _syncSpeedToCore();
+  }
+
   String? _mmlCode;
   double? _mmlDurationSec;
   double? _pcmDurationSec;
+
+  bool _shouldSyncToCore() =>
+      _soundId != null && _isInitialized && _getBindingsOrNull() != null;
+
+  void _syncListToCore(
+    List<int> values,
+    String apiName,
+    bool Function(FlutterxelBindings, int, ffi.Pointer<ffi.Int32>, int) invoke,
+  ) {
+    if (!_shouldSyncToCore()) {
+      return;
+    }
+    final bindings = _getBindingsOrNull();
+    final soundId = _soundId;
+    if (bindings == null || soundId == null) {
+      return;
+    }
+
+    ffi.Pointer<ffi.Int32> ptr = ffi.nullptr;
+    try {
+      if (values.isNotEmpty) {
+        ptr = calloc<ffi.Int32>(values.length);
+        for (var i = 0; i < values.length; i++) {
+          ptr[i] = values[i];
+        }
+      }
+      final ok = invoke(bindings, soundId, ptr, values.length);
+      if (!ok) {
+        throw StateError('$apiName failed.');
+      }
+    } finally {
+      if (ptr != ffi.nullptr) {
+        calloc.free(ptr);
+      }
+    }
+  }
+
+  void _syncSpeedToCore() {
+    if (!_shouldSyncToCore()) {
+      return;
+    }
+    final bindings = _getBindingsOrNull();
+    final soundId = _soundId;
+    if (bindings == null || soundId == null) {
+      return;
+    }
+    final ok = bindings.flutterxel_core_sound_set_speed(soundId, _speed);
+    if (!ok) {
+      throw StateError('flutterxel_core_sound_set_speed failed.');
+    }
+  }
 
   void set(
     String notes,
@@ -4670,6 +4878,12 @@ class Sound {
     _notesData
       ..clear()
       ..addAll(_parseSoundNotes(notes));
+    _syncListToCore(
+      _notesData,
+      'flutterxel_core_sound_set_notes',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_notes(soundId, ptr, len),
+    );
   }
 
   void note(String notes) {
@@ -4680,6 +4894,12 @@ class Sound {
     _tonesData
       ..clear()
       ..addAll(_parseSoundTones(tones));
+    _syncListToCore(
+      _tonesData,
+      'flutterxel_core_sound_set_tones',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_tones(soundId, ptr, len),
+    );
   }
 
   void tone(String tones) {
@@ -4690,6 +4910,12 @@ class Sound {
     _volumesData
       ..clear()
       ..addAll(_parseSoundVolumes(volumes));
+    _syncListToCore(
+      _volumesData,
+      'flutterxel_core_sound_set_volumes',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_volumes(soundId, ptr, len),
+    );
   }
 
   void volume(String volumes) {
@@ -4700,6 +4926,12 @@ class Sound {
     _effectsData
       ..clear()
       ..addAll(_parseSoundEffects(effects));
+    _syncListToCore(
+      _effectsData,
+      'flutterxel_core_sound_set_effects',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_effects(soundId, ptr, len),
+    );
   }
 
   void effect(String effects) {
@@ -4713,7 +4945,8 @@ class Sound {
       return;
     }
     _pcmDurationSec = null;
-    _mmlDurationSec = _calcMmlDurationSec(code);
+    final oldSyntax = old_syntax == true || _looksLikeOldMml(code);
+    _mmlDurationSec = _calcMmlDurationSec(code, oldSyntax: oldSyntax);
     _mmlCode = code;
   }
 
@@ -4722,13 +4955,13 @@ class Sound {
       _pcmDurationSec = null;
       return;
     }
-    _pcmDurationSec = _loadWavDurationSec(filename);
+    _pcmDurationSec = _loadAudioDurationSec(filename);
     _mmlCode = null;
     _mmlDurationSec = null;
   }
 
   void save(String filename, double sec, {bool? ffmpeg}) {
-    _writeSilentPcm16Wav(filename, sec);
+    _saveAudioCapture(filename, sec, ffmpeg: ffmpeg ?? false);
   }
 
   double? total_sec() {
@@ -4746,7 +4979,9 @@ class Sound {
 }
 
 class Music {
-  Music() : _seqData = List<List<int>>.generate(NUM_CHANNELS, (_) => <int>[]) {
+  Music()
+    : _musicId = null,
+      _seqData = List<List<int>>.generate(NUM_CHANNELS, (_) => <int>[]) {
     _seqViews = List<Seq<int>>.generate(
       NUM_CHANNELS,
       (index) => Seq<int>.proxy(() => _seqData[index]),
@@ -4754,9 +4989,57 @@ class Music {
     seqs = Seq<Seq<int>>.proxy(() => _seqViews);
   }
 
+  Music._resource(int musicId)
+    : _musicId = musicId,
+      _seqData = List<List<int>>.generate(NUM_CHANNELS, (_) => <int>[]) {
+    _seqViews = List<Seq<int>>.generate(
+      NUM_CHANNELS,
+      (index) => Seq<int>.proxy(() => _seqData[index]),
+    );
+    seqs = Seq<Seq<int>>.proxy(() => _seqViews);
+  }
+
+  final int? _musicId;
   final List<List<int>> _seqData;
   late final List<Seq<int>> _seqViews;
   late final Seq<Seq<int>> seqs;
+
+  bool _shouldSyncToCore() =>
+      _musicId != null && _isInitialized && _getBindingsOrNull() != null;
+
+  void _syncSeqToCore(int channel) {
+    if (!_shouldSyncToCore()) {
+      return;
+    }
+    final bindings = _getBindingsOrNull();
+    final musicId = _musicId;
+    if (bindings == null || musicId == null) {
+      return;
+    }
+    final seq = _seqData[channel];
+    ffi.Pointer<ffi.Int32> ptr = ffi.nullptr;
+    try {
+      if (seq.isNotEmpty) {
+        ptr = calloc<ffi.Int32>(seq.length);
+        for (var i = 0; i < seq.length; i++) {
+          ptr[i] = seq[i];
+        }
+      }
+      final ok = bindings.flutterxel_core_music_set_seq(
+        musicId,
+        channel,
+        ptr,
+        seq.length,
+      );
+      if (!ok) {
+        throw StateError('flutterxel_core_music_set_seq failed.');
+      }
+    } finally {
+      if (ptr != ffi.nullptr) {
+        calloc.free(ptr);
+      }
+    }
+  }
 
   void set(
     List<int> seq1, [
@@ -4770,11 +5053,12 @@ class Music {
       _seqData[i]
         ..clear()
         ..addAll(seq ?? const <int>[]);
+      _syncSeqToCore(i);
     }
   }
 
   void save(String filename, double sec, {bool? ffmpeg}) {
-    _writeSilentPcm16Wav(filename, sec);
+    _saveAudioCapture(filename, sec, ffmpeg: ffmpeg ?? false);
   }
 }
 
@@ -4782,10 +5066,10 @@ final List<Tone> _toneResources = List<Tone>.unmodifiable(
   List<Tone>.generate(NUM_TONES, (_) => Tone(), growable: false),
 );
 final List<Sound> _soundResources = List<Sound>.unmodifiable(
-  List<Sound>.generate(NUM_SOUNDS, (_) => Sound(), growable: false),
+  List<Sound>.generate(NUM_SOUNDS, Sound._resource, growable: false),
 );
 final List<Music> _musicResources = List<Music>.unmodifiable(
-  List<Music>.generate(NUM_MUSICS, (_) => Music(), growable: false),
+  List<Music>.generate(NUM_MUSICS, Music._resource, growable: false),
 );
 
 final Seq<Tone> tones = Seq<Tone>.proxy(() => _toneResources);

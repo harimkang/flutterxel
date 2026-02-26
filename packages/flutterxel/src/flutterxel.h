@@ -161,6 +161,29 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double rotate,
     double scale);
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_notes(
+    int32_t snd,
+    const int32_t* notes_ptr,
+    size_t notes_len);
+FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_tones(
+    int32_t snd,
+    const int32_t* tones_ptr,
+    size_t tones_len);
+FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_volumes(
+    int32_t snd,
+    const int32_t* volumes_ptr,
+    size_t volumes_len);
+FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_effects(
+    int32_t snd,
+    const int32_t* effects_ptr,
+    size_t effects_len);
+FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_speed(int32_t snd,
+                                                        int32_t speed);
+FFI_PLUGIN_EXPORT bool flutterxel_core_music_set_seq(int32_t msc,
+                                                      int32_t ch,
+                                                      const int32_t* seq_ptr,
+                                                      size_t seq_len);
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_play(
     int32_t ch,
     int32_t snd_kind,
