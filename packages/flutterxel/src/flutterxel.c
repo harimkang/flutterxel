@@ -27,6 +27,7 @@ typedef struct FlutterxelState {
   int32_t width;
   int32_t height;
   uint64_t frame_count;
+  char title[256];
   int32_t clear_color;
   int32_t camera_x;
   int32_t camera_y;
@@ -272,6 +273,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.width = width;
   g_state.height = height;
   g_state.frame_count = 0;
+  memset(g_state.title, 0, sizeof(g_state.title));
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -309,6 +311,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.width = 0;
   g_state.height = 0;
   g_state.frame_count = 0;
+  memset(g_state.title, 0, sizeof(g_state.title));
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -368,6 +371,19 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_flip(void) {
   return flutterxel_core_run(NULL, NULL, NULL, NULL);
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_show(void) {
+  return flutterxel_core_flip();
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_title(const char* title) {
+  if (!g_state.initialized || title == NULL) {
+    return false;
+  }
+  strncpy(g_state.title, title, sizeof(g_state.title) - 1);
+  g_state.title[sizeof(g_state.title) - 1] = '\0';
+  return true;
 }
 
 FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void) {

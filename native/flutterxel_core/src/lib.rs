@@ -1619,6 +1619,29 @@ pub extern "C" fn flutterxel_core_flip() -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_show() -> bool {
+    flutterxel_core_flip()
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_title(title: *const c_char) -> bool {
+    if title.is_null() {
+        return false;
+    }
+    let c_str = unsafe { CStr::from_ptr(title) };
+    let Ok(value) = c_str.to_str() else {
+        return false;
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.title = Some(value.to_string());
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_frame_count() -> u64 {
     let state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -2886,6 +2909,21 @@ mod tests {
         assert!(flutterxel_core_flip());
         assert_eq!(flutterxel_core_frame_count(), 1);
         assert!(!flutterxel_core_btnr(33));
+    }
+
+    #[test]
+    fn show_advances_frame_and_title_updates_runtime_title() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert_eq!(flutterxel_core_frame_count(), 0);
+        assert!(flutterxel_core_show());
+        assert_eq!(flutterxel_core_frame_count(), 1);
+
+        let title = CString::new("Flutterxel Game").expect("valid cstring");
+        assert!(flutterxel_core_title(title.as_ptr()));
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        assert_eq!(state.title.as_deref(), Some("Flutterxel Game"));
     }
 
     #[test]

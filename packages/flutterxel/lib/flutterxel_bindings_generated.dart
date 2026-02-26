@@ -149,6 +149,26 @@ class FlutterxelBindings {
   late final _flutterxel_core_flip = _flutterxel_core_flipPtr
       .asFunction<bool Function()>();
 
+  bool flutterxel_core_show() {
+    return _flutterxel_core_show();
+  }
+
+  late final _flutterxel_core_showPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function()>>('flutterxel_core_show');
+  late final _flutterxel_core_show = _flutterxel_core_showPtr
+      .asFunction<bool Function()>();
+
+  bool flutterxel_core_title(ffi.Pointer<ffi.Char> title) {
+    return _flutterxel_core_title(title);
+  }
+
+  late final _flutterxel_core_titlePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Pointer<ffi.Char>)>>(
+        'flutterxel_core_title',
+      );
+  late final _flutterxel_core_title = _flutterxel_core_titlePtr
+      .asFunction<bool Function(ffi.Pointer<ffi.Char>)>();
+
   int flutterxel_core_frame_count() {
     return _flutterxel_core_frame_count();
   }

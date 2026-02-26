@@ -89,6 +89,7 @@ int _fallbackClipY = 0;
 int _fallbackClipW = 0;
 int _fallbackClipH = 0;
 bool _fallbackMouseVisible = true;
+String _fallbackTitle = '';
 List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
 int _fallbackImageBankSize = 16;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
@@ -354,6 +355,7 @@ void init(
     _fallbackClipW = width;
     _fallbackClipH = height;
     _fallbackMouseVisible = true;
+    _fallbackTitle = title ?? '';
     _fallbackPaletteMap = List<int>.generate(16, (index) => index);
     _seedFallbackResources();
     _fallbackRngState = _fallbackRngDefaultState;
@@ -395,6 +397,7 @@ void quit() {
   _fallbackClipW = 0;
   _fallbackClipH = 0;
   _fallbackMouseVisible = true;
+  _fallbackTitle = '';
   _fallbackPaletteMap = List<int>.generate(16, (index) => index);
   _fallbackImageBankSize = 16;
   _fallbackImageBanks.clear();
@@ -444,6 +447,44 @@ void flip() {
   _frameNotifier.value = frameCount;
 }
 
+/// Pyxel-compatible show API.
+void show() {
+  _ensureInitialized('show');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_show() ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_show failed.');
+  }
+
+  frameCount = bindings?.flutterxel_core_frame_count() ?? (frameCount + 1);
+  _fallbackReleasedFrame.removeWhere(
+    (_, releasedFrame) => releasedFrame != frameCount,
+  );
+  _clearTransientInputValues();
+  _frameNotifier.value = frameCount;
+}
+
+/// Pyxel-compatible title API.
+void title(String value) {
+  _ensureInitialized('title');
+
+  final bindings = _getBindingsOrNull();
+  final titlePtr = value.toNativeUtf8().cast<ffi.Char>();
+  try {
+    final ok = bindings?.flutterxel_core_title(titlePtr) ?? true;
+    if (!ok) {
+      throw StateError('flutterxel_core_title failed.');
+    }
+  } finally {
+    calloc.free(titlePtr);
+  }
+
+  if (bindings == null) {
+    _fallbackTitle = value;
+  }
+}
+
 void _clearTransientInputValues() {
   if (!_isInitialized) {
     return;
@@ -458,6 +499,7 @@ void _clearTransientInputValues() {
 
 bool get isRunning => _runLoopTimer?.isActive ?? false;
 bool get isMouseVisible => _fallbackMouseVisible;
+String get runtimeTitle => _fallbackTitle;
 
 void stopRunLoop() {
   _runLoopTimer?.cancel();

@@ -7,12 +7,14 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise API surface',
+    'exposes init/run/show/flip/quit/title/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
+      expect(flutterxel.show, isA<Function>());
       expect(flutterxel.flip, isA<Function>());
       expect(flutterxel.quit, isA<Function>());
+      expect(flutterxel.title, isA<Function>());
       expect(flutterxel.camera, isA<Function>());
       expect(flutterxel.clip, isA<Function>());
       expect(flutterxel.pal, isA<Function>());
@@ -380,5 +382,15 @@ void main() {
     expect(value2, value1);
     expect(value3, value1);
     expect(value1, inInclusiveRange(-1.0, 1.0));
+  });
+
+  test('show advances frame and title accepts runtime title update', () {
+    flutterxel.init(8, 8);
+    expect(flutterxel.frameCount, 0);
+
+    flutterxel.show();
+    expect(flutterxel.frameCount, 1);
+
+    expect(() => flutterxel.title('Flutterxel Game'), returnsNormally);
   });
 }

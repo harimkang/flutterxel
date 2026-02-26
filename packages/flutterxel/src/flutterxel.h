@@ -51,6 +51,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
     void* draw_user_data);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_flip(void);
+FFI_PLUGIN_EXPORT bool flutterxel_core_show(void);
+FFI_PLUGIN_EXPORT bool flutterxel_core_title(const char* title);
 
 FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void);
 FFI_PLUGIN_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);

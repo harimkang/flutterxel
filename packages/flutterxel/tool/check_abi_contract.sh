@@ -10,6 +10,8 @@ SYMBOLS=(
   flutterxel_core_quit
   flutterxel_core_run
   flutterxel_core_flip
+  flutterxel_core_show
+  flutterxel_core_title
   flutterxel_core_btn
   flutterxel_core_btnp
   flutterxel_core_btnr
