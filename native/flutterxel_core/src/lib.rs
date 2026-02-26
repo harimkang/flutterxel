@@ -15,6 +15,7 @@ const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 const TILE_SIZE: i32 = 8;
+const RNG_DEFAULT_STATE: u64 = 0xA3C5_9AC3_D12B_9E5D;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -110,6 +111,7 @@ struct RuntimeState {
     sounds: HashMap<i32, SoundResource>,
     musics: HashMap<i32, MusicResource>,
     channel_playback: HashMap<i32, PlayCall>,
+    rng_state: u64,
     last_blt: Option<BltCall>,
     last_play: Option<PlayCall>,
     last_loaded: Option<String>,
@@ -148,6 +150,7 @@ impl Default for RuntimeState {
             sounds: HashMap::new(),
             musics: HashMap::new(),
             channel_playback: HashMap::new(),
+            rng_state: RNG_DEFAULT_STATE,
             last_blt: None,
             last_play: None,
             last_loaded: None,
@@ -161,6 +164,19 @@ type FrameCallback = Option<extern "C" fn(*mut c_void)>;
 fn runtime_state() -> &'static Mutex<RuntimeState> {
     static STATE: OnceLock<Mutex<RuntimeState>> = OnceLock::new();
     STATE.get_or_init(|| Mutex::new(RuntimeState::default()))
+}
+
+fn seed_to_rng_state(seed: i32) -> u64 {
+    let unsigned_seed = u64::from(seed as u32);
+    unsigned_seed ^ RNG_DEFAULT_STATE
+}
+
+fn next_random_u32(state: &mut RuntimeState) -> u32 {
+    state.rng_state = state
+        .rng_state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1);
+    (state.rng_state >> 32) as u32
 }
 
 fn decode_optional_i32(value: i32) -> Option<i32> {
@@ -1458,6 +1474,7 @@ pub extern "C" fn flutterxel_core_init(
     state.sounds.clear();
     state.musics.clear();
     state.channel_playback.clear();
+    state.rng_state = RNG_DEFAULT_STATE;
     state.last_blt = None;
     state.last_play = None;
     state.last_loaded = None;
@@ -1499,6 +1516,7 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.sounds.clear();
     state.musics.clear();
     state.channel_playback.clear();
+    state.rng_state = RNG_DEFAULT_STATE;
     state.last_blt = None;
     state.last_play = None;
     state.last_loaded = None;
@@ -2124,6 +2142,49 @@ pub extern "C" fn flutterxel_core_play_pos(ch: i32, snd: *mut i32, pos: *mut f64
         *pos = 0.0;
     }
     true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_rseed(seed: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.rng_state = seed_to_rng_state(seed);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_rndi(a: i32, b: i32) -> i32 {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0;
+    }
+
+    let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+    let range = (i64::from(hi) - i64::from(lo) + 1) as u64;
+    if range == 0 {
+        return lo;
+    }
+
+    let value = u64::from(next_random_u32(&mut state)) % range;
+    (i64::from(lo) + value as i64) as i32
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_rndf(a: f64, b: f64) -> f64 {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0.0;
+    }
+
+    let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+    if (hi - lo).abs() <= f64::EPSILON {
+        return lo;
+    }
+
+    let unit = f64::from(next_random_u32(&mut state)) / f64::from(u32::MAX);
+    lo + (hi - lo) * unit
 }
 
 #[no_mangle]
@@ -3215,6 +3276,25 @@ mod tests {
 
         assert!(flutterxel_core_stop(0));
         assert!(!flutterxel_core_play_pos(0, &mut snd, &mut pos));
+    }
+
+    #[test]
+    fn random_api_is_seeded_and_range_bounded() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_rseed(1234));
+        let int1 = flutterxel_core_rndi(10, 20);
+        let float1 = flutterxel_core_rndf(-1.0, 1.0);
+
+        assert!(flutterxel_core_rseed(1234));
+        let int2 = flutterxel_core_rndi(10, 20);
+        let float2 = flutterxel_core_rndf(-1.0, 1.0);
+
+        assert_eq!(int1, int2);
+        assert_eq!(float1, float2);
+        assert!((10..=20).contains(&int1));
+        assert!((-1.0..=1.0).contains(&float1));
     }
 
     #[test]

@@ -207,6 +207,13 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_play_pos(int32_t ch,
                                                      int32_t* snd,
                                                      double* pos);
 
+// pyxel.rseed(seed)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_rseed(int32_t seed);
+// pyxel.rndi(a, b)
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_rndi(int32_t a, int32_t b);
+// pyxel.rndf(a, b)
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_rndf(double a, double b);
+
 // pyxel.load(filename, *, exclude_images=None, exclude_tilemaps=None,
 //            exclude_sounds=None, exclude_musics=None)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_load(

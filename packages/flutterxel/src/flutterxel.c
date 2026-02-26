@@ -1,5 +1,6 @@
 #include "flutterxel.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -15,6 +16,7 @@
 #define CHANNEL_CAPACITY 64
 #define DEFAULT_IMAGE_BANK_SIZE 16
 #define TILE_SIZE 8
+#define RNG_DEFAULT_STATE 0xA3C59AC3D12B9E5DULL
 
 typedef struct FlutterxelState {
   bool initialized;
@@ -43,6 +45,7 @@ typedef struct FlutterxelState {
   uint8_t channel_state[CHANNEL_CAPACITY];
   int32_t channel_sound_index[CHANNEL_CAPACITY];
   double channel_play_pos[CHANNEL_CAPACITY];
+  uint64_t rng_state;
   int32_t image_bank_size;
   int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
 } FlutterxelState;
@@ -71,6 +74,15 @@ static bool validate_resource_flags(
          is_valid_optional_bool(exclude_tilemaps) &&
          is_valid_optional_bool(exclude_sounds) &&
          is_valid_optional_bool(exclude_musics);
+}
+
+static uint64_t seed_to_rng_state(int32_t seed) {
+  return ((uint64_t)(uint32_t)seed) ^ RNG_DEFAULT_STATE;
+}
+
+static uint32_t next_random_u32(void) {
+  g_state.rng_state = g_state.rng_state * 6364136223846793005ULL + 1ULL;
+  return (uint32_t)(g_state.rng_state >> 32);
 }
 
 static int find_pressed_key_index(int32_t key) {
@@ -228,6 +240,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
   memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
   memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
+  g_state.rng_state = RNG_DEFAULT_STATE;
   reset_palette_map();
   seed_default_image_bank();
   return true;
@@ -264,6 +277,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
   memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
   memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
+  g_state.rng_state = RNG_DEFAULT_STATE;
   memset(g_state.image_bank0, 0, sizeof(g_state.image_bank0));
   reset_palette_map();
   return true;
@@ -1194,6 +1208,45 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play_pos(int32_t ch, int32_t* snd, double
   *snd = g_state.channel_sound_index[ch];
   *pos = g_state.channel_play_pos[ch];
   return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_rseed(int32_t seed) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.rng_state = seed_to_rng_state(seed);
+  return true;
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_rndi(int32_t a, int32_t b) {
+  if (!g_state.initialized) {
+    return 0;
+  }
+
+  int32_t lo = a <= b ? a : b;
+  int32_t hi = a <= b ? b : a;
+  uint64_t range = (uint64_t)((int64_t)hi - (int64_t)lo + 1);
+  if (range == 0) {
+    return lo;
+  }
+
+  uint64_t value = (uint64_t)next_random_u32() % range;
+  return (int32_t)((int64_t)lo + (int64_t)value);
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_rndf(double a, double b) {
+  if (!g_state.initialized) {
+    return 0.0;
+  }
+
+  double lo = a <= b ? a : b;
+  double hi = a <= b ? b : a;
+  if (fabs(hi - lo) <= DBL_EPSILON) {
+    return lo;
+  }
+
+  double unit = (double)next_random_u32() / (double)UINT32_MAX;
+  return lo + (hi - lo) * unit;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(

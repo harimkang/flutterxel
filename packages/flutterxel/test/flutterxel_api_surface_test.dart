@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -42,6 +42,9 @@ void main() {
       expect(flutterxel.playPos, isA<Function>());
       expect(flutterxel.load, isA<Function>());
       expect(flutterxel.save, isA<Function>());
+      expect(flutterxel.rseed, isA<Function>());
+      expect(flutterxel.rndi, isA<Function>());
+      expect(flutterxel.rndf, isA<Function>());
     },
   );
 
@@ -332,5 +335,22 @@ void main() {
 
     flutterxel.stop(0);
     expect(flutterxel.playPos(0), isNull);
+  });
+
+  test('rseed/rndi/rndf produce deterministic seeded random ranges', () {
+    flutterxel.init(8, 8);
+
+    flutterxel.rseed(1234);
+    final int1 = flutterxel.rndi(10, 20);
+    final double1 = flutterxel.rndf(-1.0, 1.0);
+
+    flutterxel.rseed(1234);
+    final int2 = flutterxel.rndi(10, 20);
+    final double2 = flutterxel.rndf(-1.0, 1.0);
+
+    expect(int2, int1);
+    expect(double2, double1);
+    expect(int1, inInclusiveRange(10, 20));
+    expect(double1, inInclusiveRange(-1.0, 1.0));
   });
 }

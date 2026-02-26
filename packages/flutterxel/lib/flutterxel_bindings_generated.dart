@@ -717,6 +717,39 @@ class FlutterxelBindings {
         bool Function(int, ffi.Pointer<ffi.Int32>, ffi.Pointer<ffi.Double>)
       >();
 
+  bool flutterxel_core_rseed(int seed) {
+    return _flutterxel_core_rseed(seed);
+  }
+
+  late final _flutterxel_core_rseedPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_rseed',
+      );
+  late final _flutterxel_core_rseed = _flutterxel_core_rseedPtr
+      .asFunction<bool Function(int)>();
+
+  int flutterxel_core_rndi(int a, int b) {
+    return _flutterxel_core_rndi(a, b);
+  }
+
+  late final _flutterxel_core_rndiPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_rndi',
+      );
+  late final _flutterxel_core_rndi = _flutterxel_core_rndiPtr
+      .asFunction<int Function(int, int)>();
+
+  double flutterxel_core_rndf(double a, double b) {
+    return _flutterxel_core_rndf(a, b);
+  }
+
+  late final _flutterxel_core_rndfPtr =
+      _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Double, ffi.Double)>>(
+        'flutterxel_core_rndf',
+      );
+  late final _flutterxel_core_rndf = _flutterxel_core_rndfPtr
+      .asFunction<double Function(double, double)>();
+
   bool flutterxel_core_load(
     ffi.Pointer<ffi.Char> filename,
     int exclude_images,

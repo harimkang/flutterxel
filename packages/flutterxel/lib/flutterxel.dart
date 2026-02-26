@@ -37,6 +37,8 @@ const int MOUSE_BUTTON_MIDDLE = MOUSE_KEY_START_INDEX + 5;
 const int MOUSE_BUTTON_RIGHT = MOUSE_KEY_START_INDEX + 6;
 const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
 const int _fallbackTileSize = 8;
+const int _fallbackRngDefaultState = 0xA3C59AC3D12B9E5D;
+const int _fallbackRngMask64 = 0xFFFFFFFFFFFFFFFF;
 
 class _FallbackTilemap {
   const _FallbackTilemap({
@@ -89,6 +91,7 @@ List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
 int _fallbackImageBankSize = 16;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
 final Map<int, _FallbackTilemap> _fallbackTilemaps = <int, _FallbackTilemap>{};
+int _fallbackRngState = _fallbackRngDefaultState;
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -153,6 +156,17 @@ int _encodeOptionalBool(bool? value) {
     return _optionalBoolNone;
   }
   return value ? _optionalBoolTrue : _optionalBoolFalse;
+}
+
+int _seedToFallbackRngState(int seed) {
+  final unsignedSeed = seed & 0xFFFFFFFF;
+  return (unsignedSeed ^ _fallbackRngDefaultState) & _fallbackRngMask64;
+}
+
+int _fallbackNextRandomU32() {
+  _fallbackRngState =
+      ((_fallbackRngState * 6364136223846793005) + 1) & _fallbackRngMask64;
+  return (_fallbackRngState >> 32) & 0xFFFFFFFF;
 }
 
 void _ensureInitialized(String apiName) {
@@ -290,6 +304,7 @@ void init(
     _fallbackClipH = height;
     _fallbackPaletteMap = List<int>.generate(16, (index) => index);
     _seedFallbackResources();
+    _fallbackRngState = _fallbackRngDefaultState;
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -330,6 +345,7 @@ void quit() {
   _fallbackImageBankSize = 16;
   _fallbackImageBanks.clear();
   _fallbackTilemaps.clear();
+  _fallbackRngState = _fallbackRngDefaultState;
   _isInitialized = false;
 }
 
@@ -1247,6 +1263,58 @@ bool isChannelPlaying(int ch) {
   }
 
   return _fallbackPlayPositions[ch];
+}
+
+/// Pyxel-compatible rseed API.
+void rseed(int seed) {
+  _ensureInitialized('rseed');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_rseed(seed) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_rseed failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackRngState = _seedToFallbackRngState(seed);
+  }
+}
+
+/// Pyxel-compatible rndi API.
+int rndi(int a, int b) {
+  _ensureInitialized('rndi');
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_rndi(a, b);
+  }
+
+  final lo = math.min(a, b);
+  final hi = math.max(a, b);
+  final range = hi - lo + 1;
+  if (range <= 0) {
+    return lo;
+  }
+  final value = _fallbackNextRandomU32() % range;
+  return lo + value;
+}
+
+/// Pyxel-compatible rndf API.
+double rndf(double a, double b) {
+  _ensureInitialized('rndf');
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_rndf(a, b);
+  }
+
+  final lo = math.min(a, b);
+  final hi = math.max(a, b);
+  if ((hi - lo).abs() <= 0.0) {
+    return lo;
+  }
+  final unit = _fallbackNextRandomU32() / 0xFFFFFFFF;
+  return lo + (hi - lo) * unit;
 }
 
 /// Pyxel-compatible load API.

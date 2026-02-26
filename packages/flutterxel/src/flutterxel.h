@@ -167,6 +167,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch);
 FFI_PLUGIN_EXPORT bool flutterxel_core_play_pos(int32_t ch,
                                                  int32_t* snd,
                                                  double* pos);
+FFI_PLUGIN_EXPORT bool flutterxel_core_rseed(int32_t seed);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_rndi(int32_t a, int32_t b);
+FFI_PLUGIN_EXPORT double flutterxel_core_rndf(double a, double b);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(
     const char* filename,
