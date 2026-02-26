@@ -38,6 +38,9 @@ typedef struct FlutterxelState {
   int32_t icon_scale;
   int32_t icon_colkey;
   double dither_alpha;
+  int32_t last_screenshot_scale;
+  int32_t screencast_scale;
+  bool screencast_enabled;
   int32_t clear_color;
   int32_t camera_x;
   int32_t camera_y;
@@ -348,6 +351,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.icon_scale = 1;
   g_state.icon_colkey = OPTIONAL_I32_NONE;
   g_state.dither_alpha = 1.0;
+  g_state.last_screenshot_scale = OPTIONAL_I32_NONE;
+  g_state.screencast_scale = OPTIONAL_I32_NONE;
+  g_state.screencast_enabled = false;
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -394,6 +400,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.icon_scale = 1;
   g_state.icon_colkey = OPTIONAL_I32_NONE;
   g_state.dither_alpha = 1.0;
+  g_state.last_screenshot_scale = OPTIONAL_I32_NONE;
+  g_state.screencast_scale = OPTIONAL_I32_NONE;
+  g_state.screencast_enabled = false;
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -1697,5 +1706,37 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_save_pal(const char* filename) {
     }
   }
   fclose(fp);
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_screenshot(int32_t scale) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  if (scale != OPTIONAL_I32_NONE && scale <= 0) {
+    return false;
+  }
+  g_state.last_screenshot_scale = scale;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_screencast(int32_t scale) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  if (scale != OPTIONAL_I32_NONE && scale <= 0) {
+    return false;
+  }
+  g_state.screencast_enabled = true;
+  g_state.screencast_scale = scale;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_reset_screencast(void) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.screencast_enabled = false;
+  g_state.screencast_scale = OPTIONAL_I32_NONE;
   return true;
 }

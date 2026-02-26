@@ -215,6 +215,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_save(
     int8_t exclude_musics);
 FFI_PLUGIN_EXPORT bool flutterxel_core_load_pal(const char* filename);
 FFI_PLUGIN_EXPORT bool flutterxel_core_save_pal(const char* filename);
+FFI_PLUGIN_EXPORT bool flutterxel_core_screenshot(int32_t scale);
+FFI_PLUGIN_EXPORT bool flutterxel_core_screencast(int32_t scale);
+FFI_PLUGIN_EXPORT bool flutterxel_core_reset_screencast(void);
 
 #ifdef __cplusplus
 }  // extern "C"

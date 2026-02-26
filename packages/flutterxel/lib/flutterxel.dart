@@ -96,6 +96,9 @@ List<String> _fallbackIconData = const <String>[];
 int _fallbackIconScale = 1;
 int? _fallbackIconColkey;
 double _fallbackDitherAlpha = 1.0;
+int? _fallbackLastScreenshotScale;
+int? _fallbackScreencastScale;
+bool _fallbackScreencastEnabled = false;
 bool _fallbackPerfMonitorEnabled = false;
 bool _fallbackIntegerScaleEnabled = true;
 int _fallbackScreenMode = 0;
@@ -388,6 +391,9 @@ void init(
     _fallbackIconScale = 1;
     _fallbackIconColkey = null;
     _fallbackDitherAlpha = 1.0;
+    _fallbackLastScreenshotScale = null;
+    _fallbackScreencastScale = null;
+    _fallbackScreencastEnabled = false;
     _fallbackPerfMonitorEnabled = false;
     _fallbackIntegerScaleEnabled = true;
     _fallbackScreenMode = 0;
@@ -442,6 +448,9 @@ void _clearLocalRuntimeState() {
   _fallbackIconScale = 1;
   _fallbackIconColkey = null;
   _fallbackDitherAlpha = 1.0;
+  _fallbackLastScreenshotScale = null;
+  _fallbackScreencastScale = null;
+  _fallbackScreencastEnabled = false;
   _fallbackPerfMonitorEnabled = false;
   _fallbackIntegerScaleEnabled = true;
   _fallbackScreenMode = 0;
@@ -676,6 +685,9 @@ List<String> get runtimeIconData =>
 int get runtimeIconScale => _fallbackIconScale;
 int? get runtimeIconColkey => _fallbackIconColkey;
 double get runtimeDitherAlpha => _fallbackDitherAlpha;
+int? get runtimeLastScreenshotScale => _fallbackLastScreenshotScale;
+int? get runtimeScreencastScale => _fallbackScreencastScale;
+bool get isScreencastEnabled => _fallbackScreencastEnabled;
 bool get isPerfMonitorEnabled => _fallbackPerfMonitorEnabled;
 bool get isIntegerScaleEnabled => _fallbackIntegerScaleEnabled;
 int get runtimeScreenMode => _fallbackScreenMode;
@@ -1900,6 +1912,61 @@ void savePal(String filename) {
     output.writeln(value);
   }
   File(filename).writeAsStringSync(output.toString());
+}
+
+/// Pyxel-compatible screenshot API.
+void screenshot({int? scale}) {
+  _ensureInitialized('screenshot');
+  if (scale != null && scale <= 0) {
+    throw ArgumentError.value(scale, 'scale', 'must be greater than 0.');
+  }
+
+  final bindings = _getBindingsOrNull();
+  final ok =
+      bindings?.flutterxel_core_screenshot(_encodeOptionalI32(scale)) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_screenshot failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackLastScreenshotScale = scale;
+  }
+}
+
+/// Pyxel-compatible screencast API.
+void screencast({int? scale}) {
+  _ensureInitialized('screencast');
+  if (scale != null && scale <= 0) {
+    throw ArgumentError.value(scale, 'scale', 'must be greater than 0.');
+  }
+
+  final bindings = _getBindingsOrNull();
+  final ok =
+      bindings?.flutterxel_core_screencast(_encodeOptionalI32(scale)) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_screencast failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackScreencastEnabled = true;
+    _fallbackScreencastScale = scale;
+  }
+}
+
+/// Pyxel-compatible reset_screencast API.
+void resetScreencast() {
+  _ensureInitialized('reset_screencast');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_reset_screencast() ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_reset_screencast failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackScreencastEnabled = false;
+    _fallbackScreencastScale = null;
+  }
 }
 
 String _joinPath(String left, String right) {

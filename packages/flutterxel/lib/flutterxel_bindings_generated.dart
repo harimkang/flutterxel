@@ -1088,6 +1088,39 @@ class FlutterxelBindings {
       );
   late final _flutterxel_core_save_pal = _flutterxel_core_save_palPtr
       .asFunction<bool Function(ffi.Pointer<ffi.Char>)>();
+
+  bool flutterxel_core_screenshot(int scale) {
+    return _flutterxel_core_screenshot(scale);
+  }
+
+  late final _flutterxel_core_screenshotPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_screenshot',
+      );
+  late final _flutterxel_core_screenshot = _flutterxel_core_screenshotPtr
+      .asFunction<bool Function(int)>();
+
+  bool flutterxel_core_screencast(int scale) {
+    return _flutterxel_core_screencast(scale);
+  }
+
+  late final _flutterxel_core_screencastPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_screencast',
+      );
+  late final _flutterxel_core_screencast = _flutterxel_core_screencastPtr
+      .asFunction<bool Function(int)>();
+
+  bool flutterxel_core_reset_screencast() {
+    return _flutterxel_core_reset_screencast();
+  }
+
+  late final _flutterxel_core_reset_screencastPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function()>>(
+        'flutterxel_core_reset_screencast',
+      );
+  late final _flutterxel_core_reset_screencast =
+      _flutterxel_core_reset_screencastPtr.asFunction<bool Function()>();
 }
 
 /// Optional parameter encoding in ABI:

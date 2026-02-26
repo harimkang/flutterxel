@@ -289,6 +289,12 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_save(
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_load_pal(const char* filename);
 // pyxel.save_pal(filename)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_save_pal(const char* filename);
+// pyxel.screenshot(scale=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_screenshot(int32_t scale);
+// pyxel.screencast(scale=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_screencast(int32_t scale);
+// pyxel.reset_screencast()
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_reset_screencast(void);
 
 #ifdef __cplusplus
 }  // extern "C"

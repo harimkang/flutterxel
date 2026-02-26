@@ -9,7 +9,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
+    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -57,6 +57,9 @@ void main() {
       expect(flutterxel.save, isA<Function>());
       expect(flutterxel.loadPal, isA<Function>());
       expect(flutterxel.savePal, isA<Function>());
+      expect(flutterxel.screenshot, isA<Function>());
+      expect(flutterxel.screencast, isA<Function>());
+      expect(flutterxel.resetScreencast, isA<Function>());
       expect(flutterxel.userDataDir, isA<Function>());
       expect(flutterxel.rseed, isA<Function>());
       expect(flutterxel.rndi, isA<Function>());
@@ -469,6 +472,29 @@ void main() {
       }
     },
   );
+
+  test('screenshot/screencast/resetScreencast are callable and stateful', () {
+    flutterxel.init(8, 8);
+
+    expect(() => flutterxel.screenshot(), returnsNormally);
+    expect(() => flutterxel.screenshot(scale: 2), returnsNormally);
+    expect(flutterxel.runtimeLastScreenshotScale, 2);
+
+    flutterxel.screencast();
+    expect(flutterxel.isScreencastEnabled, isTrue);
+    expect(flutterxel.runtimeScreencastScale, isNull);
+
+    flutterxel.screencast(scale: 3);
+    expect(flutterxel.isScreencastEnabled, isTrue);
+    expect(flutterxel.runtimeScreencastScale, 3);
+
+    flutterxel.resetScreencast();
+    expect(flutterxel.isScreencastEnabled, isFalse);
+    expect(flutterxel.runtimeScreencastScale, isNull);
+
+    flutterxel.quit();
+    expect(() => flutterxel.screenshot(), throwsStateError);
+  });
 
   test('show advances frame and title accepts runtime title update', () {
     flutterxel.init(8, 8);

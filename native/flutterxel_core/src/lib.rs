@@ -105,6 +105,9 @@ struct RuntimeState {
     icon_scale: i32,
     icon_colkey: Option<i32>,
     dither_alpha: f64,
+    last_screenshot_scale: Option<i32>,
+    screencast_scale: Option<i32>,
+    screencast_enabled: bool,
     clear_color: i32,
     camera_x: i32,
     camera_y: i32,
@@ -154,6 +157,9 @@ impl Default for RuntimeState {
             icon_scale: 1,
             icon_colkey: None,
             dither_alpha: 1.0,
+            last_screenshot_scale: None,
+            screencast_scale: None,
+            screencast_enabled: false,
             clear_color: 0,
             camera_x: 0,
             camera_y: 0,
@@ -1559,6 +1565,9 @@ pub extern "C" fn flutterxel_core_init(
     state.icon_scale = 1;
     state.icon_colkey = None;
     state.dither_alpha = 1.0;
+    state.last_screenshot_scale = None;
+    state.screencast_scale = None;
+    state.screencast_enabled = false;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1613,6 +1622,9 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.icon_scale = 1;
     state.icon_colkey = None;
     state.dither_alpha = 1.0;
+    state.last_screenshot_scale = None;
+    state.screencast_scale = None;
+    state.screencast_enabled = false;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1748,6 +1760,9 @@ pub extern "C" fn flutterxel_core_reset() -> bool {
     state.icon_scale = 1;
     state.icon_colkey = None;
     state.dither_alpha = 1.0;
+    state.last_screenshot_scale = None;
+    state.screencast_scale = None;
+    state.screencast_enabled = false;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -2824,6 +2839,52 @@ pub extern "C" fn flutterxel_core_save_pal(filename: *const c_char) -> bool {
     true
 }
 
+#[no_mangle]
+pub extern "C" fn flutterxel_core_screenshot(scale: i32) -> bool {
+    let decoded_scale = decode_optional_i32(scale);
+    if let Some(value) = decoded_scale {
+        if value <= 0 {
+            return false;
+        }
+    }
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.last_screenshot_scale = decoded_scale;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_screencast(scale: i32) -> bool {
+    let decoded_scale = decode_optional_i32(scale);
+    if let Some(value) = decoded_scale {
+        if value <= 0 {
+            return false;
+        }
+    }
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.screencast_enabled = true;
+    state.screencast_scale = decoded_scale;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_reset_screencast() -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.screencast_enabled = false;
+    state.screencast_scale = None;
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3298,6 +3359,39 @@ mod tests {
         {
             let state = runtime_state().lock().expect("runtime state poisoned");
             assert_eq!(state.dither_alpha, 1.0);
+        }
+    }
+
+    #[test]
+    fn screenshot_and_screencast_apis_update_runtime_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_screenshot(2));
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert_eq!(state.last_screenshot_scale, Some(2));
+        }
+
+        assert!(flutterxel_core_screencast(OPTIONAL_I32_NONE));
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert!(state.screencast_enabled);
+            assert_eq!(state.screencast_scale, None);
+        }
+
+        assert!(flutterxel_core_screencast(3));
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert!(state.screencast_enabled);
+            assert_eq!(state.screencast_scale, Some(3));
+        }
+
+        assert!(flutterxel_core_reset_screencast());
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert!(!state.screencast_enabled);
+            assert_eq!(state.screencast_scale, None);
         }
     }
 

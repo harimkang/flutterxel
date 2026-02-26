@@ -70,6 +70,9 @@ SYMBOLS=(
   flutterxel_core_save
   flutterxel_core_load_pal
   flutterxel_core_save_pal
+  flutterxel_core_screenshot
+  flutterxel_core_screencast
+  flutterxel_core_reset_screencast
   flutterxel_core_frame_count
   flutterxel_core_framebuffer_ptr
   flutterxel_core_framebuffer_len
