@@ -62,6 +62,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_btnp(int32_t key,
                                              int32_t period);
 FFI_PLUGIN_EXPORT bool flutterxel_core_btnr(int32_t key);
 FFI_PLUGIN_EXPORT int32_t flutterxel_core_btnv(int32_t key);
+FFI_PLUGIN_EXPORT bool flutterxel_core_mouse(bool visible);
+FFI_PLUGIN_EXPORT bool flutterxel_core_warp_mouse(double x, double y);
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key,
                                                       bool pressed);
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_value(int32_t key,

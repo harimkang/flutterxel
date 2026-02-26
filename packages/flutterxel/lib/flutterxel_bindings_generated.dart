@@ -227,6 +227,28 @@ class FlutterxelBindings {
   late final _flutterxel_core_btnv = _flutterxel_core_btnvPtr
       .asFunction<int Function(int)>();
 
+  bool flutterxel_core_mouse(bool visible) {
+    return _flutterxel_core_mouse(visible);
+  }
+
+  late final _flutterxel_core_mousePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Bool)>>(
+        'flutterxel_core_mouse',
+      );
+  late final _flutterxel_core_mouse = _flutterxel_core_mousePtr
+      .asFunction<bool Function(bool)>();
+
+  bool flutterxel_core_warp_mouse(double x, double y) {
+    return _flutterxel_core_warp_mouse(x, y);
+  }
+
+  late final _flutterxel_core_warp_mousePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Double, ffi.Double)>>(
+        'flutterxel_core_warp_mouse',
+      );
+  late final _flutterxel_core_warp_mouse = _flutterxel_core_warp_mousePtr
+      .asFunction<bool Function(double, double)>();
+
   bool flutterxel_core_set_btn_state(int key, bool pressed) {
     return _flutterxel_core_set_btn_state(key, pressed);
   }

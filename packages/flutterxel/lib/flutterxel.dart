@@ -87,6 +87,7 @@ int _fallbackClipX = 0;
 int _fallbackClipY = 0;
 int _fallbackClipW = 0;
 int _fallbackClipH = 0;
+bool _fallbackMouseVisible = true;
 List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
 int _fallbackImageBankSize = 16;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
@@ -302,6 +303,7 @@ void init(
     _fallbackClipY = 0;
     _fallbackClipW = width;
     _fallbackClipH = height;
+    _fallbackMouseVisible = true;
     _fallbackPaletteMap = List<int>.generate(16, (index) => index);
     _seedFallbackResources();
     _fallbackRngState = _fallbackRngDefaultState;
@@ -341,6 +343,7 @@ void quit() {
   _fallbackClipY = 0;
   _fallbackClipW = 0;
   _fallbackClipH = 0;
+  _fallbackMouseVisible = true;
   _fallbackPaletteMap = List<int>.generate(16, (index) => index);
   _fallbackImageBankSize = 16;
   _fallbackImageBanks.clear();
@@ -402,6 +405,7 @@ void _clearTransientInputValues() {
 }
 
 bool get isRunning => _runLoopTimer?.isActive ?? false;
+bool get isMouseVisible => _fallbackMouseVisible;
 
 void stopRunLoop() {
   _runLoopTimer?.cancel();
@@ -473,6 +477,40 @@ int btnv(int key) {
     return bindings.flutterxel_core_btnv(key);
   }
   return _fallbackInputValues[key] ?? 0;
+}
+
+/// Pyxel-compatible mouse API.
+void mouse(bool visible) {
+  _ensureInitialized('mouse');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_mouse(visible) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_mouse failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackMouseVisible = visible;
+  }
+}
+
+/// Pyxel-compatible warp_mouse API.
+void warpMouse(double x, double y) {
+  _ensureInitialized('warp_mouse');
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    final ok = bindings.flutterxel_core_warp_mouse(x, y);
+    if (!ok) {
+      throw StateError('flutterxel_core_warp_mouse failed.');
+    }
+    return;
+  }
+
+  final xi = x.round();
+  final yi = y.round();
+  setBtnValue(MOUSE_POS_X, xi);
+  setBtnValue(MOUSE_POS_Y, yi);
 }
 
 /// Runtime input bridge for forwarding external key/touch mappings.

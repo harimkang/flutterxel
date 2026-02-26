@@ -71,6 +71,10 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btnp(int32_t key,
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btnr(int32_t key);
 // pyxel.btnv(key)
 FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_btnv(int32_t key);
+// pyxel.mouse(visible)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_mouse(bool visible);
+// pyxel.warp_mouse(x, y)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_warp_mouse(double x, double y);
 
 // runtime input bridge
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_state(int32_t key,

@@ -14,6 +14,8 @@ SYMBOLS=(
   flutterxel_core_btnp
   flutterxel_core_btnr
   flutterxel_core_btnv
+  flutterxel_core_mouse
+  flutterxel_core_warp_mouse
   flutterxel_core_set_btn_state
   flutterxel_core_set_btn_value
   flutterxel_core_cls

@@ -17,6 +17,9 @@
 #define DEFAULT_IMAGE_BANK_SIZE 16
 #define TILE_SIZE 8
 #define RNG_DEFAULT_STATE 0xA3C59AC3D12B9E5DULL
+#define MOUSE_KEY_START_INDEX 0x50000100
+#define MOUSE_POS_X MOUSE_KEY_START_INDEX
+#define MOUSE_POS_Y (MOUSE_KEY_START_INDEX + 1)
 
 typedef struct FlutterxelState {
   bool initialized;
@@ -42,6 +45,7 @@ typedef struct FlutterxelState {
   int32_t value_keys[PRESSED_KEY_CAPACITY];
   int32_t value_values[PRESSED_KEY_CAPACITY];
   size_t value_count;
+  bool mouse_visible;
   uint8_t channel_state[CHANNEL_CAPACITY];
   int32_t channel_sound_index[CHANNEL_CAPACITY];
   double channel_play_pos[CHANNEL_CAPACITY];
@@ -231,6 +235,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.pressed_key_count = 0;
   g_state.released_key_count = 0;
   g_state.value_count = 0;
+  g_state.mouse_visible = true;
   memset(g_state.pressed_keys, 0, sizeof(g_state.pressed_keys));
   memset(g_state.pressed_key_frames, 0, sizeof(g_state.pressed_key_frames));
   memset(g_state.released_keys, 0, sizeof(g_state.released_keys));
@@ -267,6 +272,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.pressed_key_count = 0;
   g_state.released_key_count = 0;
   g_state.value_count = 0;
+  g_state.mouse_visible = true;
   g_state.image_bank_size = 0;
   memset(g_state.pressed_keys, 0, sizeof(g_state.pressed_keys));
   memset(g_state.pressed_key_frames, 0, sizeof(g_state.pressed_key_frames));
@@ -393,6 +399,25 @@ FFI_PLUGIN_EXPORT int32_t flutterxel_core_btnv(int32_t key) {
     return 0;
   }
   return g_state.value_values[(size_t)value_index];
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_mouse(bool visible) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.mouse_visible = visible;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_warp_mouse(double x, double y) {
+  if (!g_state.initialized) {
+    return false;
+  }
+
+  int32_t xi = (int32_t)llround(x);
+  int32_t yi = (int32_t)llround(y);
+  return flutterxel_core_set_btn_value(MOUSE_POS_X, xi) &&
+         flutterxel_core_set_btn_value(MOUSE_POS_Y, yi);
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key, bool pressed) {

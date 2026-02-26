@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -20,6 +20,8 @@ void main() {
       expect(flutterxel.btnp, isA<Function>());
       expect(flutterxel.btnr, isA<Function>());
       expect(flutterxel.btnv, isA<Function>());
+      expect(flutterxel.mouse, isA<Function>());
+      expect(flutterxel.warpMouse, isA<Function>());
       expect(flutterxel.cls, isA<Function>());
       expect(flutterxel.pset, isA<Function>());
       expect(flutterxel.pget, isA<Function>());
@@ -352,5 +354,14 @@ void main() {
     expect(double2, double1);
     expect(int1, inInclusiveRange(10, 20));
     expect(double1, inInclusiveRange(-1.0, 1.0));
+  });
+
+  test('warpMouse updates mouse position input values', () {
+    flutterxel.init(8, 8);
+
+    flutterxel.mouse(false);
+    flutterxel.warpMouse(3, 4);
+    expect(flutterxel.btnv(flutterxel.MOUSE_POS_X), 3);
+    expect(flutterxel.btnv(flutterxel.MOUSE_POS_Y), 4);
   });
 }

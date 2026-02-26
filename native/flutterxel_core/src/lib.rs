@@ -16,6 +16,9 @@ const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 const TILE_SIZE: i32 = 8;
 const RNG_DEFAULT_STATE: u64 = 0xA3C5_9AC3_D12B_9E5D;
+const MOUSE_KEY_START_INDEX: i32 = 0x5000_0100;
+const MOUSE_POS_X_KEY: i32 = MOUSE_KEY_START_INDEX;
+const MOUSE_POS_Y_KEY: i32 = MOUSE_KEY_START_INDEX + 1;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -104,6 +107,7 @@ struct RuntimeState {
     pressed_key_frame: HashMap<i32, u64>,
     released_key_frame: HashMap<i32, u64>,
     input_values: HashMap<i32, i32>,
+    mouse_visible: bool,
     frame_buffer: Vec<i32>,
     image_banks: HashMap<i32, Vec<i32>>,
     image_bank_size: i32,
@@ -143,6 +147,7 @@ impl Default for RuntimeState {
             pressed_key_frame: HashMap::new(),
             released_key_frame: HashMap::new(),
             input_values: HashMap::new(),
+            mouse_visible: true,
             frame_buffer: Vec::new(),
             image_banks: HashMap::new(),
             image_bank_size: 16,
@@ -1465,6 +1470,7 @@ pub extern "C" fn flutterxel_core_init(
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
     state.input_values.clear();
+    state.mouse_visible = true;
     let Some(frame_buffer_len) = frame_buffer_len(width, height) else {
         return false;
     };
@@ -1509,6 +1515,7 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
     state.input_values.clear();
+    state.mouse_visible = true;
     state.frame_buffer.clear();
     state.image_banks.clear();
     state.image_bank_size = 16;
@@ -1667,6 +1674,30 @@ pub extern "C" fn flutterxel_core_btnv(key: i32) -> i32 {
         return 0;
     }
     state.input_values.get(&key).copied().unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_mouse(visible: bool) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.mouse_visible = visible;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_warp_mouse(x: f64, y: f64) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    let clamped_x = x.round().clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32;
+    let clamped_y = y.round().clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32;
+    state.input_values.insert(MOUSE_POS_X_KEY, clamped_x);
+    state.input_values.insert(MOUSE_POS_Y_KEY, clamped_y);
+    true
 }
 
 #[no_mangle]
@@ -2798,6 +2829,17 @@ mod tests {
         assert_eq!(flutterxel_core_btnv(1000), 1);
         assert!(flutterxel_core_set_btn_state(1000, false));
         assert_eq!(flutterxel_core_btnv(1000), 0);
+    }
+
+    #[test]
+    fn warp_mouse_updates_mouse_position_values() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_mouse(false));
+        assert!(flutterxel_core_warp_mouse(3.0, 4.0));
+        assert_eq!(flutterxel_core_btnv(MOUSE_POS_X_KEY), 3);
+        assert_eq!(flutterxel_core_btnv(MOUSE_POS_Y_KEY), 4);
     }
 
     #[test]
