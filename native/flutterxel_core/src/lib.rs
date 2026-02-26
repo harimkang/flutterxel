@@ -101,6 +101,10 @@ struct RuntimeState {
     integer_scale_enabled: bool,
     screen_mode: i32,
     fullscreen_enabled: bool,
+    icon_data: Option<String>,
+    icon_scale: i32,
+    icon_colkey: Option<i32>,
+    dither_alpha: f64,
     clear_color: i32,
     camera_x: i32,
     camera_y: i32,
@@ -146,6 +150,10 @@ impl Default for RuntimeState {
             integer_scale_enabled: true,
             screen_mode: 0,
             fullscreen_enabled: false,
+            icon_data: None,
+            icon_scale: 1,
+            icon_colkey: None,
+            dither_alpha: 1.0,
             clear_color: 0,
             camera_x: 0,
             camera_y: 0,
@@ -1522,6 +1530,10 @@ pub extern "C" fn flutterxel_core_init(
     state.integer_scale_enabled = true;
     state.screen_mode = 0;
     state.fullscreen_enabled = false;
+    state.icon_data = None;
+    state.icon_scale = 1;
+    state.icon_colkey = None;
+    state.dither_alpha = 1.0;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1572,6 +1584,10 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.integer_scale_enabled = true;
     state.screen_mode = 0;
     state.fullscreen_enabled = false;
+    state.icon_data = None;
+    state.icon_scale = 1;
+    state.icon_colkey = None;
+    state.dither_alpha = 1.0;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1659,6 +1675,30 @@ pub extern "C" fn flutterxel_core_title(title: *const c_char) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_icon(data: *const c_char, scale: i32, colkey: i32) -> bool {
+    if data.is_null() || scale <= 0 {
+        return false;
+    }
+    let decoded_colkey = decode_optional_i32(colkey);
+    let c_str = unsafe { CStr::from_ptr(data) };
+    let Ok(value) = c_str.to_str() else {
+        return false;
+    };
+    if value.is_empty() {
+        return false;
+    }
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.icon_data = Some(value.to_string());
+    state.icon_scale = scale;
+    state.icon_colkey = decoded_colkey;
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_reset() -> bool {
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -1679,6 +1719,10 @@ pub extern "C" fn flutterxel_core_reset() -> bool {
     state.integer_scale_enabled = true;
     state.screen_mode = 0;
     state.fullscreen_enabled = false;
+    state.icon_data = None;
+    state.icon_scale = 1;
+    state.icon_colkey = None;
+    state.dither_alpha = 1.0;
     state.clear_color = 0;
     state.camera_x = 0;
     state.camera_y = 0;
@@ -1977,6 +2021,16 @@ pub extern "C" fn flutterxel_core_pal(col1: i32, col2: i32) -> bool {
         }
         (None, Some(_)) => false,
     }
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_dither(alpha: f64) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.dither_alpha = alpha.clamp(0.0, 1.0);
+    true
 }
 
 #[no_mangle]
@@ -3126,6 +3180,34 @@ mod tests {
         assert!(flutterxel_core_reset());
         assert_eq!(flutterxel_core_frame_count(), 0);
         assert!(!flutterxel_core_show());
+    }
+
+    #[test]
+    fn icon_and_dither_apis_update_runtime_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        let icon = CString::new("0123\n4567").expect("valid icon cstring");
+        assert!(flutterxel_core_icon(icon.as_ptr(), 2, 3));
+        assert!(flutterxel_core_dither(0.5));
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert_eq!(state.icon_data.as_deref(), Some("0123\n4567"));
+            assert_eq!(state.icon_scale, 2);
+            assert_eq!(state.icon_colkey, Some(3));
+            assert_eq!(state.dither_alpha, 0.5);
+        }
+
+        assert!(flutterxel_core_dither(-1.0));
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert_eq!(state.dither_alpha, 0.0);
+        }
+        assert!(flutterxel_core_dither(2.0));
+        {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            assert_eq!(state.dither_alpha, 1.0);
+        }
     }
 
     #[test]

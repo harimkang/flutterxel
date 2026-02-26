@@ -169,6 +169,19 @@ class FlutterxelBindings {
   late final _flutterxel_core_title = _flutterxel_core_titlePtr
       .asFunction<bool Function(ffi.Pointer<ffi.Char>)>();
 
+  bool flutterxel_core_icon(ffi.Pointer<ffi.Char> data, int scale, int colkey) {
+    return _flutterxel_core_icon(data, scale, colkey);
+  }
+
+  late final _flutterxel_core_iconPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Pointer<ffi.Char>, ffi.Int32, ffi.Int32)
+        >
+      >('flutterxel_core_icon');
+  late final _flutterxel_core_icon = _flutterxel_core_iconPtr
+      .asFunction<bool Function(ffi.Pointer<ffi.Char>, int, int)>();
+
   bool flutterxel_core_reset() {
     return _flutterxel_core_reset();
   }
@@ -389,6 +402,17 @@ class FlutterxelBindings {
       );
   late final _flutterxel_core_pal = _flutterxel_core_palPtr
       .asFunction<bool Function(int, int)>();
+
+  bool flutterxel_core_dither(double alpha) {
+    return _flutterxel_core_dither(alpha);
+  }
+
+  late final _flutterxel_core_ditherPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Double)>>(
+        'flutterxel_core_dither',
+      );
+  late final _flutterxel_core_dither = _flutterxel_core_ditherPtr
+      .asFunction<bool Function(double)>();
 
   bool flutterxel_core_pset(int x, int y, int col) {
     return _flutterxel_core_pset(x, y, col);

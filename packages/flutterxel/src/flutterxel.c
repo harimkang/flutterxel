@@ -33,6 +33,10 @@ typedef struct FlutterxelState {
   bool integer_scale_enabled;
   int32_t screen_mode;
   bool fullscreen_enabled;
+  char icon_data[1024];
+  int32_t icon_scale;
+  int32_t icon_colkey;
+  double dither_alpha;
   int32_t clear_color;
   int32_t camera_x;
   int32_t camera_y;
@@ -283,6 +287,10 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.integer_scale_enabled = true;
   g_state.screen_mode = 0;
   g_state.fullscreen_enabled = false;
+  memset(g_state.icon_data, 0, sizeof(g_state.icon_data));
+  g_state.icon_scale = 1;
+  g_state.icon_colkey = OPTIONAL_I32_NONE;
+  g_state.dither_alpha = 1.0;
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -325,6 +333,10 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.integer_scale_enabled = true;
   g_state.screen_mode = 0;
   g_state.fullscreen_enabled = false;
+  memset(g_state.icon_data, 0, sizeof(g_state.icon_data));
+  g_state.icon_scale = 1;
+  g_state.icon_colkey = OPTIONAL_I32_NONE;
+  g_state.dither_alpha = 1.0;
   g_state.clear_color = 0;
   g_state.camera_x = 0;
   g_state.camera_y = 0;
@@ -396,6 +408,20 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_title(const char* title) {
   }
   strncpy(g_state.title, title, sizeof(g_state.title) - 1);
   g_state.title[sizeof(g_state.title) - 1] = '\0';
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_icon(
+    const char* data,
+    int32_t scale,
+    int32_t colkey) {
+  if (!g_state.initialized || data == NULL || scale <= 0 || strlen(data) == 0) {
+    return false;
+  }
+  strncpy(g_state.icon_data, data, sizeof(g_state.icon_data) - 1);
+  g_state.icon_data[sizeof(g_state.icon_data) - 1] = '\0';
+  g_state.icon_scale = scale;
+  g_state.icon_colkey = colkey;
   return true;
 }
 
@@ -719,6 +745,20 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_pal(int32_t col1, int32_t col2) {
     } else {
       g_state.palette_map[col1] = col2;
     }
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_dither(double alpha) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  if (alpha < 0.0) {
+    g_state.dither_alpha = 0.0;
+  } else if (alpha > 1.0) {
+    g_state.dither_alpha = 1.0;
+  } else {
+    g_state.dither_alpha = alpha;
   }
   return true;
 }

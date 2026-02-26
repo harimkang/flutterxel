@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/show/flip/quit/reset/title/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
+    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -16,6 +16,7 @@ void main() {
       expect(flutterxel.quit, isA<Function>());
       expect(flutterxel.reset, isA<Function>());
       expect(flutterxel.title, isA<Function>());
+      expect(flutterxel.icon, isA<Function>());
       expect(flutterxel.perfMonitor, isA<Function>());
       expect(flutterxel.integerScale, isA<Function>());
       expect(flutterxel.screenMode, isA<Function>());
@@ -23,6 +24,7 @@ void main() {
       expect(flutterxel.camera, isA<Function>());
       expect(flutterxel.clip, isA<Function>());
       expect(flutterxel.pal, isA<Function>());
+      expect(flutterxel.dither, isA<Function>());
       expect(flutterxel.btn, isA<Function>());
       expect(flutterxel.btnp, isA<Function>());
       expect(flutterxel.btnr, isA<Function>());
@@ -414,6 +416,22 @@ void main() {
     expect(flutterxel.sin(30), closeTo(0.5, 1e-9));
     expect(flutterxel.cos(60), closeTo(0.5, 1e-9));
     expect(flutterxel.atan2(1, 0), closeTo(90.0, 1e-9));
+  });
+
+  test('icon and dither are callable while initialized', () {
+    flutterxel.init(8, 8);
+
+    expect(
+      () => flutterxel.icon(<String>['0123', '4567'], 1, colkey: 2),
+      returnsNormally,
+    );
+    expect(() => flutterxel.dither(0.5), returnsNormally);
+    expect(() => flutterxel.dither(-1.0), returnsNormally);
+    expect(() => flutterxel.dither(2.0), returnsNormally);
+
+    flutterxel.quit();
+    expect(() => flutterxel.icon(<String>['0123'], 1), throwsStateError);
+    expect(() => flutterxel.dither(0.5), throwsStateError);
   });
 
   test('show advances frame and title accepts runtime title update', () {

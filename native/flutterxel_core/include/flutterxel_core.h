@@ -60,6 +60,10 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_flip(void);
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_show(void);
 // pyxel.title(title)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_title(const char* title);
+// pyxel.icon(data, scale, colkey=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_icon(const char* data,
+                                                 int32_t scale,
+                                                 int32_t colkey);
 // pyxel.reset()
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_reset(void);
 // pyxel.perf_monitor(enabled)
@@ -107,6 +111,8 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_clip(int32_t x,
                                                  int32_t h);
 // pyxel.pal(col1=None, col2=None)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_pal(int32_t col1, int32_t col2);
+// pyxel.dither(alpha)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_dither(double alpha);
 
 // pyxel.pset(x, y, col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_pset(int32_t x,

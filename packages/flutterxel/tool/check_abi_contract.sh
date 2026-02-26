@@ -12,6 +12,7 @@ SYMBOLS=(
   flutterxel_core_flip
   flutterxel_core_show
   flutterxel_core_title
+  flutterxel_core_icon
   flutterxel_core_reset
   flutterxel_core_perf_monitor
   flutterxel_core_integer_scale
@@ -29,6 +30,7 @@ SYMBOLS=(
   flutterxel_core_camera
   flutterxel_core_clip
   flutterxel_core_pal
+  flutterxel_core_dither
   flutterxel_core_pset
   flutterxel_core_pget
   flutterxel_core_line

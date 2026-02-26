@@ -92,6 +92,10 @@ int _fallbackClipW = 0;
 int _fallbackClipH = 0;
 bool _fallbackMouseVisible = true;
 String _fallbackTitle = '';
+List<String> _fallbackIconData = const <String>[];
+int _fallbackIconScale = 1;
+int? _fallbackIconColkey;
+double _fallbackDitherAlpha = 1.0;
 bool _fallbackPerfMonitorEnabled = false;
 bool _fallbackIntegerScaleEnabled = true;
 int _fallbackScreenMode = 0;
@@ -362,6 +366,10 @@ void init(
     _fallbackClipH = height;
     _fallbackMouseVisible = true;
     _fallbackTitle = title ?? '';
+    _fallbackIconData = const <String>[];
+    _fallbackIconScale = 1;
+    _fallbackIconColkey = null;
+    _fallbackDitherAlpha = 1.0;
     _fallbackPerfMonitorEnabled = false;
     _fallbackIntegerScaleEnabled = true;
     _fallbackScreenMode = 0;
@@ -412,6 +420,10 @@ void _clearLocalRuntimeState() {
   _fallbackClipH = 0;
   _fallbackMouseVisible = true;
   _fallbackTitle = '';
+  _fallbackIconData = const <String>[];
+  _fallbackIconScale = 1;
+  _fallbackIconColkey = null;
+  _fallbackDitherAlpha = 1.0;
   _fallbackPerfMonitorEnabled = false;
   _fallbackIntegerScaleEnabled = true;
   _fallbackScreenMode = 0;
@@ -517,6 +529,40 @@ void title(String value) {
   }
 }
 
+/// Pyxel-compatible icon API.
+void icon(List<String> data, int scale, {int? colkey}) {
+  _ensureInitialized('icon');
+  if (scale <= 0) {
+    throw ArgumentError.value(scale, 'scale', 'must be greater than 0.');
+  }
+  final encoded = data.join('\n');
+  if (encoded.isEmpty) {
+    throw ArgumentError.value(data, 'data', 'must not be empty.');
+  }
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    final dataPtr = encoded.toNativeUtf8().cast<ffi.Char>();
+    try {
+      final ok = bindings.flutterxel_core_icon(
+        dataPtr,
+        scale,
+        _encodeOptionalI32(colkey),
+      );
+      if (!ok) {
+        throw StateError('flutterxel_core_icon failed.');
+      }
+    } finally {
+      calloc.free(dataPtr);
+    }
+    return;
+  }
+
+  _fallbackIconData = List<String>.from(data);
+  _fallbackIconScale = scale;
+  _fallbackIconColkey = colkey;
+}
+
 /// Pyxel-compatible perf_monitor API.
 void perfMonitor(bool enabled) {
   _ensureInitialized('perf_monitor');
@@ -577,6 +623,21 @@ void fullscreen(bool enabled) {
   }
 }
 
+/// Pyxel-compatible dither API.
+void dither(double alpha) {
+  _ensureInitialized('dither');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_dither(alpha) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_dither failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackDitherAlpha = alpha.clamp(0.0, 1.0).toDouble();
+  }
+}
+
 void _clearTransientInputValues() {
   if (!_isInitialized) {
     return;
@@ -592,6 +653,11 @@ void _clearTransientInputValues() {
 bool get isRunning => _runLoopTimer?.isActive ?? false;
 bool get isMouseVisible => _fallbackMouseVisible;
 String get runtimeTitle => _fallbackTitle;
+List<String> get runtimeIconData =>
+    List<String>.unmodifiable(_fallbackIconData);
+int get runtimeIconScale => _fallbackIconScale;
+int? get runtimeIconColkey => _fallbackIconColkey;
+double get runtimeDitherAlpha => _fallbackDitherAlpha;
 bool get isPerfMonitorEnabled => _fallbackPerfMonitorEnabled;
 bool get isIntegerScaleEnabled => _fallbackIntegerScaleEnabled;
 int get runtimeScreenMode => _fallbackScreenMode;
