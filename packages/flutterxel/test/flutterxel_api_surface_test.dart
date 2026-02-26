@@ -250,21 +250,37 @@ void main() {
         captureSec: 10,
       );
 
-      flutterxel.load(
-        'assets/sample.pyxres',
-        excludeImages: true,
-        excludeTilemaps: false,
-        excludeSounds: null,
-        excludeMusics: null,
-      );
+      Object? loadError;
+      try {
+        flutterxel.load(
+          'assets/sample.pyxres',
+          excludeImages: true,
+          excludeTilemaps: false,
+          excludeSounds: null,
+          excludeMusics: null,
+        );
+      } catch (error) {
+        loadError = error;
+      }
+      if (loadError != null) {
+        expect(loadError, anyOf(isA<UnsupportedError>(), isA<StateError>()));
+      }
 
-      flutterxel.save(
-        'assets/out.pyxres',
-        excludeImages: null,
-        excludeTilemaps: true,
-        excludeSounds: false,
-        excludeMusics: null,
-      );
+      Object? saveError;
+      try {
+        flutterxel.save(
+          'assets/out.pyxres',
+          excludeImages: null,
+          excludeTilemaps: true,
+          excludeSounds: false,
+          excludeMusics: null,
+        );
+      } catch (error) {
+        saveError = error;
+      }
+      if (saveError != null) {
+        expect(saveError, anyOf(isA<UnsupportedError>(), isA<StateError>()));
+      }
 
       flutterxel.play(0, 1, sec: 0.5, loop: true, resume: false);
       flutterxel.play(0, <int>[1, 2, 3], sec: null, loop: null, resume: null);
@@ -429,7 +445,11 @@ void main() {
       flutterxel.stop(0);
 
       final resourcePath = '${tempDir.path}/seq_sync.pyxres';
-      flutterxel.save(resourcePath);
+      try {
+        flutterxel.save(resourcePath);
+      } on UnsupportedError {
+        return;
+      }
       final manifest = _readPyxresManifest(resourcePath);
       if (manifest != null) {
         expect(manifest, contains(RegExp(r'notes\s*=\s*\[12,\s*24,\s*-1\]')));
@@ -1213,4 +1233,98 @@ void main() {
       expect(() => flutterxel.cls(0), throwsStateError);
     },
   );
+
+  test('load reports failure for missing resources (no silent success)', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync(
+      'flutterxel-load-miss-',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final missingPath =
+        '${tempDir.path}${Platform.pathSeparator}missing.pyxres';
+    expect(
+      () => flutterxel.load(missingPath),
+      throwsA(
+        anyOf(
+          isA<UnsupportedError>(),
+          isA<StateError>(),
+          isA<FileSystemException>(),
+        ),
+      ),
+    );
+  });
+
+  test('save either writes output or throws (no silent no-op)', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync('flutterxel-save-out-');
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final outPath = '${tempDir.path}${Platform.pathSeparator}out.pyxres';
+    Object? error;
+    try {
+      flutterxel.save(outPath);
+    } catch (e) {
+      error = e;
+    }
+
+    if (error != null) {
+      expect(
+        error,
+        anyOf(
+          isA<UnsupportedError>(),
+          isA<StateError>(),
+          isA<FileSystemException>(),
+        ),
+      );
+      return;
+    }
+
+    expect(File(outPath).existsSync(), isTrue);
+  });
+
+  test('quit then init clears sound/music resource proxy caches', () {
+    flutterxel.init(8, 8);
+
+    final sound = flutterxel.sounds[0];
+    sound.set_notes('c3e3g3');
+    sound.set_tones('tsp');
+    sound.set_volumes('765');
+    sound.set_effects('nsv');
+    sound.speed = 12;
+
+    final music = flutterxel.musics[0];
+    music.set(<int>[1, 2, 3], <int>[4, 5], <int>[6], <int>[7, 8]);
+
+    expect(sound.notes, isNotEmpty);
+    expect(sound.tones, isNotEmpty);
+    expect(sound.volumes, isNotEmpty);
+    expect(sound.effects, isNotEmpty);
+    expect(sound.speed, 12);
+    expect(music.seqs[0], isNotEmpty);
+    expect(music.seqs[1], isNotEmpty);
+    expect(music.seqs[2], isNotEmpty);
+    expect(music.seqs[3], isNotEmpty);
+
+    flutterxel.quit();
+    flutterxel.init(8, 8);
+
+    expect(sound.notes, isEmpty);
+    expect(sound.tones, isEmpty);
+    expect(sound.volumes, isEmpty);
+    expect(sound.effects, isEmpty);
+    expect(sound.speed, 30);
+    expect(music.seqs[0], isEmpty);
+    expect(music.seqs[1], isEmpty);
+    expect(music.seqs[2], isEmpty);
+    expect(music.seqs[3], isEmpty);
+  });
 }

@@ -133,17 +133,48 @@ ffi.DynamicLibrary _openLibrary() {
     ),
   };
 
-  Object? lastError;
-  for (final candidate in candidates) {
+  bool hasVersionSymbol(ffi.DynamicLibrary library) {
     try {
-      return ffi.DynamicLibrary.open(candidate);
+      library.lookup<ffi.NativeFunction<ffi.Int32 Function()>>(
+        'flutterxel_core_version_major',
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  final attempted = <String>['process'];
+  Object? lastError;
+  try {
+    final processLibrary = ffi.DynamicLibrary.process();
+    if (hasVersionSymbol(processLibrary)) {
+      return processLibrary;
+    }
+    lastError = ArgumentError(
+      'Missing flutterxel_core_version_major in process image.',
+    );
+  } catch (error) {
+    lastError = error;
+  }
+
+  for (final candidate in candidates) {
+    attempted.add(candidate);
+    try {
+      final library = ffi.DynamicLibrary.open(candidate);
+      if (hasVersionSymbol(library)) {
+        return library;
+      }
+      lastError = ArgumentError(
+        'Missing flutterxel_core_version_major in $candidate.',
+      );
     } catch (error) {
       lastError = error;
     }
   }
 
   throw ArgumentError(
-    'Unable to load native library. Tried: ${candidates.join(", ")}'
+    'Unable to load native library. Tried: ${attempted.join(", ")}'
     '${lastError == null ? "" : ". Last error: $lastError"}',
   );
 }
@@ -723,9 +754,19 @@ void _clearLocalRuntimeState() {
   _fallbackImageBankSize = IMAGE_SIZE;
   _fallbackImageBanks.clear();
   _fallbackTilemaps.clear();
+  _clearAudioResourceProxyState();
   _fallbackRngState = _fallbackRngDefaultState;
   _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
   _isInitialized = false;
+}
+
+void _clearAudioResourceProxyState() {
+  for (final sound in _soundResources) {
+    sound._clearLocalState();
+  }
+  for (final music in _musicResources) {
+    music._clearLocalState();
+  }
 }
 
 /// Pyxel-compatible reset API.
@@ -2361,18 +2402,21 @@ void load(
   _ensureInitialized('load');
 
   final bindings = _getBindingsOrNull();
+  if (bindings == null) {
+    throw UnsupportedError(
+      'pyxel.load requires native flutterxel core bindings.',
+    );
+  }
   final filenamePtr = filename.toNativeUtf8().cast<ffi.Char>();
 
   try {
-    final ok =
-        bindings?.flutterxel_core_load(
-          filenamePtr,
-          _encodeOptionalBool(excludeImages),
-          _encodeOptionalBool(excludeTilemaps),
-          _encodeOptionalBool(excludeSounds),
-          _encodeOptionalBool(excludeMusics),
-        ) ??
-        true;
+    final ok = bindings.flutterxel_core_load(
+      filenamePtr,
+      _encodeOptionalBool(excludeImages),
+      _encodeOptionalBool(excludeTilemaps),
+      _encodeOptionalBool(excludeSounds),
+      _encodeOptionalBool(excludeMusics),
+    );
 
     if (!ok) {
       throw StateError('flutterxel_core_load failed.');
@@ -2393,18 +2437,21 @@ void save(
   _ensureInitialized('save');
 
   final bindings = _getBindingsOrNull();
+  if (bindings == null) {
+    throw UnsupportedError(
+      'pyxel.save requires native flutterxel core bindings.',
+    );
+  }
   final filenamePtr = filename.toNativeUtf8().cast<ffi.Char>();
 
   try {
-    final ok =
-        bindings?.flutterxel_core_save(
-          filenamePtr,
-          _encodeOptionalBool(excludeImages),
-          _encodeOptionalBool(excludeTilemaps),
-          _encodeOptionalBool(excludeSounds),
-          _encodeOptionalBool(excludeMusics),
-        ) ??
-        true;
+    final ok = bindings.flutterxel_core_save(
+      filenamePtr,
+      _encodeOptionalBool(excludeImages),
+      _encodeOptionalBool(excludeTilemaps),
+      _encodeOptionalBool(excludeSounds),
+      _encodeOptionalBool(excludeMusics),
+    );
 
     if (!ok) {
       throw StateError('flutterxel_core_save failed.');
@@ -5318,6 +5365,17 @@ class Sound {
     }
     return (_notesData.length * speed) / _soundTicksPerSecond;
   }
+
+  void _clearLocalState() {
+    _notesData.clear();
+    _tonesData.clear();
+    _volumesData.clear();
+    _effectsData.clear();
+    _speed = 30;
+    _mmlCode = null;
+    _mmlDurationSec = null;
+    _pcmDurationSec = null;
+  }
 }
 
 class Music {
@@ -5407,6 +5465,12 @@ class Music {
 
   void save(String filename, double sec, {bool? ffmpeg}) {
     _saveAudioCapture(filename, sec, ffmpeg: ffmpeg ?? false);
+  }
+
+  void _clearLocalState() {
+    for (final seq in _seqData) {
+      seq.clear();
+    }
   }
 }
 
