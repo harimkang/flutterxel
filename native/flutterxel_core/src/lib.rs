@@ -1892,6 +1892,88 @@ mod tests {
     }
 
     #[test]
+    fn save_with_exclude_resource_flags_writes_empty_sections() {
+        let _guard = test_lock();
+        init_runtime(2, 2);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 2,
+                    height: 2,
+                    imgsrc: 1,
+                    data: vec![(1, 2), (3, 4), (5, 6), (7, 8)],
+                },
+            );
+            state.sounds.insert(
+                0,
+                SoundResource {
+                    notes: vec![28, 30, -1],
+                    tones: vec![1],
+                    volumes: vec![6, 5],
+                    effects: vec![2, 3],
+                    speed: 25,
+                },
+            );
+            state.musics.insert(
+                0,
+                MusicResource {
+                    seqs: vec![vec![0, 1, 2], vec![3]],
+                },
+            );
+        }
+
+        let path = tmp_resource_path("save_exclude_sections");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, 1, 1, 1));
+
+        let manifest_text = read_resource_archive_toml(&path);
+        let manifest = toml::from_str::<toml::Value>(&manifest_text).expect("valid toml manifest");
+        let tilemaps_len = manifest
+            .get("tilemaps")
+            .and_then(toml::Value::as_array)
+            .map(|value| value.len())
+            .unwrap_or(usize::MAX);
+        let sounds_len = manifest
+            .get("sounds")
+            .and_then(toml::Value::as_array)
+            .map(|value| value.len())
+            .unwrap_or(usize::MAX);
+        let musics_len = manifest
+            .get("musics")
+            .and_then(toml::Value::as_array)
+            .map(|value| value.len())
+            .unwrap_or(usize::MAX);
+        assert_eq!(tilemaps_len, 0);
+        assert_eq!(sounds_len, 0);
+        assert_eq!(musics_len, 0);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_accepts_reference_sample_pyxres_when_available() {
+        let _guard = test_lock();
+        init_runtime(8, 8);
+
+        let sample_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../reference/pyxel/python/pyxel/examples/assets/sample.pyxres");
+        if !sample_path.exists() {
+            return;
+        }
+
+        let c_path = CString::new(sample_path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
+
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        assert!(!state.image_banks.is_empty());
+        assert!(!state.tilemaps.is_empty());
+        assert!(!state.sounds.is_empty());
+        assert!(!state.musics.is_empty());
+    }
+
+    #[test]
     fn play_updates_channel_state() {
         let _guard = test_lock();
         init_runtime(4, 4);
