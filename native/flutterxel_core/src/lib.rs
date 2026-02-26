@@ -86,6 +86,7 @@ struct RuntimeState {
     pressed_keys: HashSet<i32>,
     pressed_key_frame: HashMap<i32, u64>,
     released_key_frame: HashMap<i32, u64>,
+    input_values: HashMap<i32, i32>,
     frame_buffer: Vec<i32>,
     image_banks: HashMap<i32, Vec<i32>>,
     image_bank_size: i32,
@@ -116,6 +117,7 @@ impl Default for RuntimeState {
             pressed_keys: HashSet::new(),
             pressed_key_frame: HashMap::new(),
             released_key_frame: HashMap::new(),
+            input_values: HashMap::new(),
             frame_buffer: Vec::new(),
             image_banks: HashMap::new(),
             image_bank_size: 16,
@@ -1013,6 +1015,7 @@ pub extern "C" fn flutterxel_core_init(
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
+    state.input_values.clear();
     let Some(frame_buffer_len) = frame_buffer_len(width, height) else {
         return false;
     };
@@ -1108,12 +1111,14 @@ pub extern "C" fn flutterxel_core_set_btn_state(key: i32, pressed: bool) -> bool
             state.pressed_key_frame.insert(key, frame);
         }
         state.released_key_frame.remove(&key);
+        state.input_values.insert(key, 1);
     } else {
         if state.pressed_keys.remove(&key) {
             state.pressed_key_frame.remove(&key);
             let frame = state.frame_count;
             state.released_key_frame.insert(key, frame);
         }
+        state.input_values.insert(key, 0);
     }
     true
 }
@@ -1157,6 +1162,25 @@ pub extern "C" fn flutterxel_core_btnr(key: i32) -> bool {
     }
 
     state.released_key_frame.get(&key).copied() == Some(state.frame_count)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_btnv(key: i32) -> i32 {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0;
+    }
+    state.input_values.get(&key).copied().unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_set_btn_value(key: i32, value: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.input_values.insert(key, value);
+    true
 }
 
 #[no_mangle]
@@ -1660,6 +1684,21 @@ mod tests {
             std::ptr::null_mut()
         ));
         assert!(!flutterxel_core_btnr(32));
+    }
+
+    #[test]
+    fn btnv_reads_value_state_and_set_btn_value_bridge() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert_eq!(flutterxel_core_btnv(1000), 0);
+        assert!(flutterxel_core_set_btn_value(1000, 42));
+        assert_eq!(flutterxel_core_btnv(1000), 42);
+
+        assert!(flutterxel_core_set_btn_state(1000, true));
+        assert_eq!(flutterxel_core_btnv(1000), 1);
+        assert!(flutterxel_core_set_btn_state(1000, false));
+        assert_eq!(flutterxel_core_btnv(1000), 0);
     }
 
     #[test]

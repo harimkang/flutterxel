@@ -53,6 +53,7 @@ final ValueNotifier<int> _frameNotifier = ValueNotifier<int>(0);
 final Set<int> _fallbackPressedKeys = <int>{};
 final Map<int, int> _fallbackPressedFrame = <int, int>{};
 final Map<int, int> _fallbackReleasedFrame = <int, int>{};
+final Map<int, int> _fallbackInputValues = <int, int>{};
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -167,6 +168,7 @@ void init(
     _fallbackPressedKeys.clear();
     _fallbackPressedFrame.clear();
     _fallbackReleasedFrame.clear();
+    _fallbackInputValues.clear();
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -281,6 +283,18 @@ bool btnr(int key) {
   return _fallbackReleasedFrame[key] == frameCount;
 }
 
+/// Pyxel-compatible btnv API.
+int btnv(int key) {
+  if (!_isInitialized) {
+    return 0;
+  }
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_btnv(key);
+  }
+  return _fallbackInputValues[key] ?? 0;
+}
+
 /// Runtime input bridge for forwarding external key/touch mappings.
 void setBtnState(int key, bool pressed) {
   if (!_isInitialized) {
@@ -299,13 +313,30 @@ void setBtnState(int key, bool pressed) {
       _fallbackPressedFrame[key] = frameCount;
     }
     _fallbackReleasedFrame.remove(key);
+    _fallbackInputValues[key] = 1;
   } else {
     final removed = _fallbackPressedKeys.remove(key);
     _fallbackPressedFrame.remove(key);
     if (removed) {
       _fallbackReleasedFrame[key] = frameCount;
     }
+    _fallbackInputValues[key] = 0;
   }
+}
+
+/// Runtime input bridge for forwarding value-based key state.
+void setBtnValue(int key, int value) {
+  if (!_isInitialized) {
+    return;
+  }
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    final ok = bindings.flutterxel_core_set_btn_value(key, value);
+    if (!ok) {
+      throw StateError('flutterxel_core_set_btn_value failed.');
+    }
+  }
+  _fallbackInputValues[key] = value;
 }
 
 /// Pyxel-compatible cls API.
@@ -607,6 +638,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
       return;
     }
     _focusNode.requestFocus();
+    _updatePointerPosition(event);
     setBtnState(MOUSE_BUTTON_LEFT, true);
   }
 
@@ -614,7 +646,24 @@ class _FlutterxelViewState extends State<FlutterxelView> {
     if (!widget.captureInput || !_isInitialized) {
       return;
     }
+    _updatePointerPosition(event);
     setBtnState(MOUSE_BUTTON_LEFT, false);
+  }
+
+  void _handlePointerMove(PointerEvent event) {
+    if (!widget.captureInput || !_isInitialized) {
+      return;
+    }
+    _updatePointerPosition(event);
+  }
+
+  void _updatePointerPosition(PointerEvent event) {
+    final x = (event.localPosition.dx / widget.pixelScale).floor();
+    final y = (event.localPosition.dy / widget.pixelScale).floor();
+    final boundedX = x.clamp(0, width > 0 ? width - 1 : 0).toInt();
+    final boundedY = y.clamp(0, height > 0 ? height - 1 : 0).toInt();
+    setBtnValue(MOUSE_POS_X, boundedX);
+    setBtnValue(MOUSE_POS_Y, boundedY);
   }
 
   @override
@@ -656,6 +705,8 @@ class _FlutterxelViewState extends State<FlutterxelView> {
       child: Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: _handlePointerDown,
+        onPointerHover: _handlePointerMove,
+        onPointerMove: _handlePointerMove,
         onPointerUp: _handlePointerUp,
         onPointerCancel: _handlePointerUp,
         child: view,

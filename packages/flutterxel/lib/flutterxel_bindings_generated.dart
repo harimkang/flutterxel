@@ -198,6 +198,17 @@ class FlutterxelBindings {
   late final _flutterxel_core_btnr = _flutterxel_core_btnrPtr
       .asFunction<bool Function(int)>();
 
+  int flutterxel_core_btnv(int key) {
+    return _flutterxel_core_btnv(key);
+  }
+
+  late final _flutterxel_core_btnvPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32)>>(
+        'flutterxel_core_btnv',
+      );
+  late final _flutterxel_core_btnv = _flutterxel_core_btnvPtr
+      .asFunction<int Function(int)>();
+
   bool flutterxel_core_set_btn_state(int key, bool pressed) {
     return _flutterxel_core_set_btn_state(key, pressed);
   }
@@ -208,6 +219,17 @@ class FlutterxelBindings {
       );
   late final _flutterxel_core_set_btn_state = _flutterxel_core_set_btn_statePtr
       .asFunction<bool Function(int, bool)>();
+
+  bool flutterxel_core_set_btn_value(int key, int value) {
+    return _flutterxel_core_set_btn_value(key, value);
+  }
+
+  late final _flutterxel_core_set_btn_valuePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_set_btn_value',
+      );
+  late final _flutterxel_core_set_btn_value = _flutterxel_core_set_btn_valuePtr
+      .asFunction<bool Function(int, int)>();
 
   bool flutterxel_core_cls(int col) {
     return _flutterxel_core_cls(col);

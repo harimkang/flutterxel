@@ -6,18 +6,22 @@ void main() {
     flutterxel.stopRunLoop();
   });
 
-  test('exposes init/run/btn/cls/blt/play/load/save API surface', () {
-    expect(flutterxel.init, isA<Function>());
-    expect(flutterxel.run, isA<Function>());
-    expect(flutterxel.btn, isA<Function>());
-    expect(flutterxel.btnp, isA<Function>());
-    expect(flutterxel.btnr, isA<Function>());
-    expect(flutterxel.cls, isA<Function>());
-    expect(flutterxel.blt, isA<Function>());
-    expect(flutterxel.play, isA<Function>());
-    expect(flutterxel.load, isA<Function>());
-    expect(flutterxel.save, isA<Function>());
-  });
+  test(
+    'exposes init/run/btn/btnp/btnr/btnv/cls/blt/play/load/save API surface',
+    () {
+      expect(flutterxel.init, isA<Function>());
+      expect(flutterxel.run, isA<Function>());
+      expect(flutterxel.btn, isA<Function>());
+      expect(flutterxel.btnp, isA<Function>());
+      expect(flutterxel.btnr, isA<Function>());
+      expect(flutterxel.btnv, isA<Function>());
+      expect(flutterxel.cls, isA<Function>());
+      expect(flutterxel.blt, isA<Function>());
+      expect(flutterxel.play, isA<Function>());
+      expect(flutterxel.load, isA<Function>());
+      expect(flutterxel.save, isA<Function>());
+    },
+  );
 
   test(
     'accepts Pyxel-compatible named options for init/load/save/play/blt',
@@ -88,6 +92,8 @@ void main() {
     expect(flutterxel.btn(32), isA<bool>());
     expect(flutterxel.btnp(32), isA<bool>());
     expect(flutterxel.btnr(32), isA<bool>());
+    flutterxel.setBtnValue(1000, 123);
+    expect(flutterxel.btnv(1000), 123);
 
     final frame = flutterxel.frameBufferSnapshot();
     expect(frame, isA<List<int>>());
@@ -113,5 +119,8 @@ void main() {
 
     flutterxel.run(() {}, () {});
     expect(flutterxel.btnr(32), isFalse);
+
+    flutterxel.setBtnValue(1001, 33);
+    expect(flutterxel.btnv(1001), 33);
   });
 }

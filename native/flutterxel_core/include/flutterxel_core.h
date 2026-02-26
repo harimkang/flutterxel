@@ -63,10 +63,14 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btnp(int32_t key,
                                                   int32_t period);
 // pyxel.btnr(key)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btnr(int32_t key);
+// pyxel.btnv(key)
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_btnv(int32_t key);
 
 // runtime input bridge
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_state(int32_t key,
                                                            bool pressed);
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_value(int32_t key,
+                                                           int32_t value);
 
 // pyxel.cls(col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_cls(int32_t col);

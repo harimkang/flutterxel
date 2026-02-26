@@ -81,6 +81,8 @@ void main() {
     final gesture = await tester.startGesture(tester.getCenter(viewFinder));
     await tester.pump();
     expect(flutterxel.btn(flutterxel.MOUSE_BUTTON_LEFT), isTrue);
+    expect(flutterxel.btnv(flutterxel.MOUSE_POS_X), inInclusiveRange(0, 15));
+    expect(flutterxel.btnv(flutterxel.MOUSE_POS_Y), inInclusiveRange(0, 15));
 
     await gesture.up();
     await tester.pump();
