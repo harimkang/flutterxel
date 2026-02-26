@@ -734,13 +734,19 @@ bool btn(int key) {
 }
 
 /// Pyxel-compatible btnp API.
-bool btnp(int key, {int hold = 0, int period = 0}) {
+bool btnp(
+  int key, {
+  int hold = 0,
+  int? repeat,
+  @Deprecated('Use repeat instead.') int? period,
+}) {
+  final repeatValue = repeat ?? period ?? 0;
   if (!_isInitialized) {
     return false;
   }
   final bindings = _getBindingsOrNull();
   if (bindings != null) {
-    return bindings.flutterxel_core_btnp(key, hold, period);
+    return bindings.flutterxel_core_btnp(key, hold, repeatValue);
   }
 
   if (!_fallbackPressedKeys.contains(key)) {
@@ -755,13 +761,13 @@ bool btnp(int key, {int hold = 0, int period = 0}) {
   if (elapsed == 0) {
     return true;
   }
-  if (hold <= 0 || period <= 0) {
+  if (hold <= 0 || repeatValue <= 0) {
     return false;
   }
   if (elapsed < hold) {
     return false;
   }
-  return ((elapsed - hold) % period) == 0;
+  return ((elapsed - hold) % repeatValue) == 0;
 }
 
 /// Pyxel-compatible btnr API.

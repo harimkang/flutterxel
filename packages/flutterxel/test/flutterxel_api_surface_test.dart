@@ -380,7 +380,7 @@ void main() {
     expect(flutterxel.btnp(32), isFalse);
 
     flutterxel.run(() {}, () {});
-    expect(flutterxel.btnp(32, hold: 2, period: 2), isTrue);
+    expect(flutterxel.btnp(32, hold: 2, repeat: 2), isTrue);
 
     flutterxel.setBtnState(32, false);
     expect(flutterxel.btnr(32), isTrue);
