@@ -159,18 +159,6 @@ fn ensure_default_image_bank(state: &mut RuntimeState) {
     state.image_banks.insert(0, bank);
 }
 
-fn validate_optional_resource_flags(
-    exclude_images: i8,
-    exclude_tilemaps: i8,
-    exclude_sounds: i8,
-    exclude_musics: i8,
-) -> bool {
-    decode_optional_bool(exclude_images).is_some()
-        && decode_optional_bool(exclude_tilemaps).is_some()
-        && decode_optional_bool(exclude_sounds).is_some()
-        && decode_optional_bool(exclude_musics).is_some()
-}
-
 fn parse_i32_value(value: &toml::Value) -> Option<i32> {
     value.as_integer().and_then(|raw| i32::try_from(raw).ok())
 }
@@ -189,14 +177,247 @@ fn frame_buffer_len(width: i32, height: i32) -> Option<usize> {
     width.checked_mul(height)
 }
 
-fn build_resource_toml(state: &RuntimeState) -> String {
-    format!(
-        "format_version = {RESOURCE_FORMAT_VERSION}\nimages = []\ntilemaps = []\nsounds = []\nmusics = []\n[{RESOURCE_RUNTIME_SECTION}]\nwidth = {width}\nheight = {height}\nframe_count = {frame_count}\nclear_color = {clear_color}\n",
-        width = state.width,
-        height = state.height,
-        frame_count = state.frame_count,
-        clear_color = state.clear_color,
-    )
+fn image_bank_to_rows(bank: &[i32], bank_size: usize) -> Option<Vec<Vec<i32>>> {
+    let required_len = bank_size.checked_mul(bank_size)?;
+    if bank.len() < required_len {
+        return None;
+    }
+
+    let mut rows = Vec::with_capacity(bank_size);
+    for y in 0..bank_size {
+        let from = y * bank_size;
+        let to = from + bank_size;
+        rows.push(bank[from..to].to_vec());
+    }
+    Some(rows)
+}
+
+fn parse_image_data(data_value: &toml::Value, width: usize, height: usize) -> Option<Vec<i32>> {
+    let rows = data_value.as_array()?;
+    let mut parsed_rows = Vec::new();
+
+    for row_value in rows {
+        let row_entries = row_value.as_array()?;
+        let mut row = Vec::new();
+        for color in row_entries {
+            row.push(parse_i32_value(color)?);
+        }
+        if row.is_empty() {
+            row.push(0);
+        }
+        parsed_rows.push(row);
+    }
+
+    if parsed_rows.is_empty() {
+        parsed_rows.push(vec![0]);
+    }
+
+    for row in &mut parsed_rows {
+        let fill = *row.last().unwrap_or(&0);
+        if row.len() < width {
+            row.resize(width, fill);
+        }
+        if row.len() > width {
+            row.truncate(width);
+        }
+    }
+
+    while parsed_rows.len() < height {
+        let last_row = parsed_rows
+            .last()
+            .cloned()
+            .unwrap_or_else(|| vec![0; width.max(1)]);
+        parsed_rows.push(last_row);
+    }
+    if parsed_rows.len() > height {
+        parsed_rows.truncate(height);
+    }
+
+    Some(parsed_rows.into_iter().flatten().collect())
+}
+
+fn build_resource_images_value(state: &RuntimeState, exclude_images: bool) -> Option<toml::Value> {
+    if exclude_images {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let bank_size = usize::try_from(state.image_bank_size.max(1)).ok()?;
+    let bank_len = bank_size.checked_mul(bank_size)?;
+    let max_image_index = state
+        .image_banks
+        .keys()
+        .copied()
+        .filter(|index| *index >= 0)
+        .max()
+        .unwrap_or(-1);
+
+    if max_image_index < 0 {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let mut images = Vec::new();
+    for image_index in 0..=max_image_index {
+        let bank = state
+            .image_banks
+            .get(&image_index)
+            .cloned()
+            .unwrap_or_else(|| vec![0; bank_len]);
+
+        let mut padded_bank = bank;
+        if padded_bank.len() < bank_len {
+            padded_bank.resize(bank_len, 0);
+        }
+        let rows = image_bank_to_rows(&padded_bank, bank_size)?;
+
+        let mut image_table = toml::map::Map::new();
+        image_table.insert("width".to_string(), toml::Value::Integer(bank_size as i64));
+        image_table.insert("height".to_string(), toml::Value::Integer(bank_size as i64));
+        image_table.insert(
+            "data".to_string(),
+            toml::Value::Array(
+                rows.into_iter()
+                    .map(|row| {
+                        toml::Value::Array(
+                            row.into_iter()
+                                .map(|color| toml::Value::Integer(color as i64))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+        );
+        images.push(toml::Value::Table(image_table));
+    }
+
+    Some(toml::Value::Array(images))
+}
+
+fn load_resource_images(
+    state: &mut RuntimeState,
+    manifest: &toml::Value,
+    exclude_images: bool,
+) -> bool {
+    if exclude_images {
+        return true;
+    }
+    let Some(images_value) = manifest.get("images") else {
+        return true;
+    };
+    let Some(images) = images_value.as_array() else {
+        return false;
+    };
+    if images.is_empty() {
+        return true;
+    }
+
+    let mut parsed_banks = Vec::<(usize, Vec<i32>, usize)>::new();
+    let mut max_bank_size = 0usize;
+
+    for (image_index, image_value) in images.iter().enumerate() {
+        let Some(image_table) = image_value.as_table() else {
+            return false;
+        };
+        let Some(width) = image_table.get("width").and_then(parse_u32_value) else {
+            return false;
+        };
+        let Some(height) = image_table.get("height").and_then(parse_u32_value) else {
+            return false;
+        };
+        if width == 0 || height == 0 {
+            return false;
+        }
+
+        let width = width as usize;
+        let height = height as usize;
+        let Some(data_value) = image_table.get("data") else {
+            return false;
+        };
+        let Some(flat_data) = parse_image_data(data_value, width, height) else {
+            return false;
+        };
+
+        let bank_size = width.max(height);
+        let Some(bank_len) = bank_size.checked_mul(bank_size) else {
+            return false;
+        };
+        let mut square_bank = vec![0; bank_len];
+        for y in 0..height {
+            for x in 0..width {
+                square_bank[y * bank_size + x] = flat_data[y * width + x];
+            }
+        }
+
+        max_bank_size = max_bank_size.max(bank_size);
+        parsed_banks.push((image_index, square_bank, bank_size));
+    }
+
+    if max_bank_size == 0 {
+        return true;
+    }
+
+    let Some(max_bank_len) = max_bank_size.checked_mul(max_bank_size) else {
+        return false;
+    };
+    state.image_banks.clear();
+    for (image_index, bank, bank_size) in parsed_banks {
+        let normalized_bank = if bank_size == max_bank_size {
+            bank
+        } else {
+            let mut normalized = vec![0; max_bank_len];
+            for y in 0..bank_size {
+                let src_from = y * bank_size;
+                let src_to = src_from + bank_size;
+                let dst_from = y * max_bank_size;
+                let dst_to = dst_from + bank_size;
+                normalized[dst_from..dst_to].copy_from_slice(&bank[src_from..src_to]);
+            }
+            normalized
+        };
+        state
+            .image_banks
+            .insert(image_index as i32, normalized_bank);
+    }
+    state.image_bank_size = max_bank_size as i32;
+    true
+}
+
+fn build_resource_toml(state: &RuntimeState, exclude_images: bool) -> Option<String> {
+    let mut root = toml::map::Map::new();
+    root.insert(
+        "format_version".to_string(),
+        toml::Value::Integer(RESOURCE_FORMAT_VERSION as i64),
+    );
+    root.insert(
+        "images".to_string(),
+        build_resource_images_value(state, exclude_images)?,
+    );
+    root.insert("tilemaps".to_string(), toml::Value::Array(Vec::new()));
+    root.insert("sounds".to_string(), toml::Value::Array(Vec::new()));
+    root.insert("musics".to_string(), toml::Value::Array(Vec::new()));
+
+    let mut runtime_table = toml::map::Map::new();
+    runtime_table.insert(
+        "width".to_string(),
+        toml::Value::Integer(state.width as i64),
+    );
+    runtime_table.insert(
+        "height".to_string(),
+        toml::Value::Integer(state.height as i64),
+    );
+    runtime_table.insert(
+        "frame_count".to_string(),
+        toml::Value::Integer(state.frame_count as i64),
+    );
+    runtime_table.insert(
+        "clear_color".to_string(),
+        toml::Value::Integer(state.clear_color as i64),
+    );
+    root.insert(
+        RESOURCE_RUNTIME_SECTION.to_string(),
+        toml::Value::Table(runtime_table),
+    );
+
+    toml::to_string(&toml::Value::Table(root)).ok()
 }
 
 fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
@@ -525,14 +746,22 @@ pub extern "C" fn flutterxel_core_load(
     if filename.is_null() {
         return false;
     }
-    if !validate_optional_resource_flags(
-        exclude_images,
-        exclude_tilemaps,
-        exclude_sounds,
-        exclude_musics,
-    ) {
+    let Some(exclude_images) = decode_optional_bool(exclude_images) else {
         return false;
-    }
+    };
+    let Some(exclude_tilemaps) = decode_optional_bool(exclude_tilemaps) else {
+        return false;
+    };
+    let Some(exclude_sounds) = decode_optional_bool(exclude_sounds) else {
+        return false;
+    };
+    let Some(exclude_musics) = decode_optional_bool(exclude_musics) else {
+        return false;
+    };
+    let exclude_images = exclude_images.unwrap_or(false);
+    let _exclude_tilemaps = exclude_tilemaps.unwrap_or(false);
+    let _exclude_sounds = exclude_sounds.unwrap_or(false);
+    let _exclude_musics = exclude_musics.unwrap_or(false);
 
     let c_str = unsafe { CStr::from_ptr(filename) };
     let Ok(path) = c_str.to_str() else {
@@ -611,6 +840,9 @@ pub extern "C" fn flutterxel_core_load(
         state.height = loaded_height;
         state.frame_buffer = vec![state.clear_color; buffer_len];
     }
+    if !load_resource_images(&mut state, &manifest, exclude_images) {
+        return false;
+    }
 
     state.last_loaded = Some(path.to_string());
     true
@@ -627,14 +859,22 @@ pub extern "C" fn flutterxel_core_save(
     if filename.is_null() {
         return false;
     }
-    if !validate_optional_resource_flags(
-        exclude_images,
-        exclude_tilemaps,
-        exclude_sounds,
-        exclude_musics,
-    ) {
+    let Some(exclude_images) = decode_optional_bool(exclude_images) else {
         return false;
-    }
+    };
+    let Some(exclude_tilemaps) = decode_optional_bool(exclude_tilemaps) else {
+        return false;
+    };
+    let Some(exclude_sounds) = decode_optional_bool(exclude_sounds) else {
+        return false;
+    };
+    let Some(exclude_musics) = decode_optional_bool(exclude_musics) else {
+        return false;
+    };
+    let exclude_images = exclude_images.unwrap_or(false);
+    let _exclude_tilemaps = exclude_tilemaps.unwrap_or(false);
+    let _exclude_sounds = exclude_sounds.unwrap_or(false);
+    let _exclude_musics = exclude_musics.unwrap_or(false);
 
     let c_str = unsafe { CStr::from_ptr(filename) };
     let Ok(path) = c_str.to_str() else {
@@ -646,7 +886,10 @@ pub extern "C" fn flutterxel_core_save(
         if !state.initialized {
             return false;
         }
-        build_resource_toml(&state)
+        let Some(toml_text) = build_resource_toml(&state, exclude_images) else {
+            return false;
+        };
+        toml_text
     };
 
     let Ok(file) = File::create(path) else {
@@ -886,6 +1129,90 @@ mod tests {
         assert_eq!(state.height, 4);
         assert_eq!(state.frame_buffer.len(), 16);
 
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_then_load_roundtrips_image_bank_data() {
+        let _guard = test_lock();
+        init_runtime(2, 2);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_bank_size = 2;
+            state.image_banks.insert(0, vec![1, 2, 3, 4]);
+        }
+
+        let path = tmp_resource_path("image_roundtrip");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, -1, -1, -1));
+
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_banks.insert(0, vec![9, 9, 9, 9]);
+        }
+
+        assert!(flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            2.0,
+            2.0,
+            OPTIONAL_I32_NONE,
+            f64::NAN,
+            f64::NAN
+        ));
+
+        let frame_buffer = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            state.frame_buffer.clone()
+        };
+        assert_eq!(frame_buffer, vec![1, 2, 3, 4]);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_with_exclude_images_keeps_existing_image_data() {
+        let _guard = test_lock();
+        init_runtime(2, 2);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_bank_size = 2;
+            state.image_banks.insert(0, vec![1, 2, 3, 4]);
+        }
+
+        let path = tmp_resource_path("exclude_images");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, -1, -1, -1));
+
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_banks.insert(0, vec![9, 9, 9, 9]);
+        }
+
+        assert!(flutterxel_core_load(c_path.as_ptr(), 1, -1, -1, -1));
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            2.0,
+            2.0,
+            OPTIONAL_I32_NONE,
+            f64::NAN,
+            f64::NAN
+        ));
+
+        let frame_buffer = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            state.frame_buffer.clone()
+        };
+        assert_eq!(frame_buffer, vec![9, 9, 9, 9]);
         let _ = fs::remove_file(path);
     }
 

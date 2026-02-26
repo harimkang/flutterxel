@@ -9,7 +9,8 @@ Rust native crates and build assets for `flutterxel`.
 ## Notes
 
 - Current exports provide phase-1 runtime API scope (`init/run/btn/cls/blt/play/load/save`).
-- `.pyxres` `load/save` currently uses ZIP + `pyxel_resource.toml` baseline handling in Rust.
+- `.pyxres` `load/save` currently uses ZIP + `pyxel_resource.toml` handling in Rust.
+- Current resource implementation supports image bank serialization round-trip and `excludeImages` load/save behavior.
 - Production integration will provide:
   - mobile artifact builds (`.so`, `.xcframework`)
   - stable ABI versioning policy

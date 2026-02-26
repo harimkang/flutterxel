@@ -33,7 +33,7 @@ Current implemented bridge includes:
 
 - Core API skeleton: `init/run/btn/cls/blt/play/load/save`
 - Runtime helper ABI: framebuffer pointer/length, frame counter, input-state bridge
-- `.pyxres` baseline compatibility: ZIP archive + `pyxel_resource.toml` format handling in Rust core
+- `.pyxres` compatibility: ZIP archive + `pyxel_resource.toml` format handling and image-bank round-trip in Rust core
 
 ## Rendering and Input
 
