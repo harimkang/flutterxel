@@ -9,6 +9,8 @@ SYMBOLS=(
   flutterxel_core_init
   flutterxel_core_run
   flutterxel_core_btn
+  flutterxel_core_btnp
+  flutterxel_core_btnr
   flutterxel_core_set_btn_state
   flutterxel_core_cls
   flutterxel_core_blt

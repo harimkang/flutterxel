@@ -24,7 +24,11 @@ typedef struct FlutterxelState {
   int32_t* frame_buffer;
   size_t frame_buffer_len;
   int32_t pressed_keys[PRESSED_KEY_CAPACITY];
+  uint64_t pressed_key_frames[PRESSED_KEY_CAPACITY];
   size_t pressed_key_count;
+  int32_t released_keys[PRESSED_KEY_CAPACITY];
+  uint64_t released_key_frames[PRESSED_KEY_CAPACITY];
+  size_t released_key_count;
   uint8_t channel_state[CHANNEL_CAPACITY];
   int32_t image_bank_size;
   int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
@@ -63,6 +67,29 @@ static int find_pressed_key_index(int32_t key) {
     }
   }
   return -1;
+}
+
+static int find_released_key_index(int32_t key) {
+  for (size_t i = 0; i < g_state.released_key_count; i++) {
+    if (g_state.released_keys[i] == key) {
+      return (int)i;
+    }
+  }
+  return -1;
+}
+
+static void remove_released_key_at(size_t index) {
+  if (index >= g_state.released_key_count) {
+    return;
+  }
+  size_t last_index = g_state.released_key_count - 1;
+  if (index != last_index) {
+    g_state.released_keys[index] = g_state.released_keys[last_index];
+    g_state.released_key_frames[index] = g_state.released_key_frames[last_index];
+  }
+  g_state.released_keys[last_index] = 0;
+  g_state.released_key_frames[last_index] = 0;
+  g_state.released_key_count -= 1;
 }
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
@@ -115,7 +142,11 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.frame_count = 0;
   g_state.clear_color = 0;
   g_state.pressed_key_count = 0;
+  g_state.released_key_count = 0;
   memset(g_state.pressed_keys, 0, sizeof(g_state.pressed_keys));
+  memset(g_state.pressed_key_frames, 0, sizeof(g_state.pressed_key_frames));
+  memset(g_state.released_keys, 0, sizeof(g_state.released_keys));
+  memset(g_state.released_key_frames, 0, sizeof(g_state.released_key_frames));
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
   seed_default_image_bank();
   return true;
@@ -131,6 +162,13 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
   }
 
   g_state.frame_count += 1;
+  for (size_t i = 0; i < g_state.released_key_count;) {
+    if (g_state.released_key_frames[i] == g_state.frame_count) {
+      i += 1;
+      continue;
+    }
+    remove_released_key_at(i);
+  }
 
   if (update != NULL) {
     update(update_user_data);
@@ -170,6 +208,47 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_btn(int32_t key) {
   return find_pressed_key_index(key) >= 0;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_btnp(int32_t key,
+                                             int32_t hold,
+                                             int32_t period) {
+  if (!g_state.initialized) {
+    return false;
+  }
+
+  int pressed_index = find_pressed_key_index(key);
+  if (pressed_index < 0) {
+    return false;
+  }
+
+  uint64_t pressed_frame = g_state.pressed_key_frames[(size_t)pressed_index];
+  uint64_t elapsed = g_state.frame_count - pressed_frame;
+  if (elapsed == 0) {
+    return true;
+  }
+  if (hold <= 0 || period <= 0) {
+    return false;
+  }
+
+  uint64_t hold_u = (uint64_t)hold;
+  uint64_t period_u = (uint64_t)period;
+  if (elapsed < hold_u) {
+    return false;
+  }
+  return ((elapsed - hold_u) % period_u) == 0;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_btnr(int32_t key) {
+  if (!g_state.initialized) {
+    return false;
+  }
+
+  int released_index = find_released_key_index(key);
+  if (released_index < 0) {
+    return false;
+  }
+  return g_state.released_key_frames[(size_t)released_index] == g_state.frame_count;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key, bool pressed) {
   if (!g_state.initialized) {
     return false;
@@ -183,7 +262,14 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key, bool pressed) 
     if (g_state.pressed_key_count >= PRESSED_KEY_CAPACITY) {
       return false;
     }
-    g_state.pressed_keys[g_state.pressed_key_count++] = key;
+    size_t index = g_state.pressed_key_count;
+    g_state.pressed_keys[index] = key;
+    g_state.pressed_key_frames[index] = g_state.frame_count;
+    g_state.pressed_key_count += 1;
+    int released_index = find_released_key_index(key);
+    if (released_index >= 0) {
+      remove_released_key_at((size_t)released_index);
+    }
     return true;
   }
 
@@ -195,9 +281,24 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key, bool pressed) 
   size_t last_index = g_state.pressed_key_count - 1;
   if (index != last_index) {
     g_state.pressed_keys[index] = g_state.pressed_keys[last_index];
+    g_state.pressed_key_frames[index] = g_state.pressed_key_frames[last_index];
   }
   g_state.pressed_keys[last_index] = 0;
+  g_state.pressed_key_frames[last_index] = 0;
   g_state.pressed_key_count -= 1;
+
+  int released_index = find_released_key_index(key);
+  if (released_index >= 0) {
+    g_state.released_key_frames[(size_t)released_index] = g_state.frame_count;
+    return true;
+  }
+  if (g_state.released_key_count >= PRESSED_KEY_CAPACITY) {
+    return false;
+  }
+  size_t release_slot = g_state.released_key_count;
+  g_state.released_keys[release_slot] = key;
+  g_state.released_key_frames[release_slot] = g_state.frame_count;
+  g_state.released_key_count += 1;
   return true;
 }
 

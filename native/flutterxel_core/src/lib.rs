@@ -84,6 +84,8 @@ struct RuntimeState {
     capture_sec: Option<i32>,
     clear_color: i32,
     pressed_keys: HashSet<i32>,
+    pressed_key_frame: HashMap<i32, u64>,
+    released_key_frame: HashMap<i32, u64>,
     frame_buffer: Vec<i32>,
     image_banks: HashMap<i32, Vec<i32>>,
     image_bank_size: i32,
@@ -112,6 +114,8 @@ impl Default for RuntimeState {
             capture_sec: None,
             clear_color: 0,
             pressed_keys: HashSet::new(),
+            pressed_key_frame: HashMap::new(),
+            released_key_frame: HashMap::new(),
             frame_buffer: Vec::new(),
             image_banks: HashMap::new(),
             image_bank_size: 16,
@@ -1007,6 +1011,8 @@ pub extern "C" fn flutterxel_core_init(
     state.capture_sec = decode_optional_i32(capture_sec);
     state.clear_color = 0;
     state.pressed_keys.clear();
+    state.pressed_key_frame.clear();
+    state.released_key_frame.clear();
     let Some(frame_buffer_len) = frame_buffer_len(width, height) else {
         return false;
     };
@@ -1037,6 +1043,10 @@ pub extern "C" fn flutterxel_core_run(
             return false;
         }
         state.frame_count = state.frame_count.saturating_add(1);
+        let current_frame = state.frame_count;
+        state
+            .released_key_frame
+            .retain(|_, released_frame| *released_frame == current_frame);
     }
 
     if let Some(callback) = update {
@@ -1093,11 +1103,60 @@ pub extern "C" fn flutterxel_core_set_btn_state(key: i32, pressed: bool) -> bool
     }
 
     if pressed {
-        state.pressed_keys.insert(key);
+        if state.pressed_keys.insert(key) {
+            let frame = state.frame_count;
+            state.pressed_key_frame.insert(key, frame);
+        }
+        state.released_key_frame.remove(&key);
     } else {
-        state.pressed_keys.remove(&key);
+        if state.pressed_keys.remove(&key) {
+            state.pressed_key_frame.remove(&key);
+            let frame = state.frame_count;
+            state.released_key_frame.insert(key, frame);
+        }
     }
     true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_btnp(key: i32, hold: i32, period: i32) -> bool {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    if !state.pressed_keys.contains(&key) {
+        return false;
+    }
+
+    let Some(pressed_frame) = state.pressed_key_frame.get(&key) else {
+        return false;
+    };
+    let elapsed = state.frame_count.saturating_sub(*pressed_frame);
+    if elapsed == 0 {
+        return true;
+    }
+
+    if hold <= 0 || period <= 0 {
+        return false;
+    }
+
+    let hold = hold as u64;
+    let period = period as u64;
+    if elapsed < hold {
+        return false;
+    }
+
+    (elapsed - hold) % period == 0
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_btnr(key: i32) -> bool {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    state.released_key_frame.get(&key).copied() == Some(state.frame_count)
 }
 
 #[no_mangle]
@@ -1547,6 +1606,63 @@ mod tests {
     }
 
     #[test]
+    fn btnp_and_btnr_follow_press_repeat_and_release_frames() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(!flutterxel_core_btnp(32, 0, 0));
+        assert!(!flutterxel_core_btnr(32));
+
+        assert!(flutterxel_core_set_btn_state(32, true));
+        assert!(flutterxel_core_btnp(32, 0, 0));
+        assert!(!flutterxel_core_btnr(32));
+
+        assert!(flutterxel_core_run(
+            None,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null_mut()
+        ));
+        assert!(!flutterxel_core_btnp(32, 0, 0));
+        assert!(!flutterxel_core_btnp(32, 2, 2));
+
+        assert!(flutterxel_core_run(
+            None,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null_mut()
+        ));
+        assert!(flutterxel_core_btnp(32, 2, 2));
+
+        assert!(flutterxel_core_run(
+            None,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null_mut()
+        ));
+        assert!(!flutterxel_core_btnp(32, 2, 2));
+
+        assert!(flutterxel_core_run(
+            None,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null_mut()
+        ));
+        assert!(flutterxel_core_btnp(32, 2, 2));
+
+        assert!(flutterxel_core_set_btn_state(32, false));
+        assert!(flutterxel_core_btnr(32));
+
+        assert!(flutterxel_core_run(
+            None,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null_mut()
+        ));
+        assert!(!flutterxel_core_btnr(32));
+    }
+
+    #[test]
     fn save_then_load_accepts_zip_resource_archive() {
         let _guard = test_lock();
         init_runtime(4, 4);
@@ -1963,7 +2079,8 @@ mod tests {
             return;
         }
 
-        let c_path = CString::new(sample_path.to_string_lossy().to_string()).expect("valid cstring");
+        let c_path =
+            CString::new(sample_path.to_string_lossy().to_string()).expect("valid cstring");
         assert!(flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
 
         let state = runtime_state().lock().expect("runtime state poisoned");

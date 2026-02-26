@@ -57,6 +57,12 @@ FLUTTERXEL_CORE_EXPORT size_t flutterxel_core_framebuffer_len(void);
 
 // pyxel.btn(key)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btn(int32_t key);
+// pyxel.btnp(key, *, hold=0, period=0)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btnp(int32_t key,
+                                                  int32_t hold,
+                                                  int32_t period);
+// pyxel.btnr(key)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btnr(int32_t key);
 
 // runtime input bridge
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_state(int32_t key,

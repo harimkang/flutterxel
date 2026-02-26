@@ -10,6 +10,8 @@ void main() {
     expect(flutterxel.init, isA<Function>());
     expect(flutterxel.run, isA<Function>());
     expect(flutterxel.btn, isA<Function>());
+    expect(flutterxel.btnp, isA<Function>());
+    expect(flutterxel.btnr, isA<Function>());
     expect(flutterxel.cls, isA<Function>());
     expect(flutterxel.blt, isA<Function>());
     expect(flutterxel.play, isA<Function>());
@@ -84,8 +86,32 @@ void main() {
 
     flutterxel.setBtnState(32, true);
     expect(flutterxel.btn(32), isA<bool>());
+    expect(flutterxel.btnp(32), isA<bool>());
+    expect(flutterxel.btnr(32), isA<bool>());
 
     final frame = flutterxel.frameBufferSnapshot();
     expect(frame, isA<List<int>>());
+  });
+
+  test('btnp and btnr expose frame-based input transitions', () {
+    flutterxel.init(8, 8);
+
+    expect(flutterxel.btnp(32), isFalse);
+    expect(flutterxel.btnr(32), isFalse);
+
+    flutterxel.setBtnState(32, true);
+    expect(flutterxel.btnp(32), isTrue);
+
+    flutterxel.run(() {}, () {});
+    expect(flutterxel.btnp(32), isFalse);
+
+    flutterxel.run(() {}, () {});
+    expect(flutterxel.btnp(32, hold: 2, period: 2), isTrue);
+
+    flutterxel.setBtnState(32, false);
+    expect(flutterxel.btnr(32), isTrue);
+
+    flutterxel.run(() {}, () {});
+    expect(flutterxel.btnr(32), isFalse);
   });
 }

@@ -53,6 +53,10 @@ FFI_PLUGIN_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
 FFI_PLUGIN_EXPORT size_t flutterxel_core_framebuffer_len(void);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_btn(int32_t key);
+FFI_PLUGIN_EXPORT bool flutterxel_core_btnp(int32_t key,
+                                             int32_t hold,
+                                             int32_t period);
+FFI_PLUGIN_EXPORT bool flutterxel_core_btnr(int32_t key);
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key,
                                                       bool pressed);
 FFI_PLUGIN_EXPORT bool flutterxel_core_cls(int32_t col);

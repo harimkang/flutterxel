@@ -51,6 +51,8 @@ int _runtimeFps = 30;
 Timer? _runLoopTimer;
 final ValueNotifier<int> _frameNotifier = ValueNotifier<int>(0);
 final Set<int> _fallbackPressedKeys = <int>{};
+final Map<int, int> _fallbackPressedFrame = <int, int>{};
+final Map<int, int> _fallbackReleasedFrame = <int, int>{};
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -163,6 +165,8 @@ void init(
     _runtimeFps = (fps ?? 30).clamp(1, 240).toInt();
     _frameNotifier.value = frameCount;
     _fallbackPressedKeys.clear();
+    _fallbackPressedFrame.clear();
+    _fallbackReleasedFrame.clear();
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -209,6 +213,9 @@ void _runFrame(void Function() update, void Function() draw) {
   }
 
   frameCount = bindings?.flutterxel_core_frame_count() ?? (frameCount + 1);
+  _fallbackReleasedFrame.removeWhere(
+    (_, releasedFrame) => releasedFrame != frameCount,
+  );
   _frameNotifier.value = frameCount;
 }
 
@@ -231,28 +238,73 @@ bool btn(int key) {
   return bindings.flutterxel_core_btn(key);
 }
 
+/// Pyxel-compatible btnp API.
+bool btnp(int key, {int hold = 0, int period = 0}) {
+  if (!_isInitialized) {
+    return false;
+  }
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_btnp(key, hold, period);
+  }
+
+  if (!_fallbackPressedKeys.contains(key)) {
+    return false;
+  }
+  final pressedFrame = _fallbackPressedFrame[key];
+  if (pressedFrame == null) {
+    return false;
+  }
+
+  final elapsed = frameCount - pressedFrame;
+  if (elapsed == 0) {
+    return true;
+  }
+  if (hold <= 0 || period <= 0) {
+    return false;
+  }
+  if (elapsed < hold) {
+    return false;
+  }
+  return ((elapsed - hold) % period) == 0;
+}
+
+/// Pyxel-compatible btnr API.
+bool btnr(int key) {
+  if (!_isInitialized) {
+    return false;
+  }
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_btnr(key);
+  }
+  return _fallbackReleasedFrame[key] == frameCount;
+}
+
 /// Runtime input bridge for forwarding external key/touch mappings.
 void setBtnState(int key, bool pressed) {
   if (!_isInitialized) {
     return;
   }
   final bindings = _getBindingsOrNull();
-  if (bindings == null) {
-    if (pressed) {
-      _fallbackPressedKeys.add(key);
-    } else {
-      _fallbackPressedKeys.remove(key);
+  if (bindings != null) {
+    final ok = bindings.flutterxel_core_set_btn_state(key, pressed);
+    if (!ok) {
+      throw StateError('flutterxel_core_set_btn_state failed.');
     }
-    return;
-  }
-  final ok = bindings.flutterxel_core_set_btn_state(key, pressed);
-  if (!ok) {
-    throw StateError('flutterxel_core_set_btn_state failed.');
   }
   if (pressed) {
-    _fallbackPressedKeys.add(key);
+    final inserted = _fallbackPressedKeys.add(key);
+    if (inserted) {
+      _fallbackPressedFrame[key] = frameCount;
+    }
+    _fallbackReleasedFrame.remove(key);
   } else {
-    _fallbackPressedKeys.remove(key);
+    final removed = _fallbackPressedKeys.remove(key);
+    _fallbackPressedFrame.remove(key);
+    if (removed) {
+      _fallbackReleasedFrame[key] = frameCount;
+    }
   }
 }
 

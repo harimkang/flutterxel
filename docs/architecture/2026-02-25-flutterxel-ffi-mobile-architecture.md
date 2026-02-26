@@ -31,7 +31,7 @@ Build a Pyxel-compatible runtime for Flutter with a Rust core over FFI, targetin
 
 Current implemented bridge includes:
 
-- Core API skeleton: `init/run/btn/cls/blt/play/load/save`
+- Core API skeleton: `init/run/btn/btnp/btnr/cls/blt/play/load/save`
 - Runtime helper ABI: framebuffer pointer/length, frame counter, input-state bridge
 - `.pyxres` compatibility: ZIP archive + `pyxel_resource.toml` format handling and image/tilemap/sound/music round-trip in Rust core
 
