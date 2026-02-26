@@ -35,6 +35,12 @@ void main() {
     },
   );
 
+  test('supports release-bump command for pre-tag version automation', () {
+    final parser = FlutterxelTools.buildParser();
+    final results = parser.parse(const ['release-bump']);
+    expect(FlutterxelTools.dispatch(results), contains('release-bump'));
+  });
+
   test('execute runs build-native script with forwarded args', () async {
     String? executable;
     List<String>? arguments;
@@ -77,5 +83,49 @@ void main() {
     expect(arguments, isNotNull);
     expect(arguments!.first, contains('check_release_versions.sh'));
     expect(arguments, containsAll(<String>['--tag', 'v0.0.1']));
+  });
+
+  test('execute runs release-check script with forwarded version', () async {
+    String? executable;
+    List<String>? arguments;
+
+    final exitCode = await FlutterxelTools.execute(
+      const ['release-check', '--version', '0.0.1'],
+      runProcess: (exec, args) async {
+        executable = exec;
+        arguments = args;
+        return ProcessResult(12345, 0, 'ok', '');
+      },
+      onStdout: (_) {},
+      onStderr: (_) {},
+    );
+
+    expect(exitCode, 0);
+    expect(executable, 'bash');
+    expect(arguments, isNotNull);
+    expect(arguments!.first, contains('check_release_versions.sh'));
+    expect(arguments, containsAll(<String>['--version', '0.0.1']));
+  });
+
+  test('execute runs release-bump script with forwarded version', () async {
+    String? executable;
+    List<String>? arguments;
+
+    final exitCode = await FlutterxelTools.execute(
+      const ['release-bump', '--version', '0.0.2'],
+      runProcess: (exec, args) async {
+        executable = exec;
+        arguments = args;
+        return ProcessResult(12345, 0, 'ok', '');
+      },
+      onStdout: (_) {},
+      onStderr: (_) {},
+    );
+
+    expect(exitCode, 0);
+    expect(executable, 'bash');
+    expect(arguments, isNotNull);
+    expect(arguments!.first, contains('bump_release_versions.sh'));
+    expect(arguments, containsAll(<String>['--version', '0.0.2']));
   });
 }

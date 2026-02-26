@@ -17,6 +17,7 @@ dart run flutterxel_tools:flutterxel_tools --help
 dart run flutterxel_tools:flutterxel_tools run
 dart run flutterxel_tools:flutterxel_tools build-native
 dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.1
+dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.2
 ```
 
 `build-native` currently points maintainers to:
@@ -43,6 +44,14 @@ bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.1
 ```
 
 `release-check` CLI wrapper runs the same script.
+
+Pre-tag version bump helper:
+
+```bash
+bash packages/flutterxel_tools/tool/bump_release_versions.sh --version 0.0.2
+```
+
+`release-bump` CLI wrapper runs the same script.
 
 ## Monorepo Context
 

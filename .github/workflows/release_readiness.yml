@@ -1,0 +1,21 @@
+name: release-readiness
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate pre-tag release metadata
+        run: |
+          VERSION="$(awk -F': ' '/^version:[[:space:]]*/ {print $2; exit}' packages/flutterxel/pubspec.yaml | tr -d '\r')"
+          bash ./packages/flutterxel_tools/tool/check_release_versions.sh --version "$VERSION"

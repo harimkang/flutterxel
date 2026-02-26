@@ -35,6 +35,8 @@ Tag releases (`v*`) publish prebuilt native bundles via GitHub Actions, includin
 
 Release tags also trigger `.github/workflows/publish_dry_run.yml`, which validates package versions against the tag and runs `pub publish --dry-run` for monorepo packages.
 
+Pre-tag metadata checks run in `.github/workflows/release_readiness.yml` (versions and CHANGELOG headings).
+
 ## Runtime Loop and View
 
 ```dart

@@ -119,6 +119,12 @@ Equivalent script:
 bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.1
 ```
 
+Pre-tag version bump (pubspec + changelog headings):
+
+```bash
+dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.2
+```
+
 ## CI Workflows
 
 - `.github/workflows/ci.yml`
@@ -130,6 +136,8 @@ bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.1
 - `.github/workflows/publish_dry_run.yml`
   - tag/version validation
   - `flutter pub publish --dry-run` for monorepo packages
+- `.github/workflows/release_readiness.yml`
+  - pre-tag metadata validation on PR/main (versions + CHANGELOG headings)
 
 ## Design/Planning Docs
 

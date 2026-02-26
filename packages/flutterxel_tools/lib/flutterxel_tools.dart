@@ -11,6 +11,7 @@ enum FlutterxelToolCommand {
   app2html,
   buildNative,
   releaseCheck,
+  releaseBump,
 }
 
 class FlutterxelTools {
@@ -50,6 +51,15 @@ class FlutterxelTools {
       'tag',
       help: 'Release tag to validate (for example v0.1.0).',
     );
+    releaseCheck.addOption(
+      'version',
+      help: 'Version to validate before tag creation (for example 0.1.0).',
+    );
+    final releaseBump = parser.addCommand('release-bump');
+    releaseBump.addOption(
+      'version',
+      help: 'Version to set (for example 0.1.0).',
+    );
     return parser;
   }
 
@@ -72,6 +82,8 @@ class FlutterxelTools {
         'build-native scaffold: run packages/flutterxel_tools/tool/build_rust_core_artifacts.sh',
       'release-check' =>
         'release-check scaffold: run packages/flutterxel_tools/tool/check_release_versions.sh',
+      'release-bump' =>
+        'release-bump scaffold: run packages/flutterxel_tools/tool/bump_release_versions.sh',
       _ => usage(),
     };
   }
@@ -97,6 +109,22 @@ class FlutterxelTools {
     final candidates = <String>[
       '${Directory.current.path}${sep}packages${sep}flutterxel_tools${sep}tool${sep}check_release_versions.sh',
       '${Directory.current.path}${sep}tool${sep}check_release_versions.sh',
+    ];
+
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+
+    return candidates.first;
+  }
+
+  static String _releaseBumpScriptPath() {
+    final sep = Platform.pathSeparator;
+    final candidates = <String>[
+      '${Directory.current.path}${sep}packages${sep}flutterxel_tools${sep}tool${sep}bump_release_versions.sh',
+      '${Directory.current.path}${sep}tool${sep}bump_release_versions.sh',
     ];
 
     for (final candidate in candidates) {
@@ -136,7 +164,9 @@ class FlutterxelTools {
       return 0;
     }
 
-    if (command != 'build-native' && command != 'release-check') {
+    if (command != 'build-native' &&
+        command != 'release-check' &&
+        command != 'release-bump') {
       onStdout(dispatch(results));
       return 0;
     }
@@ -145,6 +175,7 @@ class FlutterxelTools {
     final scriptPath = switch (command) {
       'build-native' => _buildNativeScriptPath(),
       'release-check' => _releaseCheckScriptPath(),
+      'release-bump' => _releaseBumpScriptPath(),
       _ => '',
     };
     if (!File(scriptPath).existsSync()) {
@@ -167,6 +198,15 @@ class FlutterxelTools {
       final tag = commandArgs['tag'] as String?;
       if (tag != null && tag.isNotEmpty) {
         forwarded.addAll(['--tag', tag]);
+      }
+      final version = commandArgs['version'] as String?;
+      if (version != null && version.isNotEmpty) {
+        forwarded.addAll(['--version', version]);
+      }
+    } else if (command == 'release-bump') {
+      final version = commandArgs['version'] as String?;
+      if (version != null && version.isNotEmpty) {
+        forwarded.addAll(['--version', version]);
       }
     }
     forwarded.addAll(commandArgs.rest);
