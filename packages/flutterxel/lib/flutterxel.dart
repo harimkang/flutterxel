@@ -73,6 +73,9 @@ List<String> _fallbackDroppedFiles = const <String>[];
 final Set<int> _fallbackPlayingChannels = <int>{};
 final Map<int, ({int snd, double pos})> _fallbackPlayPositions =
     <int, ({int snd, double pos})>{};
+final Map<int, ({int snd, int startedFrame, double? sec, bool loop})>
+_fallbackPlaybackMeta =
+    <int, ({int snd, int startedFrame, double? sec, bool loop})>{};
 List<int> _fallbackFrameBuffer = <int>[];
 int _fallbackCameraX = 0;
 int _fallbackCameraY = 0;
@@ -104,6 +107,7 @@ int _fallbackRngState = _fallbackRngDefaultState;
 int _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
+const int _detachedSoundPlayIdBase = 100000;
 final Finalizer<ffi.Pointer<ffi.Void>> _nativeBufferFinalizer =
     Finalizer<ffi.Pointer<ffi.Void>>((pointer) {
       calloc.free(pointer);
@@ -170,6 +174,38 @@ int _encodeOptionalBool(bool? value) {
     return _optionalBoolNone;
   }
   return value ? _optionalBoolTrue : _optionalBoolFalse;
+}
+
+void _updateFallbackPlaybackProgress() {
+  if (_runtimeFps <= 0) {
+    return;
+  }
+  final elapsedPerFrame = 1.0 / _runtimeFps;
+  final completedChannels = <int>[];
+  for (final entry in _fallbackPlaybackMeta.entries) {
+    final channel = entry.key;
+    final meta = entry.value;
+    final elapsed = (frameCount - meta.startedFrame) * elapsedPerFrame;
+    if (!meta.loop && meta.sec != null && elapsed >= meta.sec!) {
+      completedChannels.add(channel);
+      continue;
+    }
+
+    double pos = elapsed;
+    if (meta.sec != null && meta.sec! > 0) {
+      if (meta.loop) {
+        pos = elapsed % meta.sec!;
+      } else if (pos > meta.sec!) {
+        pos = meta.sec!;
+      }
+    }
+    _fallbackPlayPositions[channel] = (snd: meta.snd, pos: pos);
+  }
+  for (final channel in completedChannels) {
+    _fallbackPlayingChannels.remove(channel);
+    _fallbackPlayPositions.remove(channel);
+    _fallbackPlaybackMeta.remove(channel);
+  }
 }
 
 class _ParsedTmxLayer {
@@ -602,6 +638,7 @@ void init(
     _fallbackDroppedFiles = const <String>[];
     _fallbackPlayingChannels.clear();
     _fallbackPlayPositions.clear();
+    _fallbackPlaybackMeta.clear();
     _fallbackFrameBuffer = List<int>.filled(width * height, 0, growable: false);
     _fallbackCameraX = 0;
     _fallbackCameraY = 0;
@@ -661,6 +698,7 @@ void _clearLocalRuntimeState() {
   _fallbackDroppedFiles = const <String>[];
   _fallbackPlayingChannels.clear();
   _fallbackPlayPositions.clear();
+  _fallbackPlaybackMeta.clear();
   _fallbackFrameBuffer = <int>[];
   _fallbackCameraX = 0;
   _fallbackCameraY = 0;
@@ -740,6 +778,9 @@ void flip() {
   _fallbackReleasedFrame.removeWhere(
     (_, releasedFrame) => releasedFrame != frameCount,
   );
+  if (bindings == null) {
+    _updateFallbackPlaybackProgress();
+  }
   _clearTransientInputValues();
   _frameNotifier.value = frameCount;
 }
@@ -758,6 +799,9 @@ void show() {
   _fallbackReleasedFrame.removeWhere(
     (_, releasedFrame) => releasedFrame != frameCount,
   );
+  if (bindings == null) {
+    _updateFallbackPlaybackProgress();
+  }
   _clearTransientInputValues();
   _frameNotifier.value = frameCount;
 }
@@ -1801,6 +1845,92 @@ void _playImpl(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   var seqLen = 0;
   ffi.Pointer<ffi.Char> sndStringPtr = ffi.nullptr;
 
+  int syncDetachedSoundToCore(Sound sound, int soundId) {
+    if (bindings == null) {
+      return soundId;
+    }
+
+    ffi.Pointer<ffi.Int32> notesPtr = ffi.nullptr;
+    ffi.Pointer<ffi.Int32> tonesPtr = ffi.nullptr;
+    ffi.Pointer<ffi.Int32> volumesPtr = ffi.nullptr;
+    ffi.Pointer<ffi.Int32> effectsPtr = ffi.nullptr;
+
+    try {
+      if (sound._notesData.isNotEmpty) {
+        notesPtr = calloc<ffi.Int32>(sound._notesData.length);
+        for (var i = 0; i < sound._notesData.length; i++) {
+          notesPtr[i] = sound._notesData[i];
+        }
+      }
+      if (sound._tonesData.isNotEmpty) {
+        tonesPtr = calloc<ffi.Int32>(sound._tonesData.length);
+        for (var i = 0; i < sound._tonesData.length; i++) {
+          tonesPtr[i] = sound._tonesData[i];
+        }
+      }
+      if (sound._volumesData.isNotEmpty) {
+        volumesPtr = calloc<ffi.Int32>(sound._volumesData.length);
+        for (var i = 0; i < sound._volumesData.length; i++) {
+          volumesPtr[i] = sound._volumesData[i];
+        }
+      }
+      if (sound._effectsData.isNotEmpty) {
+        effectsPtr = calloc<ffi.Int32>(sound._effectsData.length);
+        for (var i = 0; i < sound._effectsData.length; i++) {
+          effectsPtr[i] = sound._effectsData[i];
+        }
+      }
+
+      final ok =
+          bindings.flutterxel_core_sound_set_notes(
+            soundId,
+            notesPtr,
+            sound._notesData.length,
+          ) &&
+          bindings.flutterxel_core_sound_set_tones(
+            soundId,
+            tonesPtr,
+            sound._tonesData.length,
+          ) &&
+          bindings.flutterxel_core_sound_set_volumes(
+            soundId,
+            volumesPtr,
+            sound._volumesData.length,
+          ) &&
+          bindings.flutterxel_core_sound_set_effects(
+            soundId,
+            effectsPtr,
+            sound._effectsData.length,
+          ) &&
+          bindings.flutterxel_core_sound_set_speed(soundId, sound.speed);
+      if (!ok) {
+        throw StateError('flutterxel_core_sound_set_* failed.');
+      }
+      return soundId;
+    } finally {
+      if (notesPtr != ffi.nullptr) {
+        calloc.free(notesPtr);
+      }
+      if (tonesPtr != ffi.nullptr) {
+        calloc.free(tonesPtr);
+      }
+      if (volumesPtr != ffi.nullptr) {
+        calloc.free(volumesPtr);
+      }
+      if (effectsPtr != ffi.nullptr) {
+        calloc.free(effectsPtr);
+      }
+    }
+  }
+
+  int resolveSoundPlayId(Sound sound, int detachedId) {
+    final resourceId = sound._soundId;
+    if (resourceId != null) {
+      return resourceId;
+    }
+    return syncDetachedSoundToCore(sound, detachedId);
+  }
+
   try {
     late final int sndKind;
     var sndValue = 0;
@@ -1821,13 +1951,43 @@ void _playImpl(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
           seqPtr[i] = snd[i];
         }
       }
+    } else if (snd is Sound) {
+      sndKind = FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_INT.value;
+      sndValue = resolveSoundPlayId(snd, _detachedSoundPlayIdBase);
+      fallbackSnd = sndValue;
+    } else if (snd is List<Sound>) {
+      sndKind =
+          FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_INT_LIST.value;
+      seqLen = snd.length;
+      if (seqLen > 0) {
+        seqPtr = calloc<ffi.Int32>(seqLen);
+        for (var i = 0; i < snd.length; i++) {
+          seqPtr[i] = resolveSoundPlayId(snd[i], _detachedSoundPlayIdBase + i);
+        }
+      }
+      fallbackSnd = seqLen == 0 ? 0 : seqPtr[0];
+    } else if (snd is List && snd.every((value) => value is Sound)) {
+      sndKind =
+          FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_INT_LIST.value;
+      final soundList = snd.cast<Sound>();
+      seqLen = soundList.length;
+      if (seqLen > 0) {
+        seqPtr = calloc<ffi.Int32>(seqLen);
+        for (var i = 0; i < soundList.length; i++) {
+          seqPtr[i] = resolveSoundPlayId(
+            soundList[i],
+            _detachedSoundPlayIdBase + i,
+          );
+        }
+      }
+      fallbackSnd = seqLen == 0 ? 0 : seqPtr[0];
     } else if (snd is String) {
       sndKind = FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_STRING.value;
       sndStringPtr = snd.toNativeUtf8().cast<ffi.Char>();
       fallbackSnd = 0;
     } else {
       throw UnsupportedError(
-        'play snd supports int, List<int>, or String in current skeleton.',
+        'play snd supports int, Sound, List<int>, List<Sound>, or String.',
       );
     }
 
@@ -1850,6 +2010,12 @@ void _playImpl(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
     }
     _fallbackPlayingChannels.add(ch);
     _fallbackPlayPositions[ch] = (snd: fallbackSnd, pos: 0.0);
+    _fallbackPlaybackMeta[ch] = (
+      snd: fallbackSnd,
+      startedFrame: frameCount,
+      sec: sec,
+      loop: loop ?? false,
+    );
   } finally {
     if (seqPtr != ffi.nullptr) {
       calloc.free(seqPtr);
@@ -1878,9 +2044,39 @@ void playm(int msc, {bool loop = false}) {
   for (var channel = 0; channel < 4; channel++) {
     _fallbackPlayingChannels.remove(channel);
     _fallbackPlayPositions.remove(channel);
+    _fallbackPlaybackMeta.remove(channel);
   }
-  _fallbackPlayingChannels.add(0);
-  _fallbackPlayPositions[0] = (snd: msc, pos: 0.0);
+
+  var applied = false;
+  if (msc >= 0 && msc < musics.length) {
+    final seqs = musics[msc]._seqData;
+    for (var channel = 0; channel < seqs.length && channel < 4; channel++) {
+      final seq = seqs[channel];
+      if (seq.isEmpty) {
+        continue;
+      }
+      final snd = seq.first;
+      _fallbackPlayingChannels.add(channel);
+      _fallbackPlayPositions[channel] = (snd: snd, pos: 0.0);
+      _fallbackPlaybackMeta[channel] = (
+        snd: snd,
+        startedFrame: frameCount,
+        sec: null,
+        loop: loop,
+      );
+      applied = true;
+    }
+  }
+  if (!applied) {
+    _fallbackPlayingChannels.add(0);
+    _fallbackPlayPositions[0] = (snd: msc, pos: 0.0);
+    _fallbackPlaybackMeta[0] = (
+      snd: msc,
+      startedFrame: frameCount,
+      sec: null,
+      loop: loop,
+    );
+  }
 }
 
 void _stopImpl(int? ch) {
@@ -1895,9 +2091,11 @@ void _stopImpl(int? ch) {
   if (ch == null) {
     _fallbackPlayingChannels.clear();
     _fallbackPlayPositions.clear();
+    _fallbackPlaybackMeta.clear();
   } else {
     _fallbackPlayingChannels.remove(ch);
     _fallbackPlayPositions.remove(ch);
+    _fallbackPlaybackMeta.remove(ch);
   }
 }
 
@@ -1937,6 +2135,7 @@ bool isChannelPlaying(int ch) {
     }
   }
 
+  _updateFallbackPlaybackProgress();
   return _fallbackPlayPositions[ch];
 }
 

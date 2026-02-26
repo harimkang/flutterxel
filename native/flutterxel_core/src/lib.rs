@@ -46,6 +46,7 @@ struct PlayCall {
     sec: Option<f64>,
     loop_opt: Option<bool>,
     resume_opt: Option<bool>,
+    started_frame: u64,
 }
 
 #[allow(dead_code)]
@@ -209,6 +210,51 @@ type FrameCallback = Option<extern "C" fn(*mut c_void)>;
 fn runtime_state() -> &'static Mutex<RuntimeState> {
     static STATE: OnceLock<Mutex<RuntimeState>> = OnceLock::new();
     STATE.get_or_init(|| Mutex::new(RuntimeState::default()))
+}
+
+fn runtime_fps(state: &RuntimeState) -> f64 {
+    f64::from(state.fps.unwrap_or(30).max(1))
+}
+
+fn playback_elapsed_sec(state: &RuntimeState, call: &PlayCall) -> f64 {
+    let elapsed_frames = state.frame_count.saturating_sub(call.started_frame);
+    elapsed_frames as f64 / runtime_fps(state)
+}
+
+fn playback_pos_sec(state: &RuntimeState, call: &PlayCall) -> f64 {
+    let elapsed = playback_elapsed_sec(state, call);
+    match (call.sec, call.loop_opt.unwrap_or(false)) {
+        (Some(sec), false) if sec > 0.0 => elapsed.min(sec),
+        (Some(sec), true) if sec > 0.0 => elapsed % sec,
+        _ => elapsed,
+    }
+}
+
+fn is_playback_completed(state: &RuntimeState, call: &PlayCall) -> bool {
+    if call.loop_opt.unwrap_or(false) {
+        return false;
+    }
+    let Some(sec) = call.sec else {
+        return false;
+    };
+    playback_elapsed_sec(state, call) >= sec
+}
+
+fn update_channel_playback_state(state: &mut RuntimeState) {
+    let completed: Vec<i32> = state
+        .channel_playback
+        .iter()
+        .filter_map(|(channel, call)| {
+            if is_playback_completed(state, call) {
+                Some(*channel)
+            } else {
+                None
+            }
+        })
+        .collect();
+    for channel in completed {
+        state.channel_playback.remove(&channel);
+    }
 }
 
 fn seed_to_rng_state(seed: i32) -> u64 {
@@ -1675,6 +1721,7 @@ pub extern "C" fn flutterxel_core_run(
             return false;
         }
         state.frame_count = state.frame_count.saturating_add(1);
+        update_channel_playback_state(&mut state);
         let current_frame = state.frame_count;
         state
             .released_key_frame
@@ -2509,12 +2556,13 @@ pub extern "C" fn flutterxel_core_play(
         _ => return false,
     };
 
-    let call = PlayCall {
+    let mut call = PlayCall {
         ch,
         source,
         sec: decode_optional_f64(sec),
         loop_opt,
         resume_opt,
+        started_frame: 0,
     };
 
     let mut state = runtime_state().lock().expect("runtime state poisoned");
@@ -2522,6 +2570,7 @@ pub extern "C" fn flutterxel_core_play(
         return false;
     }
 
+    call.started_frame = state.frame_count;
     state.channel_playback.insert(ch, call.clone());
     state.last_play = Some(call);
     true
@@ -2533,6 +2582,7 @@ pub extern "C" fn flutterxel_core_playm(msc: i32, loop_opt: bool) -> bool {
     if !state.initialized || msc < 0 {
         return false;
     }
+    let started_frame = state.frame_count;
 
     // pyxel music playback controls channels 0..3.
     for channel in 0..4 {
@@ -2551,6 +2601,7 @@ pub extern "C" fn flutterxel_core_playm(msc: i32, loop_opt: bool) -> bool {
                 sec: None,
                 loop_opt: Some(loop_opt),
                 resume_opt: None,
+                started_frame,
             };
             state.channel_playback.insert(channel as i32, call.clone());
             state.last_play = Some(call);
@@ -2568,6 +2619,7 @@ pub extern "C" fn flutterxel_core_playm(msc: i32, loop_opt: bool) -> bool {
         sec: None,
         loop_opt: Some(loop_opt),
         resume_opt: None,
+        started_frame,
     };
     state.channel_playback.insert(0, call.clone());
     state.last_play = Some(call);
@@ -2607,10 +2659,11 @@ pub extern "C" fn flutterxel_core_play_pos(ch: i32, snd: *mut i32, pos: *mut f64
         return false;
     }
 
-    let state = runtime_state().lock().expect("runtime state poisoned");
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
         return false;
     }
+    update_channel_playback_state(&mut state);
 
     let Some(call) = state.channel_playback.get(&ch) else {
         return false;
@@ -2618,7 +2671,7 @@ pub extern "C" fn flutterxel_core_play_pos(ch: i32, snd: *mut i32, pos: *mut f64
 
     unsafe {
         *snd = play_source_index(&call.source);
-        *pos = 0.0;
+        *pos = playback_pos_sec(&state, call);
     }
     true
 }
@@ -4087,9 +4140,33 @@ mod tests {
         assert!(flutterxel_core_play_pos(0, &mut snd, &mut pos));
         assert_eq!(snd, 7);
         assert_eq!(pos, 0.0);
+        assert!(flutterxel_core_flip());
+        assert!(flutterxel_core_play_pos(0, &mut snd, &mut pos));
+        assert!(pos > 0.0);
 
         assert!(flutterxel_core_stop(0));
         assert!(!flutterxel_core_play_pos(0, &mut snd, &mut pos));
+    }
+
+    #[test]
+    fn play_with_sec_stops_after_elapsed_duration_without_loop() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_play(
+            0,
+            0,
+            2,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            0.01,
+            0,
+            -1
+        ));
+        assert!(flutterxel_core_is_channel_playing(0));
+        assert!(flutterxel_core_flip());
+        assert!(!flutterxel_core_is_channel_playing(0));
     }
 
     #[test]

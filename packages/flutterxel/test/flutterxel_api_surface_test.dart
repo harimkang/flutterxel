@@ -254,6 +254,8 @@ void main() {
       flutterxel.play(0, 1, sec: 0.5, loop: true, resume: false);
       flutterxel.play(0, <int>[1, 2, 3], sec: null, loop: null, resume: null);
       flutterxel.play(0, 'c3e3g3c4r', sec: 1.5, loop: false, resume: true);
+      flutterxel.play(0, flutterxel.sounds[0], sec: 0.1);
+      flutterxel.play(0, <flutterxel.Sound>[flutterxel.sounds[0]], loop: true);
       expect(flutterxel.isChannelPlaying(0), isA<bool>());
       flutterxel.playm(0, loop: true);
       expect(flutterxel.isChannelPlaying(0), isTrue);
@@ -295,6 +297,8 @@ void main() {
 
     final channel0 = flutterxel.channels.first;
     channel0.play(1);
+    channel0.play(flutterxel.sounds[0], sec: 0.2);
+    channel0.play(<flutterxel.Sound>[flutterxel.sounds[0]], loop: true);
     expect(channel0.play_pos(), isNotNull);
     channel0.stop();
     expect(channel0.play_pos(), isNull);
@@ -938,6 +942,10 @@ void main() {
     expect(pos, isNotNull);
     expect(pos!.snd, 7);
     expect(pos.pos, 0.0);
+    flutterxel.flip();
+    final nextPos = flutterxel.playPos(0);
+    expect(nextPos, isNotNull);
+    expect(nextPos!.pos, greaterThan(0.0));
 
     flutterxel.stop(0);
     expect(flutterxel.playPos(0), isNull);
