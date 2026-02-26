@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -25,6 +25,8 @@ void main() {
       expect(flutterxel.rectb, isA<Function>());
       expect(flutterxel.circ, isA<Function>());
       expect(flutterxel.circb, isA<Function>());
+      expect(flutterxel.tri, isA<Function>());
+      expect(flutterxel.trib, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
       expect(flutterxel.playm, isA<Function>());
@@ -151,6 +153,20 @@ void main() {
     expect(flutterxel.pget(4, 6), 8);
     expect(flutterxel.pget(2, 4), 8);
     expect(flutterxel.pget(4, 4), 0);
+  });
+
+  test('triangle primitives draw filled and border triangles', () {
+    flutterxel.init(10, 10);
+    flutterxel.cls(0);
+
+    flutterxel.tri(1, 1, 5, 1, 3, 4, 9);
+    expect(flutterxel.pget(3, 2), 9);
+
+    flutterxel.cls(0);
+    flutterxel.trib(1, 1, 5, 1, 3, 4, 10);
+    expect(flutterxel.pget(1, 1), 10);
+    expect(flutterxel.pget(3, 1), 10);
+    expect(flutterxel.pget(3, 2), 0);
   });
 
   test('quit stops loop and resets initialized runtime state', () {

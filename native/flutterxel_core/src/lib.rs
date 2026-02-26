@@ -1089,6 +1089,54 @@ fn draw_circb(state: &mut RuntimeState, x: i32, y: i32, r: i32, col: i32) {
     }
 }
 
+fn edge_function(ax: i32, ay: i32, bx: i32, by: i32, px: i32, py: i32) -> i64 {
+    i64::from(px - ax) * i64::from(by - ay) - i64::from(py - ay) * i64::from(bx - ax)
+}
+
+fn draw_tri(
+    state: &mut RuntimeState,
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    x3: i32,
+    y3: i32,
+    col: i32,
+) {
+    let min_x = x1.min(x2).min(x3);
+    let max_x = x1.max(x2).max(x3);
+    let min_y = y1.min(y2).min(y3);
+    let max_y = y1.max(y2).max(y3);
+
+    for py in min_y..=max_y {
+        for px in min_x..=max_x {
+            let w1 = edge_function(x1, y1, x2, y2, px, py);
+            let w2 = edge_function(x2, y2, x3, y3, px, py);
+            let w3 = edge_function(x3, y3, x1, y1, px, py);
+            let all_non_negative = w1 >= 0 && w2 >= 0 && w3 >= 0;
+            let all_non_positive = w1 <= 0 && w2 <= 0 && w3 <= 0;
+            if all_non_negative || all_non_positive {
+                set_frame_pixel(state, px, py, col);
+            }
+        }
+    }
+}
+
+fn draw_trib(
+    state: &mut RuntimeState,
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    x3: i32,
+    y3: i32,
+    col: i32,
+) {
+    draw_line(state, x1, y1, x2, y2, col);
+    draw_line(state, x2, y2, x3, y3, col);
+    draw_line(state, x3, y3, x1, y1, col);
+}
+
 #[no_mangle]
 pub extern "C" fn flutterxel_core_version_major() -> u32 {
     ABI_VERSION_MAJOR
@@ -1420,6 +1468,42 @@ pub extern "C" fn flutterxel_core_circb(x: i32, y: i32, r: i32, col: i32) -> boo
         return false;
     }
     draw_circb(&mut state, x, y, r, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_tri(
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    x3: i32,
+    y3: i32,
+    col: i32,
+) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_tri(&mut state, x1, y1, x2, y2, x3, y3, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_trib(
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    x3: i32,
+    y3: i32,
+    col: i32,
+) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_trib(&mut state, x1, y1, x2, y2, x3, y3, col);
     true
 }
 
@@ -1915,6 +1999,22 @@ mod tests {
         assert_eq!(flutterxel_core_pget(4, 6), 8);
         assert_eq!(flutterxel_core_pget(2, 4), 8);
         assert_eq!(flutterxel_core_pget(4, 4), 0);
+    }
+
+    #[test]
+    fn triangle_primitives_update_expected_pixels() {
+        let _guard = test_lock();
+        init_runtime(10, 10);
+        assert!(flutterxel_core_cls(0));
+
+        assert!(flutterxel_core_tri(1, 1, 5, 1, 3, 4, 9));
+        assert_eq!(flutterxel_core_pget(3, 2), 9);
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_trib(1, 1, 5, 1, 3, 4, 10));
+        assert_eq!(flutterxel_core_pget(1, 1), 10);
+        assert_eq!(flutterxel_core_pget(3, 1), 10);
+        assert_eq!(flutterxel_core_pget(3, 2), 0);
     }
 
     #[test]

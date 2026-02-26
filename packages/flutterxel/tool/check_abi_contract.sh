@@ -24,6 +24,8 @@ SYMBOLS=(
   flutterxel_core_rectb
   flutterxel_core_circ
   flutterxel_core_circb
+  flutterxel_core_tri
+  flutterxel_core_trib
   flutterxel_core_blt
   flutterxel_core_play
   flutterxel_core_playm

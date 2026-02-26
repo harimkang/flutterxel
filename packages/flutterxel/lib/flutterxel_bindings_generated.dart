@@ -365,6 +365,64 @@ class FlutterxelBindings {
   late final _flutterxel_core_circb = _flutterxel_core_circbPtr
       .asFunction<bool Function(int, int, int, int)>();
 
+  bool flutterxel_core_tri(
+    int x1,
+    int y1,
+    int x2,
+    int y2,
+    int x3,
+    int y3,
+    int col,
+  ) {
+    return _flutterxel_core_tri(x1, y1, x2, y2, x3, y3, col);
+  }
+
+  late final _flutterxel_core_triPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_tri');
+  late final _flutterxel_core_tri = _flutterxel_core_triPtr
+      .asFunction<bool Function(int, int, int, int, int, int, int)>();
+
+  bool flutterxel_core_trib(
+    int x1,
+    int y1,
+    int x2,
+    int y2,
+    int x3,
+    int y3,
+    int col,
+  ) {
+    return _flutterxel_core_trib(x1, y1, x2, y2, x3, y3, col);
+  }
+
+  late final _flutterxel_core_tribPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_trib');
+  late final _flutterxel_core_trib = _flutterxel_core_tribPtr
+      .asFunction<bool Function(int, int, int, int, int, int, int)>();
+
   bool flutterxel_core_blt(
     double x,
     double y,

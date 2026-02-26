@@ -590,6 +590,83 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_circb(int32_t x, int32_t y, int32_t r, in
   return true;
 }
 
+static int64_t edge_function(
+    int32_t ax,
+    int32_t ay,
+    int32_t bx,
+    int32_t by,
+    int32_t px,
+    int32_t py) {
+  return (int64_t)(px - ax) * (int64_t)(by - ay) - (int64_t)(py - ay) * (int64_t)(bx - ax);
+}
+
+static int32_t min3_i32(int32_t a, int32_t b, int32_t c) {
+  int32_t ab = a < b ? a : b;
+  return ab < c ? ab : c;
+}
+
+static int32_t max3_i32(int32_t a, int32_t b, int32_t c) {
+  int32_t ab = a > b ? a : b;
+  return ab > c ? ab : c;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_tri(
+    int32_t x1,
+    int32_t y1,
+    int32_t x2,
+    int32_t y2,
+    int32_t x3,
+    int32_t y3,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+
+  int32_t min_x = min3_i32(x1, x2, x3);
+  int32_t max_x = max3_i32(x1, x2, x3);
+  int32_t min_y = min3_i32(y1, y2, y3);
+  int32_t max_y = max3_i32(y1, y2, y3);
+
+  for (int32_t py = min_y; py <= max_y; py++) {
+    for (int32_t px = min_x; px <= max_x; px++) {
+      int64_t w1 = edge_function(x1, y1, x2, y2, px, py);
+      int64_t w2 = edge_function(x2, y2, x3, y3, px, py);
+      int64_t w3 = edge_function(x3, y3, x1, y1, px, py);
+      bool all_non_negative = (w1 >= 0) && (w2 >= 0) && (w3 >= 0);
+      bool all_non_positive = (w1 <= 0) && (w2 <= 0) && (w3 <= 0);
+      if (all_non_negative || all_non_positive) {
+        set_frame_pixel(px, py, col);
+      }
+    }
+  }
+
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_trib(
+    int32_t x1,
+    int32_t y1,
+    int32_t x2,
+    int32_t y2,
+    int32_t x3,
+    int32_t y3,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+
+  if (!flutterxel_core_line(x1, y1, x2, y2, col)) {
+    return false;
+  }
+  if (!flutterxel_core_line(x2, y2, x3, y3, col)) {
+    return false;
+  }
+  if (!flutterxel_core_line(x3, y3, x1, y1, col)) {
+    return false;
+  }
+  return true;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double x,
     double y,

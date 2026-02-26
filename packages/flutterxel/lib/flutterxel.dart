@@ -577,6 +577,55 @@ void circb(int x, int y, int r, int col) {
   }
 }
 
+/// Pyxel-compatible tri API.
+void tri(int x1, int y1, int x2, int y2, int x3, int y3, int col) {
+  _ensureInitialized('tri');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_tri(x1, y1, x2, y2, x3, y3, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_tri failed.');
+  }
+  if (bindings == null) {
+    final minX = [x1, x2, x3].reduce(math.min);
+    final maxX = [x1, x2, x3].reduce(math.max);
+    final minY = [y1, y2, y3].reduce(math.min);
+    final maxY = [y1, y2, y3].reduce(math.max);
+
+    int edge(int ax, int ay, int bx, int by, int px, int py) {
+      return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
+    }
+
+    for (var py = minY; py <= maxY; py++) {
+      for (var px = minX; px <= maxX; px++) {
+        final w1 = edge(x1, y1, x2, y2, px, py);
+        final w2 = edge(x2, y2, x3, y3, px, py);
+        final w3 = edge(x3, y3, x1, y1, px, py);
+        final allNonNegative = w1 >= 0 && w2 >= 0 && w3 >= 0;
+        final allNonPositive = w1 <= 0 && w2 <= 0 && w3 <= 0;
+        if (allNonNegative || allNonPositive) {
+          _fallbackSetPixel(px, py, col);
+        }
+      }
+    }
+  }
+}
+
+/// Pyxel-compatible trib API.
+void trib(int x1, int y1, int x2, int y2, int x3, int y3, int col) {
+  _ensureInitialized('trib');
+  final bindings = _getBindingsOrNull();
+  final ok =
+      bindings?.flutterxel_core_trib(x1, y1, x2, y2, x3, y3, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_trib failed.');
+  }
+  if (bindings == null) {
+    line(x1, y1, x2, y2, col);
+    line(x2, y2, x3, y3, col);
+    line(x3, y3, x1, y1, col);
+  }
+}
+
 /// Pyxel-compatible blt API.
 void blt(
   double x,
