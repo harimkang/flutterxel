@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/text/bltm/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -28,8 +28,11 @@ void main() {
       expect(flutterxel.rectb, isA<Function>());
       expect(flutterxel.circ, isA<Function>());
       expect(flutterxel.circb, isA<Function>());
+      expect(flutterxel.elli, isA<Function>());
+      expect(flutterxel.ellib, isA<Function>());
       expect(flutterxel.tri, isA<Function>());
       expect(flutterxel.trib, isA<Function>());
+      expect(flutterxel.fill, isA<Function>());
       expect(flutterxel.text, isA<Function>());
       expect(flutterxel.bltm, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
@@ -160,6 +163,20 @@ void main() {
     expect(flutterxel.pget(4, 4), 0);
   });
 
+  test('ellipse primitives draw filled and border ellipses', () {
+    flutterxel.init(12, 12);
+    flutterxel.cls(0);
+
+    flutterxel.elli(2, 2, 5, 5, 9);
+    expect(flutterxel.pget(4, 4), 9);
+    expect(flutterxel.pget(4, 2), 9);
+
+    flutterxel.cls(0);
+    flutterxel.ellib(2, 2, 5, 5, 10);
+    expect(flutterxel.pget(4, 2), 10);
+    expect(flutterxel.pget(4, 4), 0);
+  });
+
   test('triangle primitives draw filled and border triangles', () {
     flutterxel.init(10, 10);
     flutterxel.cls(0);
@@ -215,6 +232,17 @@ void main() {
 
     flutterxel.bltm(0, 0, 0, 0, 0, 1, 1);
     expect(flutterxel.pget(1, 0), 1);
+  });
+
+  test('fill flood-fills enclosed area without crossing borders', () {
+    flutterxel.init(8, 8);
+    flutterxel.cls(0);
+
+    flutterxel.rectb(1, 1, 6, 6, 3);
+    flutterxel.fill(2, 2, 5);
+    expect(flutterxel.pget(2, 2), 5);
+    expect(flutterxel.pget(1, 1), 3);
+    expect(flutterxel.pget(0, 0), 0);
   });
 
   test('quit stops loop and resets initialized runtime state', () {

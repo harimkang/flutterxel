@@ -199,6 +199,19 @@ int _fallbackGetPixel(int x, int y) {
   return _fallbackFrameBuffer[index];
 }
 
+bool _fallbackEllipseContains(int px, int py, int w, int h) {
+  if (w <= 0 || h <= 0) {
+    return false;
+  }
+  final dx = px * 2 + 1 - w;
+  final dy = py * 2 + 1 - h;
+  final wSq = w * w;
+  final hSq = h * h;
+  final lhs = dx * dx * hSq + dy * dy * wSq;
+  final rhs = wSq * hSq;
+  return lhs <= rhs;
+}
+
 void _seedFallbackResources() {
   _fallbackImageBankSize = 16;
   final bankSize = _fallbackImageBankSize;
@@ -736,6 +749,58 @@ void circb(int x, int y, int r, int col) {
   }
 }
 
+/// Pyxel-compatible elli API.
+void elli(int x, int y, int w, int h, int col) {
+  _ensureInitialized('elli');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_elli(x, y, w, h, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_elli failed.');
+  }
+  if (bindings == null) {
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    for (var py = 0; py < h; py++) {
+      for (var px = 0; px < w; px++) {
+        if (_fallbackEllipseContains(px, py, w, h)) {
+          _fallbackSetPixel(x + px, y + py, col);
+        }
+      }
+    }
+  }
+}
+
+/// Pyxel-compatible ellib API.
+void ellib(int x, int y, int w, int h, int col) {
+  _ensureInitialized('ellib');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_ellib(x, y, w, h, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_ellib failed.');
+  }
+  if (bindings == null) {
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    for (var py = 0; py < h; py++) {
+      for (var px = 0; px < w; px++) {
+        if (!_fallbackEllipseContains(px, py, w, h)) {
+          continue;
+        }
+        final isEdge =
+            !_fallbackEllipseContains(px - 1, py, w, h) ||
+            !_fallbackEllipseContains(px + 1, py, w, h) ||
+            !_fallbackEllipseContains(px, py - 1, w, h) ||
+            !_fallbackEllipseContains(px, py + 1, w, h);
+        if (isEdge) {
+          _fallbackSetPixel(x + px, y + py, col);
+        }
+      }
+    }
+  }
+}
+
 /// Pyxel-compatible tri API.
 void tri(int x1, int y1, int x2, int y2, int x3, int y3, int col) {
   _ensureInitialized('tri');
@@ -782,6 +847,70 @@ void trib(int x1, int y1, int x2, int y2, int x3, int y3, int col) {
     line(x1, y1, x2, y2, col);
     line(x2, y2, x3, y3, col);
     line(x3, y3, x1, y1, col);
+  }
+}
+
+/// Pyxel-compatible fill API.
+void fill(int x, int y, int col) {
+  _ensureInitialized('fill');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_fill(x, y, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_fill failed.');
+  }
+  if (bindings == null) {
+    final sx = x - _fallbackCameraX;
+    final sy = y - _fallbackCameraY;
+    if (sx < 0 || sx >= width || sy < 0 || sy >= height) {
+      return;
+    }
+    if (sx < _fallbackClipX || sy < _fallbackClipY) {
+      return;
+    }
+    if (sx >= _fallbackClipX + _fallbackClipW ||
+        sy >= _fallbackClipY + _fallbackClipH) {
+      return;
+    }
+
+    final startIndex = _fallbackPixelIndex(sx, sy)!;
+    final targetColor = _fallbackFrameBuffer[startIndex];
+    final fillColor = _fallbackMapColor(col);
+    if (targetColor == fillColor) {
+      return;
+    }
+
+    final stack = <int>[sx, sy];
+    while (stack.isNotEmpty) {
+      final cy = stack.removeLast();
+      final cx = stack.removeLast();
+
+      if (cx < 0 || cx >= width || cy < 0 || cy >= height) {
+        continue;
+      }
+      if (cx < _fallbackClipX || cy < _fallbackClipY) {
+        continue;
+      }
+      if (cx >= _fallbackClipX + _fallbackClipW ||
+          cy >= _fallbackClipY + _fallbackClipH) {
+        continue;
+      }
+
+      final index = _fallbackPixelIndex(cx, cy);
+      if (index == null || _fallbackFrameBuffer[index] != targetColor) {
+        continue;
+      }
+      _fallbackFrameBuffer[index] = fillColor;
+
+      stack
+        ..add(cx - 1)
+        ..add(cy)
+        ..add(cx + 1)
+        ..add(cy)
+        ..add(cx)
+        ..add(cy - 1)
+        ..add(cx)
+        ..add(cy + 1);
+    }
   }
 }
 

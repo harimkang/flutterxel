@@ -124,6 +124,18 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_circb(int32_t x,
                                                   int32_t y,
                                                   int32_t r,
                                                   int32_t col);
+// pyxel.elli(x, y, w, h, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_elli(int32_t x,
+                                                 int32_t y,
+                                                 int32_t w,
+                                                 int32_t h,
+                                                 int32_t col);
+// pyxel.ellib(x, y, w, h, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_ellib(int32_t x,
+                                                  int32_t y,
+                                                  int32_t w,
+                                                  int32_t h,
+                                                  int32_t col);
 // pyxel.tri(x1, y1, x2, y2, x3, y3, col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_tri(int32_t x1,
                                                 int32_t y1,
@@ -139,6 +151,10 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_trib(int32_t x1,
                                                  int32_t y2,
                                                  int32_t x3,
                                                  int32_t y3,
+                                                 int32_t col);
+// pyxel.fill(x, y, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_fill(int32_t x,
+                                                 int32_t y,
                                                  int32_t col);
 // pyxel.text(x, y, s, col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_text(int32_t x,

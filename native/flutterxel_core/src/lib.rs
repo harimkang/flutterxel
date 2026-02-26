@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::CStr;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -1215,6 +1215,105 @@ fn draw_circb(state: &mut RuntimeState, x: i32, y: i32, r: i32, col: i32) {
     }
 }
 
+fn ellipse_contains(px: i32, py: i32, w: i32, h: i32) -> bool {
+    if w <= 0 || h <= 0 {
+        return false;
+    }
+
+    let dx = i128::from(px) * 2 + 1 - i128::from(w);
+    let dy = i128::from(py) * 2 + 1 - i128::from(h);
+    let w_sq = i128::from(w) * i128::from(w);
+    let h_sq = i128::from(h) * i128::from(h);
+    let lhs = dx * dx * h_sq + dy * dy * w_sq;
+    let rhs = w_sq * h_sq;
+    lhs <= rhs
+}
+
+fn draw_elli(state: &mut RuntimeState, x: i32, y: i32, w: i32, h: i32, col: i32) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+
+    for py in 0..h {
+        for px in 0..w {
+            if ellipse_contains(px, py, w, h) {
+                set_frame_pixel(state, x + px, y + py, col);
+            }
+        }
+    }
+}
+
+fn draw_ellib(state: &mut RuntimeState, x: i32, y: i32, w: i32, h: i32, col: i32) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+
+    for py in 0..h {
+        for px in 0..w {
+            if !ellipse_contains(px, py, w, h) {
+                continue;
+            }
+
+            let is_edge = !ellipse_contains(px - 1, py, w, h)
+                || !ellipse_contains(px + 1, py, w, h)
+                || !ellipse_contains(px, py - 1, w, h)
+                || !ellipse_contains(px, py + 1, w, h);
+            if is_edge {
+                set_frame_pixel(state, x + px, y + py, col);
+            }
+        }
+    }
+}
+
+fn draw_fill(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
+    let sx = x - state.camera_x;
+    let sy = y - state.camera_y;
+
+    if sx < 0 || sx >= state.width || sy < 0 || sy >= state.height {
+        return;
+    }
+    if sx < state.clip_x || sy < state.clip_y {
+        return;
+    }
+    if sx >= state.clip_x + state.clip_w || sy >= state.clip_y + state.clip_h {
+        return;
+    }
+
+    let width = state.width as usize;
+    let start_index = sy as usize * width + sx as usize;
+    let target_color = state.frame_buffer[start_index];
+    let fill_color = apply_palette(state, col);
+    if target_color == fill_color {
+        return;
+    }
+
+    let mut queue = VecDeque::new();
+    queue.push_back((sx, sy));
+
+    while let Some((cx, cy)) = queue.pop_front() {
+        if cx < 0 || cx >= state.width || cy < 0 || cy >= state.height {
+            continue;
+        }
+        if cx < state.clip_x || cy < state.clip_y {
+            continue;
+        }
+        if cx >= state.clip_x + state.clip_w || cy >= state.clip_y + state.clip_h {
+            continue;
+        }
+
+        let index = cy as usize * width + cx as usize;
+        if state.frame_buffer[index] != target_color {
+            continue;
+        }
+        state.frame_buffer[index] = fill_color;
+
+        queue.push_back((cx - 1, cy));
+        queue.push_back((cx + 1, cy));
+        queue.push_back((cx, cy - 1));
+        queue.push_back((cx, cy + 1));
+    }
+}
+
 fn edge_function(ax: i32, ay: i32, bx: i32, by: i32, px: i32, py: i32) -> i64 {
     i64::from(px - ax) * i64::from(by - ay) - i64::from(py - ay) * i64::from(bx - ax)
 }
@@ -1710,6 +1809,26 @@ pub extern "C" fn flutterxel_core_circb(x: i32, y: i32, r: i32, col: i32) -> boo
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_elli(x: i32, y: i32, w: i32, h: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_elli(&mut state, x, y, w, h, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_ellib(x: i32, y: i32, w: i32, h: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_ellib(&mut state, x, y, w, h, col);
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_tri(
     x1: i32,
     y1: i32,
@@ -1742,6 +1861,16 @@ pub extern "C" fn flutterxel_core_trib(
         return false;
     }
     draw_trib(&mut state, x1, y1, x2, y2, x3, y3, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_fill(x: i32, y: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_fill(&mut state, x, y, col);
     true
 }
 
@@ -2287,6 +2416,22 @@ mod tests {
     }
 
     #[test]
+    fn ellipse_primitives_update_expected_pixels() {
+        let _guard = test_lock();
+        init_runtime(12, 12);
+        assert!(flutterxel_core_cls(0));
+
+        assert!(flutterxel_core_elli(2, 2, 5, 5, 9));
+        assert_eq!(flutterxel_core_pget(4, 4), 9);
+        assert_eq!(flutterxel_core_pget(4, 2), 9);
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_ellib(2, 2, 5, 5, 10));
+        assert_eq!(flutterxel_core_pget(4, 2), 10);
+        assert_eq!(flutterxel_core_pget(4, 4), 0);
+    }
+
+    #[test]
     fn triangle_primitives_update_expected_pixels() {
         let _guard = test_lock();
         init_runtime(10, 10);
@@ -2300,6 +2445,19 @@ mod tests {
         assert_eq!(flutterxel_core_pget(1, 1), 10);
         assert_eq!(flutterxel_core_pget(3, 1), 10);
         assert_eq!(flutterxel_core_pget(3, 2), 0);
+    }
+
+    #[test]
+    fn fill_flood_fills_enclosed_region() {
+        let _guard = test_lock();
+        init_runtime(8, 8);
+        assert!(flutterxel_core_cls(0));
+
+        assert!(flutterxel_core_rectb(1, 1, 6, 6, 3));
+        assert!(flutterxel_core_fill(2, 2, 5));
+        assert_eq!(flutterxel_core_pget(2, 2), 5);
+        assert_eq!(flutterxel_core_pget(1, 1), 3);
+        assert_eq!(flutterxel_core_pget(0, 0), 0);
     }
 
     #[test]

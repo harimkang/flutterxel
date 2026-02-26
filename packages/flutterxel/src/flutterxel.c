@@ -709,6 +709,74 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_circb(int32_t x, int32_t y, int32_t r, in
   return true;
 }
 
+static bool ellipse_contains(int32_t px, int32_t py, int32_t w, int32_t h) {
+  if (w <= 0 || h <= 0) {
+    return false;
+  }
+
+  int64_t dx = (int64_t)px * 2 + 1 - (int64_t)w;
+  int64_t dy = (int64_t)py * 2 + 1 - (int64_t)h;
+  int64_t w_sq = (int64_t)w * (int64_t)w;
+  int64_t h_sq = (int64_t)h * (int64_t)h;
+  int64_t lhs = dx * dx * h_sq + dy * dy * w_sq;
+  int64_t rhs = w_sq * h_sq;
+  return lhs <= rhs;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_elli(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (w <= 0 || h <= 0) {
+    return true;
+  }
+
+  for (int32_t py = 0; py < h; py++) {
+    for (int32_t px = 0; px < w; px++) {
+      if (ellipse_contains(px, py, w, h)) {
+        set_frame_pixel(x + px, y + py, col);
+      }
+    }
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_ellib(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (w <= 0 || h <= 0) {
+    return true;
+  }
+
+  for (int32_t py = 0; py < h; py++) {
+    for (int32_t px = 0; px < w; px++) {
+      if (!ellipse_contains(px, py, w, h)) {
+        continue;
+      }
+
+      bool is_edge = !ellipse_contains(px - 1, py, w, h) ||
+                     !ellipse_contains(px + 1, py, w, h) ||
+                     !ellipse_contains(px, py - 1, w, h) ||
+                     !ellipse_contains(px, py + 1, w, h);
+      if (is_edge) {
+        set_frame_pixel(x + px, y + py, col);
+      }
+    }
+  }
+  return true;
+}
+
 static int64_t edge_function(
     int32_t ax,
     int32_t ay,
@@ -783,6 +851,89 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_trib(
   if (!flutterxel_core_line(x3, y3, x1, y1, col)) {
     return false;
   }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_fill(int32_t x, int32_t y, int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+
+  int32_t sx = x - g_state.camera_x;
+  int32_t sy = y - g_state.camera_y;
+  if (sx < 0 || sx >= g_state.width || sy < 0 || sy >= g_state.height) {
+    return true;
+  }
+  if (sx < g_state.clip_x || sy < g_state.clip_y) {
+    return true;
+  }
+  if (sx >= g_state.clip_x + g_state.clip_w || sy >= g_state.clip_y + g_state.clip_h) {
+    return true;
+  }
+
+  size_t width = (size_t)g_state.width;
+  size_t height = (size_t)g_state.height;
+  size_t start_index = (size_t)sy * width + (size_t)sx;
+  int32_t target_color = g_state.frame_buffer[start_index];
+  int32_t fill_color = apply_palette(col);
+  if (target_color == fill_color) {
+    return true;
+  }
+
+  size_t capacity = width * height * 4;
+  int32_t* queue_x = (int32_t*)malloc(sizeof(int32_t) * capacity);
+  int32_t* queue_y = (int32_t*)malloc(sizeof(int32_t) * capacity);
+  if (queue_x == NULL || queue_y == NULL) {
+    free(queue_x);
+    free(queue_y);
+    return false;
+  }
+
+  size_t head = 0;
+  size_t tail = 0;
+  queue_x[tail] = sx;
+  queue_y[tail] = sy;
+  tail += 1;
+
+  while (head < tail) {
+    int32_t cx = queue_x[head];
+    int32_t cy = queue_y[head];
+    head += 1;
+
+    if (cx < 0 || cx >= g_state.width || cy < 0 || cy >= g_state.height) {
+      continue;
+    }
+    if (cx < g_state.clip_x || cy < g_state.clip_y) {
+      continue;
+    }
+    if (cx >= g_state.clip_x + g_state.clip_w || cy >= g_state.clip_y + g_state.clip_h) {
+      continue;
+    }
+
+    size_t index = (size_t)cy * width + (size_t)cx;
+    if (g_state.frame_buffer[index] != target_color) {
+      continue;
+    }
+    g_state.frame_buffer[index] = fill_color;
+
+    if (tail + 4 <= capacity) {
+      queue_x[tail] = cx - 1;
+      queue_y[tail] = cy;
+      tail += 1;
+      queue_x[tail] = cx + 1;
+      queue_y[tail] = cy;
+      tail += 1;
+      queue_x[tail] = cx;
+      queue_y[tail] = cy - 1;
+      tail += 1;
+      queue_x[tail] = cx;
+      queue_y[tail] = cy + 1;
+      tail += 1;
+    }
+  }
+
+  free(queue_x);
+  free(queue_y);
   return true;
 }
 

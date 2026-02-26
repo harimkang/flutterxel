@@ -98,6 +98,16 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_circb(int32_t x,
                                               int32_t y,
                                               int32_t r,
                                               int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_elli(int32_t x,
+                                             int32_t y,
+                                             int32_t w,
+                                             int32_t h,
+                                             int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_ellib(int32_t x,
+                                              int32_t y,
+                                              int32_t w,
+                                              int32_t h,
+                                              int32_t col);
 FFI_PLUGIN_EXPORT bool flutterxel_core_tri(int32_t x1,
                                             int32_t y1,
                                             int32_t x2,
@@ -112,6 +122,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_trib(int32_t x1,
                                              int32_t x3,
                                              int32_t y3,
                                              int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_fill(int32_t x, int32_t y, int32_t col);
 FFI_PLUGIN_EXPORT bool flutterxel_core_text(int32_t x,
                                              int32_t y,
                                              const char* text,

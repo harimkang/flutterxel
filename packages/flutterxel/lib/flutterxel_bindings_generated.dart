@@ -400,6 +400,44 @@ class FlutterxelBindings {
   late final _flutterxel_core_circb = _flutterxel_core_circbPtr
       .asFunction<bool Function(int, int, int, int)>();
 
+  bool flutterxel_core_elli(int x, int y, int w, int h, int col) {
+    return _flutterxel_core_elli(x, y, w, h, col);
+  }
+
+  late final _flutterxel_core_elliPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_elli');
+  late final _flutterxel_core_elli = _flutterxel_core_elliPtr
+      .asFunction<bool Function(int, int, int, int, int)>();
+
+  bool flutterxel_core_ellib(int x, int y, int w, int h, int col) {
+    return _flutterxel_core_ellib(x, y, w, h, col);
+  }
+
+  late final _flutterxel_core_ellibPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_ellib');
+  late final _flutterxel_core_ellib = _flutterxel_core_ellibPtr
+      .asFunction<bool Function(int, int, int, int, int)>();
+
   bool flutterxel_core_tri(
     int x1,
     int y1,
@@ -457,6 +495,17 @@ class FlutterxelBindings {
       >('flutterxel_core_trib');
   late final _flutterxel_core_trib = _flutterxel_core_tribPtr
       .asFunction<bool Function(int, int, int, int, int, int, int)>();
+
+  bool flutterxel_core_fill(int x, int y, int col) {
+    return _flutterxel_core_fill(x, y, col);
+  }
+
+  late final _flutterxel_core_fillPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32)>
+      >('flutterxel_core_fill');
+  late final _flutterxel_core_fill = _flutterxel_core_fillPtr
+      .asFunction<bool Function(int, int, int)>();
 
   bool flutterxel_core_text(int x, int y, ffi.Pointer<ffi.Char> text, int col) {
     return _flutterxel_core_text(x, y, text, col);

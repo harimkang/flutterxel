@@ -27,8 +27,11 @@ SYMBOLS=(
   flutterxel_core_rectb
   flutterxel_core_circ
   flutterxel_core_circb
+  flutterxel_core_elli
+  flutterxel_core_ellib
   flutterxel_core_tri
   flutterxel_core_trib
+  flutterxel_core_fill
   flutterxel_core_text
   flutterxel_core_bltm
   flutterxel_core_blt
