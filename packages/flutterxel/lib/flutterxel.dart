@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 import 'dart:async';
 import 'dart:ffi' as ffi;
@@ -56,6 +56,7 @@ final Map<LogicalKeyboardKey, int> _defaultKeyboardMapping =
 int width = 0;
 int height = 0;
 int frameCount = 0;
+int get frame_count => frameCount;
 
 bool _isInitialized = false;
 int _runtimeFps = 30;
@@ -599,6 +600,8 @@ void perfMonitor(bool enabled) {
   }
 }
 
+void perf_monitor(bool enabled) => perfMonitor(enabled);
+
 /// Pyxel-compatible integer_scale API.
 void integerScale(bool enabled) {
   _ensureInitialized('integer_scale');
@@ -614,6 +617,8 @@ void integerScale(bool enabled) {
   }
 }
 
+void integer_scale(bool enabled) => integerScale(enabled);
+
 /// Pyxel-compatible screen_mode API.
 void screenMode(int scr) {
   _ensureInitialized('screen_mode');
@@ -628,6 +633,8 @@ void screenMode(int scr) {
     _fallbackScreenMode = scr;
   }
 }
+
+void screen_mode(int scr) => screenMode(scr);
 
 /// Pyxel-compatible fullscreen API.
 void fullscreen(bool enabled) {
@@ -678,6 +685,9 @@ bool get isMouseVisible => _fallbackMouseVisible;
 int get mouseX => btnv(MOUSE_POS_X);
 int get mouseY => btnv(MOUSE_POS_Y);
 int get mouseWheel => btnv(MOUSE_WHEEL_Y);
+int get mouse_x => mouseX;
+int get mouse_y => mouseY;
+int get mouse_wheel => mouseWheel;
 List<int> get inputKeys {
   if (!_isInitialized) {
     return const <int>[];
@@ -689,6 +699,9 @@ List<int> get inputKeys {
 String get inputText => _fallbackInputText;
 List<String> get droppedFiles =>
     List<String>.unmodifiable(_fallbackDroppedFiles);
+List<int> get input_keys => inputKeys;
+String get input_text => inputText;
+List<String> get dropped_files => droppedFiles;
 String get runtimeTitle => _fallbackTitle;
 List<String> get runtimeIconData =>
     List<String>.unmodifiable(_fallbackIconData);
@@ -808,6 +821,8 @@ void warpMouse(double x, double y) {
   setBtnValue(MOUSE_POS_X, xi);
   setBtnValue(MOUSE_POS_Y, yi);
 }
+
+void warp_mouse(double x, double y) => warpMouse(x, y);
 
 /// Runtime input bridge for forwarding external key/touch mappings.
 void setBtnState(int key, bool pressed) {
@@ -1613,6 +1628,8 @@ bool isChannelPlaying(int ch) {
   return _fallbackPlayPositions[ch];
 }
 
+({int snd, double pos})? play_pos(int ch) => playPos(ch);
+
 /// Pyxel-compatible rseed API.
 void rseed(int seed) {
   _ensureInitialized('rseed');
@@ -1913,6 +1930,8 @@ void loadPal(String filename) {
   }
 }
 
+void load_pal(String filename) => loadPal(filename);
+
 /// Pyxel-compatible save_pal API.
 void savePal(String filename) {
   _ensureInitialized('save_pal');
@@ -1937,6 +1956,8 @@ void savePal(String filename) {
   }
   File(filename).writeAsStringSync(output.toString());
 }
+
+void save_pal(String filename) => savePal(filename);
 
 /// Pyxel-compatible screenshot API.
 void screenshot({int? scale}) {
@@ -1993,6 +2014,8 @@ void resetScreencast() {
   }
 }
 
+void reset_screencast() => resetScreencast();
+
 String _joinPath(String left, String right) {
   final separator = Platform.pathSeparator;
   if (left.endsWith(separator)) {
@@ -2036,6 +2059,9 @@ String userDataDir(String vendorName, String appName) {
   Directory(dirPath).createSync(recursive: true);
   return dirPath;
 }
+
+String user_data_dir(String vendorName, String appName) =>
+    userDataDir(vendorName, appName);
 
 /// Returns a copy of the current paletted framebuffer.
 List<int> frameBufferSnapshot() {

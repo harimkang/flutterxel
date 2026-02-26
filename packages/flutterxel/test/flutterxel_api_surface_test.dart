@@ -121,6 +121,25 @@ void main() {
     expect(flutterxel.EFFECT_QUARTER_FADEOUT, 5);
   });
 
+  test('exposes Pyxel-compatible snake_case aliases', () {
+    expect(flutterxel.frame_count, isA<int>());
+    expect(flutterxel.perf_monitor, isA<Function>());
+    expect(flutterxel.integer_scale, isA<Function>());
+    expect(flutterxel.screen_mode, isA<Function>());
+    expect(flutterxel.warp_mouse, isA<Function>());
+    expect(flutterxel.play_pos, isA<Function>());
+    expect(flutterxel.load_pal, isA<Function>());
+    expect(flutterxel.save_pal, isA<Function>());
+    expect(flutterxel.reset_screencast, isA<Function>());
+    expect(flutterxel.user_data_dir, isA<Function>());
+    expect(flutterxel.mouse_x, isA<int>());
+    expect(flutterxel.mouse_y, isA<int>());
+    expect(flutterxel.mouse_wheel, isA<int>());
+    expect(flutterxel.input_keys, isA<List<int>>());
+    expect(flutterxel.input_text, isA<String>());
+    expect(flutterxel.dropped_files, isA<List<String>>());
+  });
+
   test(
     'accepts Pyxel-compatible named options for init/load/save/play/playm/blt',
     () {
