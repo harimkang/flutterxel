@@ -1,0 +1,47 @@
+name: publish-dry-run
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to validate (format: vX.Y.Z)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag and package versions
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+        run: |
+          bash ./packages/flutterxel_tools/tool/check_release_versions.sh --tag "$RELEASE_TAG"
+
+  pub-dry-run:
+    needs: release-check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - package: flutterxel
+            path: packages/flutterxel
+          - package: flutterxel_tools
+            path: packages/flutterxel_tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Bootstrap workspace
+        run: dart run melos bootstrap
+      - name: pub publish dry-run (${{ matrix.package }})
+        working-directory: ${{ matrix.path }}
+        run: flutter pub publish --dry-run

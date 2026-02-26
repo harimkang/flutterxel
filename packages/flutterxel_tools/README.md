@@ -16,6 +16,7 @@ The CLI command surface is scaffolded with placeholder handlers.
 dart run flutterxel_tools:flutterxel_tools --help
 dart run flutterxel_tools:flutterxel_tools run
 dart run flutterxel_tools:flutterxel_tools build-native
+dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.1
 ```
 
 `build-native` currently points maintainers to:
@@ -34,6 +35,14 @@ For tagged releases (`v*`), `.github/workflows/native_artifacts.yml` builds the 
 
 - platform bundle (`flutterxel-native-artifacts.tgz`)
 - package overlay (`flutterxel-native-package-overlay.tgz`)
+
+Version/tag validation helper:
+
+```bash
+bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.1
+```
+
+`release-check` CLI wrapper runs the same script.
 
 ## Monorepo Context
 

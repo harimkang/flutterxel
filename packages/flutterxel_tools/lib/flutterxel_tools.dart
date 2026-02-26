@@ -10,6 +10,7 @@ enum FlutterxelToolCommand {
   package,
   app2html,
   buildNative,
+  releaseCheck,
 }
 
 class FlutterxelTools {
@@ -44,6 +45,11 @@ class FlutterxelTools {
       'out-dir',
       help: 'Optional output directory for packaged artifacts.',
     );
+    final releaseCheck = parser.addCommand('release-check');
+    releaseCheck.addOption(
+      'tag',
+      help: 'Release tag to validate (for example v0.1.0).',
+    );
     return parser;
   }
 
@@ -64,6 +70,8 @@ class FlutterxelTools {
       'app2html' => 'app2html is scaffolded but not implemented yet.',
       'build-native' =>
         'build-native scaffold: run packages/flutterxel_tools/tool/build_rust_core_artifacts.sh',
+      'release-check' =>
+        'release-check scaffold: run packages/flutterxel_tools/tool/check_release_versions.sh',
       _ => usage(),
     };
   }
@@ -73,6 +81,22 @@ class FlutterxelTools {
     final candidates = <String>[
       '${Directory.current.path}${sep}packages${sep}flutterxel_tools${sep}tool${sep}build_rust_core_artifacts.sh',
       '${Directory.current.path}${sep}tool${sep}build_rust_core_artifacts.sh',
+    ];
+
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+
+    return candidates.first;
+  }
+
+  static String _releaseCheckScriptPath() {
+    final sep = Platform.pathSeparator;
+    final candidates = <String>[
+      '${Directory.current.path}${sep}packages${sep}flutterxel_tools${sep}tool${sep}check_release_versions.sh',
+      '${Directory.current.path}${sep}tool${sep}check_release_versions.sh',
     ];
 
     for (final candidate in candidates) {
@@ -112,28 +136,40 @@ class FlutterxelTools {
       return 0;
     }
 
-    if (command != 'build-native') {
+    if (command != 'build-native' && command != 'release-check') {
       onStdout(dispatch(results));
       return 0;
     }
 
-    final scriptPath = _buildNativeScriptPath();
+    final commandArgs = results.command!;
+    final scriptPath = switch (command) {
+      'build-native' => _buildNativeScriptPath(),
+      'release-check' => _releaseCheckScriptPath(),
+      _ => '',
+    };
     if (!File(scriptPath).existsSync()) {
-      onStderr('build-native script not found: $scriptPath');
+      onStderr('$command script not found: $scriptPath');
       return 66;
     }
 
-    final buildNativeArgs = results.command!;
     final forwarded = <String>[
-      if (buildNativeArgs['android'] == true) '--android',
-      if (buildNativeArgs['ios'] == true) '--ios',
-      if (buildNativeArgs['all'] == true) '--all',
+      if (command == 'build-native' && commandArgs['android'] == true)
+        '--android',
+      if (command == 'build-native' && commandArgs['ios'] == true) '--ios',
+      if (command == 'build-native' && commandArgs['all'] == true) '--all',
     ];
-    final outDir = buildNativeArgs['out-dir'] as String?;
-    if (outDir != null && outDir.isNotEmpty) {
-      forwarded.addAll(['--out-dir', outDir]);
+    if (command == 'build-native') {
+      final outDir = commandArgs['out-dir'] as String?;
+      if (outDir != null && outDir.isNotEmpty) {
+        forwarded.addAll(['--out-dir', outDir]);
+      }
+    } else if (command == 'release-check') {
+      final tag = commandArgs['tag'] as String?;
+      if (tag != null && tag.isNotEmpty) {
+        forwarded.addAll(['--tag', tag]);
+      }
     }
-    forwarded.addAll(buildNativeArgs.rest);
+    forwarded.addAll(commandArgs.rest);
 
     final result = await runProcess('bash', [scriptPath, ...forwarded]);
 

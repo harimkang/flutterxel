@@ -26,6 +26,15 @@ void main() {
     expect(FlutterxelTools.dispatch(results), contains('build-native'));
   });
 
+  test(
+    'supports release-check command for tag/version validation workflow',
+    () {
+      final parser = FlutterxelTools.buildParser();
+      final results = parser.parse(const ['release-check']);
+      expect(FlutterxelTools.dispatch(results), contains('release-check'));
+    },
+  );
+
   test('execute runs build-native script with forwarded args', () async {
     String? executable;
     List<String>? arguments;
@@ -46,5 +55,27 @@ void main() {
     expect(arguments, isNotNull);
     expect(arguments!.first, contains('build_rust_core_artifacts.sh'));
     expect(arguments, contains('--android'));
+  });
+
+  test('execute runs release-check script with forwarded tag', () async {
+    String? executable;
+    List<String>? arguments;
+
+    final exitCode = await FlutterxelTools.execute(
+      const ['release-check', '--tag', 'v0.0.1'],
+      runProcess: (exec, args) async {
+        executable = exec;
+        arguments = args;
+        return ProcessResult(12345, 0, 'ok', '');
+      },
+      onStdout: (_) {},
+      onStderr: (_) {},
+    );
+
+    expect(exitCode, 0);
+    expect(executable, 'bash');
+    expect(arguments, isNotNull);
+    expect(arguments!.first, contains('check_release_versions.sh'));
+    expect(arguments, containsAll(<String>['--tag', 'v0.0.1']));
   });
 }

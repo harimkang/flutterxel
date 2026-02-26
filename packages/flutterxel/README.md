@@ -33,6 +33,8 @@ Runtime loading prefers `flutterxel_core` and falls back to `flutterxel` scaffol
 
 Tag releases (`v*`) publish prebuilt native bundles via GitHub Actions, including a package-overlay archive that can be extracted directly into `packages/flutterxel/native`.
 
+Release tags also trigger `.github/workflows/publish_dry_run.yml`, which validates package versions against the tag and runs `pub publish --dry-run` for monorepo packages.
+
 ## Runtime Loop and View
 
 ```dart
