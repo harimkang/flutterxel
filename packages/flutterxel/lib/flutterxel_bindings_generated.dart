@@ -339,6 +339,32 @@ class FlutterxelBindings {
   late final _flutterxel_core_rectb = _flutterxel_core_rectbPtr
       .asFunction<bool Function(int, int, int, int, int)>();
 
+  bool flutterxel_core_circ(int x, int y, int r, int col) {
+    return _flutterxel_core_circ(x, y, r, col);
+  }
+
+  late final _flutterxel_core_circPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32, ffi.Int32)
+        >
+      >('flutterxel_core_circ');
+  late final _flutterxel_core_circ = _flutterxel_core_circPtr
+      .asFunction<bool Function(int, int, int, int)>();
+
+  bool flutterxel_core_circb(int x, int y, int r, int col) {
+    return _flutterxel_core_circb(x, y, r, col);
+  }
+
+  late final _flutterxel_core_circbPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32, ffi.Int32)
+        >
+      >('flutterxel_core_circb');
+  late final _flutterxel_core_circb = _flutterxel_core_circbPtr
+      .asFunction<bool Function(int, int, int, int)>();
+
   bool flutterxel_core_blt(
     double x,
     double y,

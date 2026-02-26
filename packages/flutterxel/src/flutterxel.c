@@ -532,6 +532,64 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_rectb(
   return true;
 }
 
+static void draw_circle_outline_points(
+    int32_t cx,
+    int32_t cy,
+    int32_t x,
+    int32_t y,
+    int32_t col) {
+  set_frame_pixel(cx + x, cy + y, col);
+  set_frame_pixel(cx - x, cy + y, col);
+  set_frame_pixel(cx + x, cy - y, col);
+  set_frame_pixel(cx - x, cy - y, col);
+  set_frame_pixel(cx + y, cy + x, col);
+  set_frame_pixel(cx - y, cy + x, col);
+  set_frame_pixel(cx + y, cy - x, col);
+  set_frame_pixel(cx - y, cy - x, col);
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_circ(int32_t x, int32_t y, int32_t r, int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (r < 0) {
+    return true;
+  }
+
+  for (int32_t dy = -r; dy <= r; dy++) {
+    int64_t remain = (int64_t)r * (int64_t)r - (int64_t)dy * (int64_t)dy;
+    int32_t max_dx = (int32_t)floor(sqrt((double)remain));
+    for (int32_t dx = -max_dx; dx <= max_dx; dx++) {
+      set_frame_pixel(x + dx, y + dy, col);
+    }
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_circb(int32_t x, int32_t y, int32_t r, int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (r < 0) {
+    return true;
+  }
+
+  int32_t px = r;
+  int32_t py = 0;
+  int32_t err = 1 - px;
+  while (px >= py) {
+    draw_circle_outline_points(x, y, px, py, col);
+    py += 1;
+    if (err < 0) {
+      err += 2 * py + 1;
+    } else {
+      px -= 1;
+      err += 2 * (py - px + 1);
+    }
+  }
+  return true;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double x,
     double y,

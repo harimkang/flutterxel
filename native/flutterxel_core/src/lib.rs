@@ -1036,6 +1036,59 @@ fn draw_rectb(state: &mut RuntimeState, x: i32, y: i32, w: i32, h: i32, col: i32
     }
 }
 
+fn draw_circle_outline_points(
+    state: &mut RuntimeState,
+    cx: i32,
+    cy: i32,
+    x: i32,
+    y: i32,
+    col: i32,
+) {
+    set_frame_pixel(state, cx + x, cy + y, col);
+    set_frame_pixel(state, cx - x, cy + y, col);
+    set_frame_pixel(state, cx + x, cy - y, col);
+    set_frame_pixel(state, cx - x, cy - y, col);
+    set_frame_pixel(state, cx + y, cy + x, col);
+    set_frame_pixel(state, cx - y, cy + x, col);
+    set_frame_pixel(state, cx + y, cy - x, col);
+    set_frame_pixel(state, cx - y, cy - x, col);
+}
+
+fn draw_circ(state: &mut RuntimeState, x: i32, y: i32, r: i32, col: i32) {
+    if r < 0 {
+        return;
+    }
+
+    let rr = i64::from(r) * i64::from(r);
+    for dy in -r..=r {
+        let remain = rr - i64::from(dy) * i64::from(dy);
+        let max_dx = (remain as f64).sqrt().floor() as i32;
+        for dx in -max_dx..=max_dx {
+            set_frame_pixel(state, x + dx, y + dy, col);
+        }
+    }
+}
+
+fn draw_circb(state: &mut RuntimeState, x: i32, y: i32, r: i32, col: i32) {
+    if r < 0 {
+        return;
+    }
+
+    let mut px = r;
+    let mut py = 0;
+    let mut err = 1 - px;
+    while px >= py {
+        draw_circle_outline_points(state, x, y, px, py, col);
+        py += 1;
+        if err < 0 {
+            err += 2 * py + 1;
+        } else {
+            px -= 1;
+            err += 2 * (py - px + 1);
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn flutterxel_core_version_major() -> u32 {
     ABI_VERSION_MAJOR
@@ -1347,6 +1400,26 @@ pub extern "C" fn flutterxel_core_rectb(x: i32, y: i32, w: i32, h: i32, col: i32
         return false;
     }
     draw_rectb(&mut state, x, y, w, h, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_circ(x: i32, y: i32, r: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_circ(&mut state, x, y, r, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_circb(x: i32, y: i32, r: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_circb(&mut state, x, y, r, col);
     true
 }
 
@@ -1820,6 +1893,28 @@ mod tests {
         assert_eq!(flutterxel_core_pget(0, 4), 6);
         assert_eq!(flutterxel_core_pget(2, 6), 6);
         assert_eq!(flutterxel_core_pget(1, 5), 0);
+    }
+
+    #[test]
+    fn circle_primitives_update_expected_pixels() {
+        let _guard = test_lock();
+        init_runtime(10, 10);
+        assert!(flutterxel_core_cls(0));
+
+        assert!(flutterxel_core_circ(4, 4, 2, 7));
+        assert_eq!(flutterxel_core_pget(4, 4), 7);
+        assert_eq!(flutterxel_core_pget(4, 2), 7);
+        assert_eq!(flutterxel_core_pget(6, 4), 7);
+        assert_eq!(flutterxel_core_pget(4, 6), 7);
+        assert_eq!(flutterxel_core_pget(2, 4), 7);
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_circb(4, 4, 2, 8));
+        assert_eq!(flutterxel_core_pget(4, 2), 8);
+        assert_eq!(flutterxel_core_pget(6, 4), 8);
+        assert_eq!(flutterxel_core_pget(4, 6), 8);
+        assert_eq!(flutterxel_core_pget(2, 4), 8);
+        assert_eq!(flutterxel_core_pget(4, 4), 0);
     }
 
     #[test]

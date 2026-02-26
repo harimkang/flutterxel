@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/gestures.dart'
@@ -514,6 +515,64 @@ void rectb(int x, int y, int w, int h, int col) {
     for (var py = y + 1; py < bottom; py++) {
       _fallbackSetPixel(x, py, col);
       _fallbackSetPixel(right, py, col);
+    }
+  }
+}
+
+/// Pyxel-compatible circ API.
+void circ(int x, int y, int r, int col) {
+  _ensureInitialized('circ');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_circ(x, y, r, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_circ failed.');
+  }
+  if (bindings == null) {
+    if (r < 0) {
+      return;
+    }
+    final rr = r * r;
+    for (var dy = -r; dy <= r; dy++) {
+      final remain = rr - (dy * dy);
+      final maxDx = math.sqrt(remain).floor();
+      for (var dx = -maxDx; dx <= maxDx; dx++) {
+        _fallbackSetPixel(x + dx, y + dy, col);
+      }
+    }
+  }
+}
+
+/// Pyxel-compatible circb API.
+void circb(int x, int y, int r, int col) {
+  _ensureInitialized('circb');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_circb(x, y, r, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_circb failed.');
+  }
+  if (bindings == null) {
+    if (r < 0) {
+      return;
+    }
+    var px = r;
+    var py = 0;
+    var err = 1 - px;
+    while (px >= py) {
+      _fallbackSetPixel(x + px, y + py, col);
+      _fallbackSetPixel(x - px, y + py, col);
+      _fallbackSetPixel(x + px, y - py, col);
+      _fallbackSetPixel(x - px, y - py, col);
+      _fallbackSetPixel(x + py, y + px, col);
+      _fallbackSetPixel(x - py, y + px, col);
+      _fallbackSetPixel(x + py, y - px, col);
+      _fallbackSetPixel(x - py, y - px, col);
+      py += 1;
+      if (err < 0) {
+        err += 2 * py + 1;
+      } else {
+        px -= 1;
+        err += 2 * (py - px + 1);
+      }
     }
   }
 }

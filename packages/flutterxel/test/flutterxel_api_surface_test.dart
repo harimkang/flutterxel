@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -23,6 +23,8 @@ void main() {
       expect(flutterxel.line, isA<Function>());
       expect(flutterxel.rect, isA<Function>());
       expect(flutterxel.rectb, isA<Function>());
+      expect(flutterxel.circ, isA<Function>());
+      expect(flutterxel.circb, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
       expect(flutterxel.playm, isA<Function>());
@@ -129,6 +131,26 @@ void main() {
     expect(flutterxel.pget(0, 4), 6);
     expect(flutterxel.pget(2, 6), 6);
     expect(flutterxel.pget(1, 5), 0);
+  });
+
+  test('circle primitives draw filled and border circles', () {
+    flutterxel.init(10, 10);
+    flutterxel.cls(0);
+
+    flutterxel.circ(4, 4, 2, 7);
+    expect(flutterxel.pget(4, 4), 7);
+    expect(flutterxel.pget(4, 2), 7);
+    expect(flutterxel.pget(6, 4), 7);
+    expect(flutterxel.pget(4, 6), 7);
+    expect(flutterxel.pget(2, 4), 7);
+
+    flutterxel.cls(0);
+    flutterxel.circb(4, 4, 2, 8);
+    expect(flutterxel.pget(4, 2), 8);
+    expect(flutterxel.pget(6, 4), 8);
+    expect(flutterxel.pget(4, 6), 8);
+    expect(flutterxel.pget(2, 4), 8);
+    expect(flutterxel.pget(4, 4), 0);
   });
 
   test('quit stops loop and resets initialized runtime state', () {

@@ -22,6 +22,8 @@ SYMBOLS=(
   flutterxel_core_line
   flutterxel_core_rect
   flutterxel_core_rectb
+  flutterxel_core_circ
+  flutterxel_core_circb
   flutterxel_core_blt
   flutterxel_core_play
   flutterxel_core_playm

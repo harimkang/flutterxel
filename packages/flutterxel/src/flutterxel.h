@@ -84,6 +84,14 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_rectb(int32_t x,
                                               int32_t w,
                                               int32_t h,
                                               int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_circ(int32_t x,
+                                             int32_t y,
+                                             int32_t r,
+                                             int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_circb(int32_t x,
+                                              int32_t y,
+                                              int32_t r,
+                                              int32_t col);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double x,
