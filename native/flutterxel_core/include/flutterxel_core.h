@@ -81,6 +81,31 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_value(int32_t key,
 // pyxel.cls(col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_cls(int32_t col);
 
+// pyxel.pset(x, y, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_pset(int32_t x,
+                                                 int32_t y,
+                                                 int32_t col);
+// pyxel.pget(x, y)
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_pget(int32_t x, int32_t y);
+// pyxel.line(x1, y1, x2, y2, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_line(int32_t x1,
+                                                 int32_t y1,
+                                                 int32_t x2,
+                                                 int32_t y2,
+                                                 int32_t col);
+// pyxel.rect(x, y, w, h, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_rect(int32_t x,
+                                                 int32_t y,
+                                                 int32_t w,
+                                                 int32_t h,
+                                                 int32_t col);
+// pyxel.rectb(x, y, w, h, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_rectb(int32_t x,
+                                                  int32_t y,
+                                                  int32_t w,
+                                                  int32_t h,
+                                                  int32_t col);
+
 // pyxel.blt(x, y, img, u, v, w, h, colkey=None, *, rotate=None, scale=None)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_blt(
     double x,

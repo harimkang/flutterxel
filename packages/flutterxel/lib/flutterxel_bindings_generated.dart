@@ -260,6 +260,85 @@ class FlutterxelBindings {
   late final _flutterxel_core_cls = _flutterxel_core_clsPtr
       .asFunction<bool Function(int)>();
 
+  bool flutterxel_core_pset(int x, int y, int col) {
+    return _flutterxel_core_pset(x, y, col);
+  }
+
+  late final _flutterxel_core_psetPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32)>
+      >('flutterxel_core_pset');
+  late final _flutterxel_core_pset = _flutterxel_core_psetPtr
+      .asFunction<bool Function(int, int, int)>();
+
+  int flutterxel_core_pget(int x, int y) {
+    return _flutterxel_core_pget(x, y);
+  }
+
+  late final _flutterxel_core_pgetPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_pget',
+      );
+  late final _flutterxel_core_pget = _flutterxel_core_pgetPtr
+      .asFunction<int Function(int, int)>();
+
+  bool flutterxel_core_line(int x1, int y1, int x2, int y2, int col) {
+    return _flutterxel_core_line(x1, y1, x2, y2, col);
+  }
+
+  late final _flutterxel_core_linePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_line');
+  late final _flutterxel_core_line = _flutterxel_core_linePtr
+      .asFunction<bool Function(int, int, int, int, int)>();
+
+  bool flutterxel_core_rect(int x, int y, int w, int h, int col) {
+    return _flutterxel_core_rect(x, y, w, h, col);
+  }
+
+  late final _flutterxel_core_rectPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_rect');
+  late final _flutterxel_core_rect = _flutterxel_core_rectPtr
+      .asFunction<bool Function(int, int, int, int, int)>();
+
+  bool flutterxel_core_rectb(int x, int y, int w, int h, int col) {
+    return _flutterxel_core_rectb(x, y, w, h, col);
+  }
+
+  late final _flutterxel_core_rectbPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_rectb');
+  late final _flutterxel_core_rectb = _flutterxel_core_rectbPtr
+      .asFunction<bool Function(int, int, int, int, int)>();
+
   bool flutterxel_core_blt(
     double x,
     double y,

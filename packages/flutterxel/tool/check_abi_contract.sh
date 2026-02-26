@@ -17,6 +17,11 @@ SYMBOLS=(
   flutterxel_core_set_btn_state
   flutterxel_core_set_btn_value
   flutterxel_core_cls
+  flutterxel_core_pset
+  flutterxel_core_pget
+  flutterxel_core_line
+  flutterxel_core_rect
+  flutterxel_core_rectb
   flutterxel_core_blt
   flutterxel_core_play
   flutterxel_core_playm

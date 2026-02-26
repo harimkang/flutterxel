@@ -104,6 +104,31 @@ static int find_value_key_index(int32_t key) {
   return -1;
 }
 
+static bool set_frame_pixel(int32_t x, int32_t y, int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (x < 0 || x >= g_state.width || y < 0 || y >= g_state.height) {
+    return true;
+  }
+
+  size_t index = (size_t)y * (size_t)g_state.width + (size_t)x;
+  g_state.frame_buffer[index] = col;
+  return true;
+}
+
+static int32_t get_frame_pixel(int32_t x, int32_t y) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return 0;
+  }
+  if (x < 0 || x >= g_state.width || y < 0 || y >= g_state.height) {
+    return 0;
+  }
+
+  size_t index = (size_t)y * (size_t)g_state.width + (size_t)x;
+  return g_state.frame_buffer[index];
+}
+
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
   return ABI_VERSION_MAJOR;
 }
@@ -413,6 +438,96 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_cls(int32_t col) {
   g_state.clear_color = col;
   for (size_t i = 0; i < g_state.frame_buffer_len; i++) {
     g_state.frame_buffer[i] = col;
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_pset(int32_t x, int32_t y, int32_t col) {
+  return set_frame_pixel(x, y, col);
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_pget(int32_t x, int32_t y) {
+  return get_frame_pixel(x, y);
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_line(
+    int32_t x1,
+    int32_t y1,
+    int32_t x2,
+    int32_t y2,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+
+  int32_t dx = abs(x2 - x1);
+  int32_t sx = x1 < x2 ? 1 : -1;
+  int32_t dy = -abs(y2 - y1);
+  int32_t sy = y1 < y2 ? 1 : -1;
+  int32_t err = dx + dy;
+
+  while (true) {
+    set_frame_pixel(x1, y1, col);
+    if (x1 == x2 && y1 == y2) {
+      break;
+    }
+    int32_t e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x1 += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y1 += sy;
+    }
+  }
+
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_rect(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (w <= 0 || h <= 0) {
+    return true;
+  }
+
+  for (int32_t py = y; py < y + h; py++) {
+    for (int32_t px = x; px < x + w; px++) {
+      set_frame_pixel(px, py, col);
+    }
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_rectb(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+  if (w <= 0 || h <= 0) {
+    return true;
+  }
+
+  int32_t right = x + w - 1;
+  int32_t bottom = y + h - 1;
+  for (int32_t px = x; px <= right; px++) {
+    set_frame_pixel(px, y, col);
+    set_frame_pixel(px, bottom, col);
+  }
+  for (int32_t py = y + 1; py < bottom; py++) {
+    set_frame_pixel(x, py, col);
+    set_frame_pixel(right, py, col);
   }
   return true;
 }

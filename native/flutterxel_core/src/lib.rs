@@ -966,6 +966,76 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     true
 }
 
+fn set_frame_pixel(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
+    if x < 0 || x >= state.width || y < 0 || y >= state.height {
+        return;
+    }
+    let index = y as usize * state.width as usize + x as usize;
+    state.frame_buffer[index] = col;
+}
+
+fn get_frame_pixel(state: &RuntimeState, x: i32, y: i32) -> i32 {
+    if x < 0 || x >= state.width || y < 0 || y >= state.height {
+        return 0;
+    }
+    let index = y as usize * state.width as usize + x as usize;
+    state.frame_buffer[index]
+}
+
+fn draw_line(state: &mut RuntimeState, mut x1: i32, mut y1: i32, x2: i32, y2: i32, col: i32) {
+    let dx = (x2 - x1).abs();
+    let sx = if x1 < x2 { 1 } else { -1 };
+    let dy = -(y2 - y1).abs();
+    let sy = if y1 < y2 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        set_frame_pixel(state, x1, y1, col);
+        if x1 == x2 && y1 == y2 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            x1 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y1 += sy;
+        }
+    }
+}
+
+fn draw_rect(state: &mut RuntimeState, x: i32, y: i32, w: i32, h: i32, col: i32) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    for py in y..(y + h) {
+        for px in x..(x + w) {
+            set_frame_pixel(state, px, py, col);
+        }
+    }
+}
+
+fn draw_rectb(state: &mut RuntimeState, x: i32, y: i32, w: i32, h: i32, col: i32) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+
+    let right = x + w - 1;
+    let bottom = y + h - 1;
+    for px in x..=right {
+        set_frame_pixel(state, px, y, col);
+        set_frame_pixel(state, px, bottom, col);
+    }
+    if bottom > y {
+        for py in (y + 1)..bottom {
+            set_frame_pixel(state, x, py, col);
+            set_frame_pixel(state, right, py, col);
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn flutterxel_core_version_major() -> u32 {
     ABI_VERSION_MAJOR
@@ -1228,6 +1298,55 @@ pub extern "C" fn flutterxel_core_cls(col: i32) -> bool {
     }
     state.clear_color = col;
     state.frame_buffer.fill(col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_pset(x: i32, y: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    set_frame_pixel(&mut state, x, y, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_pget(x: i32, y: i32) -> i32 {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0;
+    }
+    get_frame_pixel(&state, x, y)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_line(x1: i32, y1: i32, x2: i32, y2: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_line(&mut state, x1, y1, x2, y2, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_rect(x: i32, y: i32, w: i32, h: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_rect(&mut state, x, y, w, h, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_rectb(x: i32, y: i32, w: i32, h: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_rectb(&mut state, x, y, w, h, col);
     true
 }
 
@@ -1678,6 +1797,29 @@ mod tests {
         };
         assert_eq!(frame_buffer.len(), 16);
         assert!(frame_buffer.iter().all(|pixel| *pixel == 7));
+    }
+
+    #[test]
+    fn drawing_primitives_update_expected_pixels() {
+        let _guard = test_lock();
+        init_runtime(8, 8);
+        assert!(flutterxel_core_cls(0));
+
+        assert!(flutterxel_core_pset(1, 1, 3));
+        assert_eq!(flutterxel_core_pget(1, 1), 3);
+
+        assert!(flutterxel_core_line(0, 0, 3, 0, 4));
+        assert_eq!(flutterxel_core_pget(0, 0), 4);
+        assert_eq!(flutterxel_core_pget(3, 0), 4);
+
+        assert!(flutterxel_core_rect(2, 2, 2, 2, 5));
+        assert_eq!(flutterxel_core_pget(2, 2), 5);
+        assert_eq!(flutterxel_core_pget(3, 3), 5);
+
+        assert!(flutterxel_core_rectb(0, 4, 3, 3, 6));
+        assert_eq!(flutterxel_core_pget(0, 4), 6);
+        assert_eq!(flutterxel_core_pget(2, 6), 6);
+        assert_eq!(flutterxel_core_pget(1, 5), 0);
     }
 
     #[test]

@@ -60,6 +60,7 @@ final Map<int, int> _fallbackPressedFrame = <int, int>{};
 final Map<int, int> _fallbackReleasedFrame = <int, int>{};
 final Map<int, int> _fallbackInputValues = <int, int>{};
 final Set<int> _fallbackPlayingChannels = <int>{};
+List<int> _fallbackFrameBuffer = <int>[];
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -132,6 +133,29 @@ void _ensureInitialized(String apiName) {
   }
 }
 
+int? _fallbackPixelIndex(int x, int y) {
+  if (x < 0 || x >= width || y < 0 || y >= height) {
+    return null;
+  }
+  return y * width + x;
+}
+
+void _fallbackSetPixel(int x, int y, int col) {
+  final index = _fallbackPixelIndex(x, y);
+  if (index == null) {
+    return;
+  }
+  _fallbackFrameBuffer[index] = col;
+}
+
+int _fallbackGetPixel(int x, int y) {
+  final index = _fallbackPixelIndex(x, y);
+  if (index == null) {
+    return 0;
+  }
+  return _fallbackFrameBuffer[index];
+}
+
 /// Pyxel-compatible 1st-scope initialization API.
 void init(
   int widthValue,
@@ -176,6 +200,7 @@ void init(
     _fallbackReleasedFrame.clear();
     _fallbackInputValues.clear();
     _fallbackPlayingChannels.clear();
+    _fallbackFrameBuffer = List<int>.filled(width * height, 0, growable: false);
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -204,6 +229,7 @@ void quit() {
   _fallbackReleasedFrame.clear();
   _fallbackInputValues.clear();
   _fallbackPlayingChannels.clear();
+  _fallbackFrameBuffer = <int>[];
   _isInitialized = false;
 }
 
@@ -384,6 +410,111 @@ void cls(int col) {
   final ok = bindings?.flutterxel_core_cls(col) ?? true;
   if (!ok) {
     throw StateError('flutterxel_core_cls failed.');
+  }
+  if (bindings == null) {
+    _fallbackFrameBuffer.fillRange(0, _fallbackFrameBuffer.length, col);
+  }
+}
+
+/// Pyxel-compatible pset API.
+void pset(int x, int y, int col) {
+  _ensureInitialized('pset');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_pset(x, y, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_pset failed.');
+  }
+  if (bindings == null) {
+    _fallbackSetPixel(x, y, col);
+  }
+}
+
+/// Pyxel-compatible pget API.
+int pget(int x, int y) {
+  _ensureInitialized('pget');
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_pget(x, y);
+  }
+  return _fallbackGetPixel(x, y);
+}
+
+/// Pyxel-compatible line API.
+void line(int x1, int y1, int x2, int y2, int col) {
+  _ensureInitialized('line');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_line(x1, y1, x2, y2, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_line failed.');
+  }
+  if (bindings == null) {
+    var cx = x1;
+    var cy = y1;
+    final dx = (x2 - x1).abs();
+    final sx = x1 < x2 ? 1 : -1;
+    final dy = -(y2 - y1).abs();
+    final sy = y1 < y2 ? 1 : -1;
+    var err = dx + dy;
+    while (true) {
+      _fallbackSetPixel(cx, cy, col);
+      if (cx == x2 && cy == y2) {
+        break;
+      }
+      final e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        cx += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        cy += sy;
+      }
+    }
+  }
+}
+
+/// Pyxel-compatible rect API.
+void rect(int x, int y, int w, int h, int col) {
+  _ensureInitialized('rect');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_rect(x, y, w, h, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_rect failed.');
+  }
+  if (bindings == null) {
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    for (var py = y; py < y + h; py++) {
+      for (var px = x; px < x + w; px++) {
+        _fallbackSetPixel(px, py, col);
+      }
+    }
+  }
+}
+
+/// Pyxel-compatible rectb API.
+void rectb(int x, int y, int w, int h, int col) {
+  _ensureInitialized('rectb');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_rectb(x, y, w, h, col) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_rectb failed.');
+  }
+  if (bindings == null) {
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    final right = x + w - 1;
+    final bottom = y + h - 1;
+    for (var px = x; px <= right; px++) {
+      _fallbackSetPixel(px, y, col);
+      _fallbackSetPixel(px, bottom, col);
+    }
+    for (var py = y + 1; py < bottom; py++) {
+      _fallbackSetPixel(x, py, col);
+      _fallbackSetPixel(right, py, col);
+    }
   }
 }
 
@@ -604,12 +735,15 @@ void save(
 List<int> frameBufferSnapshot() {
   _ensureInitialized('frameBufferSnapshot');
   final bindings = _getBindingsOrNull();
-  final len = bindings?.flutterxel_core_framebuffer_len() ?? 0;
+  if (bindings == null) {
+    return List<int>.from(_fallbackFrameBuffer, growable: false);
+  }
+  final len = bindings.flutterxel_core_framebuffer_len();
   if (len <= 0) {
     return const [];
   }
 
-  final ptr = bindings?.flutterxel_core_framebuffer_ptr() ?? ffi.nullptr;
+  final ptr = bindings.flutterxel_core_framebuffer_ptr();
   if (ptr == ffi.nullptr) {
     return const [];
   }

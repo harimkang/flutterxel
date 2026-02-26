@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -18,6 +18,11 @@ void main() {
       expect(flutterxel.btnr, isA<Function>());
       expect(flutterxel.btnv, isA<Function>());
       expect(flutterxel.cls, isA<Function>());
+      expect(flutterxel.pset, isA<Function>());
+      expect(flutterxel.pget, isA<Function>());
+      expect(flutterxel.line, isA<Function>());
+      expect(flutterxel.rect, isA<Function>());
+      expect(flutterxel.rectb, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
       expect(flutterxel.playm, isA<Function>());
@@ -103,6 +108,27 @@ void main() {
     flutterxel.flip();
     expect(flutterxel.frameCount, 1);
     expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_X), 0);
+  });
+
+  test('drawing primitives update pixel values', () {
+    flutterxel.init(8, 8);
+    flutterxel.cls(0);
+
+    flutterxel.pset(1, 1, 3);
+    expect(flutterxel.pget(1, 1), 3);
+
+    flutterxel.line(0, 0, 3, 0, 4);
+    expect(flutterxel.pget(0, 0), 4);
+    expect(flutterxel.pget(3, 0), 4);
+
+    flutterxel.rect(2, 2, 2, 2, 5);
+    expect(flutterxel.pget(2, 2), 5);
+    expect(flutterxel.pget(3, 3), 5);
+
+    flutterxel.rectb(0, 4, 3, 3, 6);
+    expect(flutterxel.pget(0, 4), 6);
+    expect(flutterxel.pget(2, 6), 6);
+    expect(flutterxel.pget(1, 5), 0);
   });
 
   test('quit stops loop and resets initialized runtime state', () {
