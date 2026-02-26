@@ -22,6 +22,14 @@ dart run flutterxel_tools:flutterxel_tools build-native
 
 - `packages/flutterxel_tools/tool/build_rust_core_artifacts.sh`
 
+Examples:
+
+```bash
+dart run flutterxel_tools:flutterxel_tools build-native --android
+dart run flutterxel_tools:flutterxel_tools build-native --ios
+dart run flutterxel_tools:flutterxel_tools build-native --all --out-dir ./dist/native
+```
+
 ## Monorepo Context
 
 `flutterxel_tools` is intentionally separated from `flutterxel` runtime so app projects can depend on runtime without pulling in tooling/editor dependencies.

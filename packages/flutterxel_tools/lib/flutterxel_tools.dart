@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:args/args.dart';
 
 enum FlutterxelToolCommand {
@@ -22,7 +24,26 @@ class FlutterxelTools {
     parser.addCommand('edit');
     parser.addCommand('package');
     parser.addCommand('app2html');
-    parser.addCommand('build-native');
+    final buildNative = parser.addCommand('build-native');
+    buildNative.addFlag(
+      'android',
+      negatable: false,
+      help: 'Build Android shared libraries.',
+    );
+    buildNative.addFlag(
+      'ios',
+      negatable: false,
+      help: 'Build iOS static libraries and xcframework.',
+    );
+    buildNative.addFlag(
+      'all',
+      negatable: false,
+      help: 'Build both Android and iOS artifacts.',
+    );
+    buildNative.addOption(
+      'out-dir',
+      help: 'Optional output directory for packaged artifacts.',
+    );
     return parser;
   }
 
@@ -45,5 +66,87 @@ class FlutterxelTools {
         'build-native scaffold: run packages/flutterxel_tools/tool/build_rust_core_artifacts.sh',
       _ => usage(),
     };
+  }
+
+  static String _buildNativeScriptPath() {
+    final sep = Platform.pathSeparator;
+    final candidates = <String>[
+      '${Directory.current.path}${sep}packages${sep}flutterxel_tools${sep}tool${sep}build_rust_core_artifacts.sh',
+      '${Directory.current.path}${sep}tool${sep}build_rust_core_artifacts.sh',
+    ];
+
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+
+    return candidates.first;
+  }
+
+  static Future<int> execute(
+    List<String> args, {
+    Future<ProcessResult> Function(String executable, List<String> arguments)?
+    runProcess,
+    void Function(String message)? onStdout,
+    void Function(String message)? onStderr,
+  }) async {
+    runProcess ??= (executable, arguments) =>
+        Process.run(executable, arguments);
+    onStdout ??= (message) => stdout.writeln(message);
+    onStderr ??= (message) => stderr.writeln(message);
+
+    final parser = buildParser();
+    late final ArgResults results;
+    try {
+      results = parser.parse(args);
+    } on FormatException catch (error) {
+      onStderr(error.message);
+      onStdout(parser.usage);
+      return 64;
+    }
+
+    final command = results.command?.name;
+    if (results['help'] == true || command == null) {
+      onStdout(parser.usage);
+      return 0;
+    }
+
+    if (command != 'build-native') {
+      onStdout(dispatch(results));
+      return 0;
+    }
+
+    final scriptPath = _buildNativeScriptPath();
+    if (!File(scriptPath).existsSync()) {
+      onStderr('build-native script not found: $scriptPath');
+      return 66;
+    }
+
+    final buildNativeArgs = results.command!;
+    final forwarded = <String>[
+      if (buildNativeArgs['android'] == true) '--android',
+      if (buildNativeArgs['ios'] == true) '--ios',
+      if (buildNativeArgs['all'] == true) '--all',
+    ];
+    final outDir = buildNativeArgs['out-dir'] as String?;
+    if (outDir != null && outDir.isNotEmpty) {
+      forwarded.addAll(['--out-dir', outDir]);
+    }
+    forwarded.addAll(buildNativeArgs.rest);
+
+    final result = await runProcess('bash', [scriptPath, ...forwarded]);
+
+    final stdOutText = result.stdout.toString().trim();
+    if (stdOutText.isNotEmpty) {
+      onStdout(stdOutText);
+    }
+
+    final stdErrText = result.stderr.toString().trim();
+    if (stdErrText.isNotEmpty) {
+      onStderr(stdErrText);
+    }
+
+    return result.exitCode;
   }
 }

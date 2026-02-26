@@ -1,0 +1,112 @@
+name: native-artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target platform artifacts to build'
+        required: true
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+        default: all
+
+jobs:
+  android:
+    if: github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'android'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Android artifacts
+        run: ./packages/flutterxel_tools/tool/build_rust_core_artifacts.sh --android
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutterxel-android-jniLibs
+          path: packages/flutterxel/native/android/jniLibs
+          if-no-files-found: error
+
+  ios:
+    if: github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'ios'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build iOS artifacts
+        run: ./packages/flutterxel_tools/tool/build_rust_core_artifacts.sh --ios
+
+      - name: Upload iOS xcframework
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutterxel-ios-xcframework
+          path: packages/flutterxel/native/ios/FlutterxelCore.xcframework
+          if-no-files-found: error
+
+      - name: Upload iOS static library
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutterxel-ios-staticlib
+          path: packages/flutterxel/native/ios/libflutterxel_core.a
+          if-no-files-found: error
+
+  package:
+    needs: [android, ios]
+    if: always() && !cancelled() && (needs.android.result == 'success' || needs.ios.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Android artifacts
+        if: needs.android.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: flutterxel-android-jniLibs
+          path: dist/android/jniLibs
+
+      - name: Download iOS xcframework
+        if: needs.ios.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: flutterxel-ios-xcframework
+          path: dist/ios/FlutterxelCore.xcframework
+
+      - name: Download iOS static library
+        if: needs.ios.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: flutterxel-ios-staticlib
+          path: dist/ios
+
+      - name: Create combined archive
+        run: |
+          mkdir -p release
+          tar -czf release/flutterxel-native-artifacts.tgz -C dist .
+
+      - name: Upload combined archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutterxel-native-artifacts
+          path: release/flutterxel-native-artifacts.tgz
+          if-no-files-found: error

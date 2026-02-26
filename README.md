@@ -43,6 +43,11 @@ GitHub Actions pipeline (`.github/workflows/ci.yml`) validates:
 - Rust core formatting/tests
 - ABI symbol contract between C header and generated Dart bindings
 
+Native artifact pipeline (`.github/workflows/native_artifacts.yml`) builds:
+
+- Android `jniLibs` (`libflutterxel_core.so`)
+- iOS `FlutterxelCore.xcframework` and static library
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

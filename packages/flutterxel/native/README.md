@@ -23,3 +23,17 @@ Alternative static library packaging (advanced):
 ## Runtime Loading Priority
 
 The Dart runtime attempts to load `flutterxel_core` first and falls back to the C scaffold library `flutterxel`.
+
+## Maintainer Build Command
+
+From repository root:
+
+```bash
+./packages/flutterxel_tools/tool/build_rust_core_artifacts.sh --all
+```
+
+Or via CLI:
+
+```bash
+dart run flutterxel_tools:flutterxel_tools build-native --all
+```
