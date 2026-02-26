@@ -44,6 +44,9 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_init(
     int32_t capture_scale,
     int32_t capture_sec);
 
+// pyxel.quit()
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_quit(void);
+
 // pyxel.run(update, draw)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_run(
     FlutterxelCoreFrameCallback update,

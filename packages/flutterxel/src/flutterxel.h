@@ -42,6 +42,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
     int32_t capture_scale,
     int32_t capture_sec);
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void);
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_run(
     FlutterxelCoreFrameCallback update,
     void* update_user_data,

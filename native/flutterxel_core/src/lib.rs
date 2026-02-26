@@ -1034,6 +1034,38 @@ pub extern "C" fn flutterxel_core_init(
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_quit() -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    state.initialized = false;
+    state.width = 0;
+    state.height = 0;
+    state.frame_count = 0;
+    state.title = None;
+    state.fps = None;
+    state.quit_key = None;
+    state.display_scale = None;
+    state.capture_scale = None;
+    state.capture_sec = None;
+    state.clear_color = 0;
+    state.pressed_keys.clear();
+    state.pressed_key_frame.clear();
+    state.released_key_frame.clear();
+    state.input_values.clear();
+    state.frame_buffer.clear();
+    state.image_banks.clear();
+    state.image_bank_size = 16;
+    state.tilemaps.clear();
+    state.sounds.clear();
+    state.musics.clear();
+    state.channel_playback.clear();
+    state.last_blt = None;
+    state.last_play = None;
+    state.last_loaded = None;
+    state.last_saved = None;
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_run(
     update: FrameCallback,
     update_user_data: *mut c_void,
@@ -1697,6 +1729,37 @@ mod tests {
 
         assert!(flutterxel_core_set_btn_state(32, false));
         assert!(!flutterxel_core_btn(32));
+    }
+
+    #[test]
+    fn quit_resets_runtime_state_and_is_idempotent() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        assert!(flutterxel_core_set_btn_state(32, true));
+        assert!(flutterxel_core_play(
+            0,
+            0,
+            1,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            f64::NAN,
+            -1,
+            -1
+        ));
+
+        assert!(flutterxel_core_quit());
+        assert_eq!(flutterxel_core_frame_count(), 0);
+        assert_eq!(flutterxel_core_framebuffer_len(), 0);
+        assert!(!flutterxel_core_btn(32));
+        assert!(!flutterxel_core_is_channel_playing(0));
+        assert!(!flutterxel_core_run(
+            None,
+            std::ptr::null_mut(),
+            None,
+            std::ptr::null_mut()
+        ));
+        assert!(flutterxel_core_quit());
     }
 
     #[test]

@@ -185,6 +185,28 @@ void init(
   }
 }
 
+/// Pyxel-compatible quit API.
+void quit() {
+  stopRunLoop();
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_quit() ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_quit failed.');
+  }
+
+  width = 0;
+  height = 0;
+  frameCount = 0;
+  _frameNotifier.value = frameCount;
+  _fallbackPressedKeys.clear();
+  _fallbackPressedFrame.clear();
+  _fallbackReleasedFrame.clear();
+  _fallbackInputValues.clear();
+  _fallbackPlayingChannels.clear();
+  _isInitialized = false;
+}
+
 /// Pyxel-compatible run API.
 ///
 /// In Flutter, this starts a non-blocking periodic loop.

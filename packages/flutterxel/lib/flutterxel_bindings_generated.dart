@@ -101,6 +101,15 @@ class FlutterxelBindings {
         bool Function(int, int, ffi.Pointer<ffi.Char>, int, int, int, int, int)
       >();
 
+  bool flutterxel_core_quit() {
+    return _flutterxel_core_quit();
+  }
+
+  late final _flutterxel_core_quitPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function()>>('flutterxel_core_quit');
+  late final _flutterxel_core_quit = _flutterxel_core_quitPtr
+      .asFunction<bool Function()>();
+
   bool flutterxel_core_run(
     FlutterxelCoreFrameCallback update,
     ffi.Pointer<ffi.Void> update_user_data,

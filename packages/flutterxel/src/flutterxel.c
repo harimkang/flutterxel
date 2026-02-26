@@ -167,6 +167,33 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   return true;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
+  if (g_state.frame_buffer != NULL) {
+    free(g_state.frame_buffer);
+    g_state.frame_buffer = NULL;
+  }
+
+  g_state.initialized = false;
+  g_state.width = 0;
+  g_state.height = 0;
+  g_state.frame_count = 0;
+  g_state.clear_color = 0;
+  g_state.frame_buffer_len = 0;
+  g_state.pressed_key_count = 0;
+  g_state.released_key_count = 0;
+  g_state.value_count = 0;
+  g_state.image_bank_size = 0;
+  memset(g_state.pressed_keys, 0, sizeof(g_state.pressed_keys));
+  memset(g_state.pressed_key_frames, 0, sizeof(g_state.pressed_key_frames));
+  memset(g_state.released_keys, 0, sizeof(g_state.released_keys));
+  memset(g_state.released_key_frames, 0, sizeof(g_state.released_key_frames));
+  memset(g_state.value_keys, 0, sizeof(g_state.value_keys));
+  memset(g_state.value_values, 0, sizeof(g_state.value_values));
+  memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  memset(g_state.image_bank0, 0, sizeof(g_state.image_bank0));
+  return true;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_run(
     FlutterxelCoreFrameCallback update,
     void* update_user_data,
