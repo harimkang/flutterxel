@@ -772,6 +772,30 @@ class FlutterxelBindings {
   late final _flutterxel_core_rndf = _flutterxel_core_rndfPtr
       .asFunction<double Function(double, double)>();
 
+  bool flutterxel_core_nseed(int seed) {
+    return _flutterxel_core_nseed(seed);
+  }
+
+  late final _flutterxel_core_nseedPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_nseed',
+      );
+  late final _flutterxel_core_nseed = _flutterxel_core_nseedPtr
+      .asFunction<bool Function(int)>();
+
+  double flutterxel_core_noise(double x, double y, double z) {
+    return _flutterxel_core_noise(x, y, z);
+  }
+
+  late final _flutterxel_core_noisePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Double Function(ffi.Double, ffi.Double, ffi.Double)
+        >
+      >('flutterxel_core_noise');
+  late final _flutterxel_core_noise = _flutterxel_core_noisePtr
+      .asFunction<double Function(double, double, double)>();
+
   bool flutterxel_core_load(
     ffi.Pointer<ffi.Char> filename,
     int exclude_images,

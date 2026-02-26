@@ -17,6 +17,7 @@
 #define DEFAULT_IMAGE_BANK_SIZE 16
 #define TILE_SIZE 8
 #define RNG_DEFAULT_STATE 0xA3C59AC3D12B9E5DULL
+#define NOISE_DEFAULT_SEED 0U
 #define MOUSE_KEY_START_INDEX 0x50000100
 #define MOUSE_POS_X MOUSE_KEY_START_INDEX
 #define MOUSE_POS_Y (MOUSE_KEY_START_INDEX + 1)
@@ -50,6 +51,7 @@ typedef struct FlutterxelState {
   int32_t channel_sound_index[CHANNEL_CAPACITY];
   double channel_play_pos[CHANNEL_CAPACITY];
   uint64_t rng_state;
+  uint32_t noise_seed;
   int32_t image_bank_size;
   int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
 } FlutterxelState;
@@ -87,6 +89,51 @@ static uint64_t seed_to_rng_state(int32_t seed) {
 static uint32_t next_random_u32(void) {
   g_state.rng_state = g_state.rng_state * 6364136223846793005ULL + 1ULL;
   return (uint32_t)(g_state.rng_state >> 32);
+}
+
+static double noise_fade(double t) {
+  return t * t * (3.0 - 2.0 * t);
+}
+
+static double noise_lerp(double a, double b, double t) {
+  return a + (b - a) * t;
+}
+
+static double noise_hash(uint32_t seed, int32_t x, int32_t y, int32_t z) {
+  int64_t n = (int64_t)x * 374761393LL + (int64_t)y * 668265263LL +
+              (int64_t)z * 2147483647LL + (int64_t)seed * 1274126177LL;
+  n = (n ^ (n >> 13)) * 1274126177LL;
+  uint32_t value = (uint32_t)(n ^ (n >> 16));
+  return ((double)value / (double)UINT32_MAX) * 2.0 - 1.0;
+}
+
+static double sample_noise(uint32_t seed, double x, double y, double z) {
+  int32_t x0 = (int32_t)floor(x);
+  int32_t y0 = (int32_t)floor(y);
+  int32_t z0 = (int32_t)floor(z);
+  double tx = x - (double)x0;
+  double ty = y - (double)y0;
+  double tz = z - (double)z0;
+  double fx = noise_fade(tx);
+  double fy = noise_fade(ty);
+  double fz = noise_fade(tz);
+
+  double c000 = noise_hash(seed, x0, y0, z0);
+  double c100 = noise_hash(seed, x0 + 1, y0, z0);
+  double c010 = noise_hash(seed, x0, y0 + 1, z0);
+  double c110 = noise_hash(seed, x0 + 1, y0 + 1, z0);
+  double c001 = noise_hash(seed, x0, y0, z0 + 1);
+  double c101 = noise_hash(seed, x0 + 1, y0, z0 + 1);
+  double c011 = noise_hash(seed, x0, y0 + 1, z0 + 1);
+  double c111 = noise_hash(seed, x0 + 1, y0 + 1, z0 + 1);
+
+  double x00 = noise_lerp(c000, c100, fx);
+  double x10 = noise_lerp(c010, c110, fx);
+  double x01 = noise_lerp(c001, c101, fx);
+  double x11 = noise_lerp(c011, c111, fx);
+  double y0v = noise_lerp(x00, x10, fy);
+  double y1v = noise_lerp(x01, x11, fy);
+  return noise_lerp(y0v, y1v, fz);
 }
 
 static int find_pressed_key_index(int32_t key) {
@@ -246,6 +293,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
   memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
   g_state.rng_state = RNG_DEFAULT_STATE;
+  g_state.noise_seed = NOISE_DEFAULT_SEED;
   reset_palette_map();
   seed_default_image_bank();
   return true;
@@ -284,6 +332,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
   memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
   g_state.rng_state = RNG_DEFAULT_STATE;
+  g_state.noise_seed = NOISE_DEFAULT_SEED;
   memset(g_state.image_bank0, 0, sizeof(g_state.image_bank0));
   reset_palette_map();
   return true;
@@ -1272,6 +1321,21 @@ FFI_PLUGIN_EXPORT double flutterxel_core_rndf(double a, double b) {
 
   double unit = (double)next_random_u32() / (double)UINT32_MAX;
   return lo + (hi - lo) * unit;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_nseed(int32_t seed) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.noise_seed = (uint32_t)seed;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_noise(double x, double y, double z) {
+  if (!g_state.initialized) {
+    return 0.0;
+  }
+  return sample_noise(g_state.noise_seed, x, y, z);
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(

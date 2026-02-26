@@ -39,6 +39,7 @@ const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
 const int _fallbackTileSize = 8;
 const int _fallbackRngDefaultState = 0xA3C59AC3D12B9E5D;
 const int _fallbackRngMask64 = 0xFFFFFFFFFFFFFFFF;
+const int _fallbackNoiseDefaultSeed = 0;
 
 class _FallbackTilemap {
   const _FallbackTilemap({
@@ -93,6 +94,7 @@ int _fallbackImageBankSize = 16;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
 final Map<int, _FallbackTilemap> _fallbackTilemaps = <int, _FallbackTilemap>{};
 int _fallbackRngState = _fallbackRngDefaultState;
+int _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -168,6 +170,54 @@ int _fallbackNextRandomU32() {
   _fallbackRngState =
       ((_fallbackRngState * 6364136223846793005) + 1) & _fallbackRngMask64;
   return (_fallbackRngState >> 32) & 0xFFFFFFFF;
+}
+
+double _fallbackNoiseFade(double t) {
+  return t * t * (3.0 - 2.0 * t);
+}
+
+double _fallbackNoiseLerp(double a, double b, double t) {
+  return a + (b - a) * t;
+}
+
+double _fallbackNoiseHash(int seed, int x, int y, int z) {
+  var n =
+      (x * 374761393) +
+      (y * 668265263) +
+      (z * 2147483647) +
+      ((seed & 0xFFFFFFFF) * 1274126177);
+  n = (n ^ (n >> 13)) * 1274126177;
+  final value = (n ^ (n >> 16)) & 0xFFFFFFFF;
+  return (value / 0xFFFFFFFF) * 2.0 - 1.0;
+}
+
+double _fallbackSampleNoise(double x, double y, double z) {
+  final x0 = x.floor();
+  final y0 = y.floor();
+  final z0 = z.floor();
+  final tx = x - x0;
+  final ty = y - y0;
+  final tz = z - z0;
+  final fx = _fallbackNoiseFade(tx);
+  final fy = _fallbackNoiseFade(ty);
+  final fz = _fallbackNoiseFade(tz);
+
+  final c000 = _fallbackNoiseHash(_fallbackNoiseSeed, x0, y0, z0);
+  final c100 = _fallbackNoiseHash(_fallbackNoiseSeed, x0 + 1, y0, z0);
+  final c010 = _fallbackNoiseHash(_fallbackNoiseSeed, x0, y0 + 1, z0);
+  final c110 = _fallbackNoiseHash(_fallbackNoiseSeed, x0 + 1, y0 + 1, z0);
+  final c001 = _fallbackNoiseHash(_fallbackNoiseSeed, x0, y0, z0 + 1);
+  final c101 = _fallbackNoiseHash(_fallbackNoiseSeed, x0 + 1, y0, z0 + 1);
+  final c011 = _fallbackNoiseHash(_fallbackNoiseSeed, x0, y0 + 1, z0 + 1);
+  final c111 = _fallbackNoiseHash(_fallbackNoiseSeed, x0 + 1, y0 + 1, z0 + 1);
+
+  final x00 = _fallbackNoiseLerp(c000, c100, fx);
+  final x10 = _fallbackNoiseLerp(c010, c110, fx);
+  final x01 = _fallbackNoiseLerp(c001, c101, fx);
+  final x11 = _fallbackNoiseLerp(c011, c111, fx);
+  final y0v = _fallbackNoiseLerp(x00, x10, fy);
+  final y1v = _fallbackNoiseLerp(x01, x11, fy);
+  return _fallbackNoiseLerp(y0v, y1v, fz);
 }
 
 void _ensureInitialized(String apiName) {
@@ -307,6 +357,7 @@ void init(
     _fallbackPaletteMap = List<int>.generate(16, (index) => index);
     _seedFallbackResources();
     _fallbackRngState = _fallbackRngDefaultState;
+    _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -349,6 +400,7 @@ void quit() {
   _fallbackImageBanks.clear();
   _fallbackTilemaps.clear();
   _fallbackRngState = _fallbackRngDefaultState;
+  _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
   _isInitialized = false;
 }
 
@@ -1353,6 +1405,34 @@ double rndf(double a, double b) {
   }
   final unit = _fallbackNextRandomU32() / 0xFFFFFFFF;
   return lo + (hi - lo) * unit;
+}
+
+/// Pyxel-compatible nseed API.
+void nseed(int seed) {
+  _ensureInitialized('nseed');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_nseed(seed) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_nseed failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackNoiseSeed = seed;
+  }
+}
+
+/// Pyxel-compatible noise API.
+double noise(double x, [double? y, double? z]) {
+  _ensureInitialized('noise');
+
+  final yValue = y ?? 0.0;
+  final zValue = z ?? 0.0;
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_noise(x, yValue, zValue);
+  }
+  return _fallbackSampleNoise(x, yValue, zValue);
 }
 
 /// Pyxel-compatible load API.

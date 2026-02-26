@@ -16,6 +16,7 @@ const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 const TILE_SIZE: i32 = 8;
 const RNG_DEFAULT_STATE: u64 = 0xA3C5_9AC3_D12B_9E5D;
+const NOISE_DEFAULT_SEED: u32 = 0;
 const MOUSE_KEY_START_INDEX: i32 = 0x5000_0100;
 const MOUSE_POS_X_KEY: i32 = MOUSE_KEY_START_INDEX;
 const MOUSE_POS_Y_KEY: i32 = MOUSE_KEY_START_INDEX + 1;
@@ -116,6 +117,7 @@ struct RuntimeState {
     musics: HashMap<i32, MusicResource>,
     channel_playback: HashMap<i32, PlayCall>,
     rng_state: u64,
+    noise_seed: u32,
     last_blt: Option<BltCall>,
     last_play: Option<PlayCall>,
     last_loaded: Option<String>,
@@ -156,6 +158,7 @@ impl Default for RuntimeState {
             musics: HashMap::new(),
             channel_playback: HashMap::new(),
             rng_state: RNG_DEFAULT_STATE,
+            noise_seed: NOISE_DEFAULT_SEED,
             last_blt: None,
             last_play: None,
             last_loaded: None,
@@ -182,6 +185,54 @@ fn next_random_u32(state: &mut RuntimeState) -> u32 {
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1);
     (state.rng_state >> 32) as u32
+}
+
+fn noise_fade(t: f64) -> f64 {
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn noise_lerp(a: f64, b: f64, t: f64) -> f64 {
+    a + (b - a) * t
+}
+
+fn noise_hash(seed: u32, x: i32, y: i32, z: i32) -> f64 {
+    let mut n = i64::from(x)
+        .wrapping_mul(374_761_393)
+        .wrapping_add(i64::from(y).wrapping_mul(668_265_263))
+        .wrapping_add(i64::from(z).wrapping_mul(2_147_483_647))
+        .wrapping_add(i64::from(seed).wrapping_mul(1_274_126_177));
+    n = (n ^ (n >> 13)).wrapping_mul(1_274_126_177);
+    let value = (n ^ (n >> 16)) as u32;
+    (f64::from(value) / f64::from(u32::MAX)) * 2.0 - 1.0
+}
+
+fn sample_noise(seed: u32, x: f64, y: f64, z: f64) -> f64 {
+    let x0 = x.floor() as i32;
+    let y0 = y.floor() as i32;
+    let z0 = z.floor() as i32;
+    let tx = x - f64::from(x0);
+    let ty = y - f64::from(y0);
+    let tz = z - f64::from(z0);
+    let fx = noise_fade(tx);
+    let fy = noise_fade(ty);
+    let fz = noise_fade(tz);
+
+    let c000 = noise_hash(seed, x0, y0, z0);
+    let c100 = noise_hash(seed, x0 + 1, y0, z0);
+    let c010 = noise_hash(seed, x0, y0 + 1, z0);
+    let c110 = noise_hash(seed, x0 + 1, y0 + 1, z0);
+    let c001 = noise_hash(seed, x0, y0, z0 + 1);
+    let c101 = noise_hash(seed, x0 + 1, y0, z0 + 1);
+    let c011 = noise_hash(seed, x0, y0 + 1, z0 + 1);
+    let c111 = noise_hash(seed, x0 + 1, y0 + 1, z0 + 1);
+
+    let x00 = noise_lerp(c000, c100, fx);
+    let x10 = noise_lerp(c010, c110, fx);
+    let x01 = noise_lerp(c001, c101, fx);
+    let x11 = noise_lerp(c011, c111, fx);
+    let y0v = noise_lerp(x00, x10, fy);
+    let y1v = noise_lerp(x01, x11, fy);
+    noise_lerp(y0v, y1v, fz)
 }
 
 fn decode_optional_i32(value: i32) -> Option<i32> {
@@ -1481,6 +1532,7 @@ pub extern "C" fn flutterxel_core_init(
     state.musics.clear();
     state.channel_playback.clear();
     state.rng_state = RNG_DEFAULT_STATE;
+    state.noise_seed = NOISE_DEFAULT_SEED;
     state.last_blt = None;
     state.last_play = None;
     state.last_loaded = None;
@@ -1524,6 +1576,7 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.musics.clear();
     state.channel_playback.clear();
     state.rng_state = RNG_DEFAULT_STATE;
+    state.noise_seed = NOISE_DEFAULT_SEED;
     state.last_blt = None;
     state.last_play = None;
     state.last_loaded = None;
@@ -2216,6 +2269,25 @@ pub extern "C" fn flutterxel_core_rndf(a: f64, b: f64) -> f64 {
 
     let unit = f64::from(next_random_u32(&mut state)) / f64::from(u32::MAX);
     lo + (hi - lo) * unit
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_nseed(seed: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.noise_seed = seed as u32;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_noise(x: f64, y: f64, z: f64) -> f64 {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0.0;
+    }
+    sample_noise(state.noise_seed, x, y, z)
 }
 
 #[no_mangle]
@@ -3337,6 +3409,22 @@ mod tests {
         assert_eq!(float1, float2);
         assert!((10..=20).contains(&int1));
         assert!((-1.0..=1.0).contains(&float1));
+    }
+
+    #[test]
+    fn noise_api_is_seeded_and_range_bounded() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_nseed(77));
+        let value1 = flutterxel_core_noise(0.25, 0.5, 0.75);
+        let value2 = flutterxel_core_noise(0.25, 0.5, 0.75);
+        assert_eq!(value1, value2);
+
+        assert!(flutterxel_core_nseed(77));
+        let value3 = flutterxel_core_noise(0.25, 0.5, 0.75);
+        assert_eq!(value1, value3);
+        assert!((-1.0..=1.0).contains(&value1));
     }
 
     #[test]

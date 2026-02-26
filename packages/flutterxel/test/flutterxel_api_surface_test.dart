@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -47,6 +47,8 @@ void main() {
       expect(flutterxel.rseed, isA<Function>());
       expect(flutterxel.rndi, isA<Function>());
       expect(flutterxel.rndf, isA<Function>());
+      expect(flutterxel.nseed, isA<Function>());
+      expect(flutterxel.noise, isA<Function>());
     },
   );
 
@@ -363,5 +365,20 @@ void main() {
     flutterxel.warpMouse(3, 4);
     expect(flutterxel.btnv(flutterxel.MOUSE_POS_X), 3);
     expect(flutterxel.btnv(flutterxel.MOUSE_POS_Y), 4);
+  });
+
+  test('nseed/noise produce deterministic seeded noise values', () {
+    flutterxel.init(8, 8);
+
+    flutterxel.nseed(77);
+    final value1 = flutterxel.noise(0.25, 0.5, 0.75);
+    final value2 = flutterxel.noise(0.25, 0.5, 0.75);
+
+    flutterxel.nseed(77);
+    final value3 = flutterxel.noise(0.25, 0.5, 0.75);
+
+    expect(value2, value1);
+    expect(value3, value1);
+    expect(value1, inInclusiveRange(-1.0, 1.0));
   });
 }
