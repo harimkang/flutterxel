@@ -9,7 +9,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
+    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/mouseX/mouseY/mouseWheel/inputKeys/inputText/droppedFiles/setInputText/setDroppedFiles/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -33,6 +33,14 @@ void main() {
       expect(flutterxel.btnv, isA<Function>());
       expect(flutterxel.mouse, isA<Function>());
       expect(flutterxel.warpMouse, isA<Function>());
+      expect(flutterxel.mouseX, isA<int>());
+      expect(flutterxel.mouseY, isA<int>());
+      expect(flutterxel.mouseWheel, isA<int>());
+      expect(flutterxel.inputKeys, isA<List<int>>());
+      expect(flutterxel.inputText, isA<String>());
+      expect(flutterxel.droppedFiles, isA<List<String>>());
+      expect(flutterxel.setInputText, isA<Function>());
+      expect(flutterxel.setDroppedFiles, isA<Function>());
       expect(flutterxel.cls, isA<Function>());
       expect(flutterxel.pset, isA<Function>());
       expect(flutterxel.pget, isA<Function>());
@@ -495,6 +503,32 @@ void main() {
     flutterxel.quit();
     expect(() => flutterxel.screenshot(), throwsStateError);
   });
+
+  test(
+    'input mirror getters expose mouse/text/drop state and clear transients',
+    () {
+      flutterxel.init(8, 8);
+
+      flutterxel.setBtnState(flutterxel.KEY_SPACE, true);
+      flutterxel.setBtnValue(flutterxel.MOUSE_POS_X, 3);
+      flutterxel.setBtnValue(flutterxel.MOUSE_POS_Y, 4);
+      flutterxel.setBtnValue(flutterxel.MOUSE_WHEEL_Y, 2);
+      flutterxel.setInputText('ab');
+      flutterxel.setDroppedFiles(<String>['a.txt', 'b.txt']);
+
+      expect(flutterxel.mouseX, 3);
+      expect(flutterxel.mouseY, 4);
+      expect(flutterxel.mouseWheel, 2);
+      expect(flutterxel.inputKeys, contains(flutterxel.KEY_SPACE));
+      expect(flutterxel.inputText, 'ab');
+      expect(flutterxel.droppedFiles, <String>['a.txt', 'b.txt']);
+
+      flutterxel.flip();
+      expect(flutterxel.mouseWheel, 0);
+      expect(flutterxel.inputText, isEmpty);
+      expect(flutterxel.droppedFiles, isEmpty);
+    },
+  );
 
   test('show advances frame and title accepts runtime title update', () {
     flutterxel.init(8, 8);

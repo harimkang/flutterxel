@@ -80,6 +80,8 @@ final Set<int> _fallbackPressedKeys = <int>{};
 final Map<int, int> _fallbackPressedFrame = <int, int>{};
 final Map<int, int> _fallbackReleasedFrame = <int, int>{};
 final Map<int, int> _fallbackInputValues = <int, int>{};
+String _fallbackInputText = '';
+List<String> _fallbackDroppedFiles = const <String>[];
 final Set<int> _fallbackPlayingChannels = <int>{};
 final Map<int, ({int snd, double pos})> _fallbackPlayPositions =
     <int, ({int snd, double pos})>{};
@@ -376,6 +378,8 @@ void init(
     _fallbackPressedFrame.clear();
     _fallbackReleasedFrame.clear();
     _fallbackInputValues.clear();
+    _fallbackInputText = '';
+    _fallbackDroppedFiles = const <String>[];
     _fallbackPlayingChannels.clear();
     _fallbackPlayPositions.clear();
     _fallbackFrameBuffer = List<int>.filled(width * height, 0, growable: false);
@@ -433,6 +437,8 @@ void _clearLocalRuntimeState() {
   _fallbackPressedFrame.clear();
   _fallbackReleasedFrame.clear();
   _fallbackInputValues.clear();
+  _fallbackInputText = '';
+  _fallbackDroppedFiles = const <String>[];
   _fallbackPlayingChannels.clear();
   _fallbackPlayPositions.clear();
   _fallbackFrameBuffer = <int>[];
@@ -675,10 +681,26 @@ void _clearTransientInputValues() {
       setBtnValue(key, 0);
     }
   }
+  _fallbackInputText = '';
+  _fallbackDroppedFiles = const <String>[];
 }
 
 bool get isRunning => _runLoopTimer?.isActive ?? false;
 bool get isMouseVisible => _fallbackMouseVisible;
+int get mouseX => btnv(MOUSE_POS_X);
+int get mouseY => btnv(MOUSE_POS_Y);
+int get mouseWheel => btnv(MOUSE_WHEEL_Y);
+List<int> get inputKeys {
+  if (!_isInitialized) {
+    return const <int>[];
+  }
+  final values = _fallbackPressedKeys.toList()..sort();
+  return List<int>.unmodifiable(values);
+}
+
+String get inputText => _fallbackInputText;
+List<String> get droppedFiles =>
+    List<String>.unmodifiable(_fallbackDroppedFiles);
 String get runtimeTitle => _fallbackTitle;
 List<String> get runtimeIconData =>
     List<String>.unmodifiable(_fallbackIconData);
@@ -841,6 +863,20 @@ void setBtnValue(int key, int value) {
     }
   }
   _fallbackInputValues[key] = value;
+}
+
+void setInputText(String text) {
+  if (!_isInitialized) {
+    return;
+  }
+  _fallbackInputText = text;
+}
+
+void setDroppedFiles(List<String> files) {
+  if (!_isInitialized) {
+    return;
+  }
+  _fallbackDroppedFiles = List<String>.from(files);
 }
 
 /// Pyxel-compatible cls API.
