@@ -694,6 +694,29 @@ class FlutterxelBindings {
   late final _flutterxel_core_is_channel_playing =
       _flutterxel_core_is_channel_playingPtr.asFunction<bool Function(int)>();
 
+  bool flutterxel_core_play_pos(
+    int ch,
+    ffi.Pointer<ffi.Int32> snd,
+    ffi.Pointer<ffi.Double> pos,
+  ) {
+    return _flutterxel_core_play_pos(ch, snd, pos);
+  }
+
+  late final _flutterxel_core_play_posPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Pointer<ffi.Int32>,
+            ffi.Pointer<ffi.Double>,
+          )
+        >
+      >('flutterxel_core_play_pos');
+  late final _flutterxel_core_play_pos = _flutterxel_core_play_posPtr
+      .asFunction<
+        bool Function(int, ffi.Pointer<ffi.Int32>, ffi.Pointer<ffi.Double>)
+      >();
+
   bool flutterxel_core_load(
     ffi.Pointer<ffi.Char> filename,
     int exclude_images,

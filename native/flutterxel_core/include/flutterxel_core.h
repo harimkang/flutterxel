@@ -203,6 +203,9 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_playm(int32_t msc, bool loop);
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_stop(int32_t ch);
 
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch);
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_play_pos(int32_t ch,
+                                                     int32_t* snd,
+                                                     double* pos);
 
 // pyxel.load(filename, *, exclude_images=None, exclude_tilemaps=None,
 //            exclude_sounds=None, exclude_musics=None)

@@ -39,6 +39,7 @@ SYMBOLS=(
   flutterxel_core_playm
   flutterxel_core_stop
   flutterxel_core_is_channel_playing
+  flutterxel_core_play_pos
   flutterxel_core_load
   flutterxel_core_save
   flutterxel_core_frame_count

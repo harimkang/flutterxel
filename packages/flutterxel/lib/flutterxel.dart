@@ -76,6 +76,8 @@ final Map<int, int> _fallbackPressedFrame = <int, int>{};
 final Map<int, int> _fallbackReleasedFrame = <int, int>{};
 final Map<int, int> _fallbackInputValues = <int, int>{};
 final Set<int> _fallbackPlayingChannels = <int>{};
+final Map<int, ({int snd, double pos})> _fallbackPlayPositions =
+    <int, ({int snd, double pos})>{};
 List<int> _fallbackFrameBuffer = <int>[];
 int _fallbackCameraX = 0;
 int _fallbackCameraY = 0;
@@ -278,6 +280,7 @@ void init(
     _fallbackReleasedFrame.clear();
     _fallbackInputValues.clear();
     _fallbackPlayingChannels.clear();
+    _fallbackPlayPositions.clear();
     _fallbackFrameBuffer = List<int>.filled(width * height, 0, growable: false);
     _fallbackCameraX = 0;
     _fallbackCameraY = 0;
@@ -315,6 +318,7 @@ void quit() {
   _fallbackReleasedFrame.clear();
   _fallbackInputValues.clear();
   _fallbackPlayingChannels.clear();
+  _fallbackPlayPositions.clear();
   _fallbackFrameBuffer = <int>[];
   _fallbackCameraX = 0;
   _fallbackCameraY = 0;
@@ -1117,14 +1121,17 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   try {
     late final int sndKind;
     var sndValue = 0;
+    var fallbackSnd = 0;
 
     if (snd is int) {
       sndKind = FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_INT.value;
       sndValue = snd;
+      fallbackSnd = snd;
     } else if (snd is List<int>) {
       sndKind =
           FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_INT_LIST.value;
       seqLen = snd.length;
+      fallbackSnd = snd.isEmpty ? 0 : snd.first;
       if (seqLen > 0) {
         seqPtr = calloc<ffi.Int32>(seqLen);
         for (var i = 0; i < snd.length; i++) {
@@ -1134,6 +1141,7 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
     } else if (snd is String) {
       sndKind = FlutterxelCorePlaySndKind.FLUTTERXEL_CORE_PLAY_SND_STRING.value;
       sndStringPtr = snd.toNativeUtf8().cast<ffi.Char>();
+      fallbackSnd = 0;
     } else {
       throw UnsupportedError(
         'play snd supports int, List<int>, or String in current skeleton.',
@@ -1158,6 +1166,7 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
       throw StateError('flutterxel_core_play failed.');
     }
     _fallbackPlayingChannels.add(ch);
+    _fallbackPlayPositions[ch] = (snd: fallbackSnd, pos: 0.0);
   } finally {
     if (seqPtr != ffi.nullptr) {
       calloc.free(seqPtr);
@@ -1180,8 +1189,10 @@ void playm(int msc, {bool loop = false}) {
 
   for (var channel = 0; channel < 4; channel++) {
     _fallbackPlayingChannels.remove(channel);
+    _fallbackPlayPositions.remove(channel);
   }
   _fallbackPlayingChannels.add(0);
+  _fallbackPlayPositions[0] = (snd: msc, pos: 0.0);
 }
 
 /// Pyxel-compatible stop API.
@@ -1196,8 +1207,10 @@ void stop([int? ch]) {
 
   if (ch == null) {
     _fallbackPlayingChannels.clear();
+    _fallbackPlayPositions.clear();
   } else {
     _fallbackPlayingChannels.remove(ch);
+    _fallbackPlayPositions.remove(ch);
   }
 }
 
@@ -1211,6 +1224,29 @@ bool isChannelPlaying(int ch) {
     return bindings.flutterxel_core_is_channel_playing(ch);
   }
   return _fallbackPlayingChannels.contains(ch);
+}
+
+/// Pyxel-compatible play_pos API.
+({int snd, double pos})? playPos(int ch) {
+  _ensureInitialized('play_pos');
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    final sndOut = calloc<ffi.Int32>();
+    final posOut = calloc<ffi.Double>();
+    try {
+      final ok = bindings.flutterxel_core_play_pos(ch, sndOut, posOut);
+      if (!ok) {
+        return null;
+      }
+      return (snd: sndOut.value, pos: posOut.value);
+    } finally {
+      calloc.free(sndOut);
+      calloc.free(posOut);
+    }
+  }
+
+  return _fallbackPlayPositions[ch];
 }
 
 /// Pyxel-compatible load API.

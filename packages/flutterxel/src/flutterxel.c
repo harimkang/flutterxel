@@ -41,6 +41,8 @@ typedef struct FlutterxelState {
   int32_t value_values[PRESSED_KEY_CAPACITY];
   size_t value_count;
   uint8_t channel_state[CHANNEL_CAPACITY];
+  int32_t channel_sound_index[CHANNEL_CAPACITY];
+  double channel_play_pos[CHANNEL_CAPACITY];
   int32_t image_bank_size;
   int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
 } FlutterxelState;
@@ -224,6 +226,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   memset(g_state.value_keys, 0, sizeof(g_state.value_keys));
   memset(g_state.value_values, 0, sizeof(g_state.value_values));
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
+  memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
   reset_palette_map();
   seed_default_image_bank();
   return true;
@@ -258,6 +262,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   memset(g_state.value_keys, 0, sizeof(g_state.value_keys));
   memset(g_state.value_values, 0, sizeof(g_state.value_values));
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
+  memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
   memset(g_state.image_bank0, 0, sizeof(g_state.image_bank0));
   reset_palette_map();
   return true;
@@ -1091,7 +1097,6 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
     double sec,
     int8_t loop,
     int8_t resume) {
-  (void)snd_value;
   (void)sec;
 
   if (!g_state.initialized) {
@@ -1106,6 +1111,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
 
   if (snd_kind == FLUTTERXEL_CORE_PLAY_SND_INT) {
     g_state.channel_state[ch] = 1;
+    g_state.channel_sound_index[ch] = snd_value;
+    g_state.channel_play_pos[ch] = 0.0;
     return true;
   }
   if (snd_kind == FLUTTERXEL_CORE_PLAY_SND_INT_LIST) {
@@ -1113,6 +1120,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
       return false;
     }
     g_state.channel_state[ch] = 1;
+    g_state.channel_sound_index[ch] =
+        snd_sequence_len > 0 ? snd_sequence_ptr[0] : 0;
+    g_state.channel_play_pos[ch] = 0.0;
     return true;
   }
   if (snd_kind == FLUTTERXEL_CORE_PLAY_SND_STRING) {
@@ -1120,6 +1130,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
       return false;
     }
     g_state.channel_state[ch] = 1;
+    g_state.channel_sound_index[ch] = 0;
+    g_state.channel_play_pos[ch] = 0.0;
     return true;
   }
 
@@ -1134,7 +1146,11 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_playm(int32_t msc, bool loop) {
   }
 
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
+  memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
   g_state.channel_state[0] = 1;
+  g_state.channel_sound_index[0] = msc;
+  g_state.channel_play_pos[0] = 0.0;
   return true;
 }
 
@@ -1145,6 +1161,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_stop(int32_t ch) {
 
   if (ch == OPTIONAL_I32_NONE) {
     memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+    memset(g_state.channel_sound_index, 0, sizeof(g_state.channel_sound_index));
+    memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
     return true;
   }
 
@@ -1152,6 +1170,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_stop(int32_t ch) {
     return true;
   }
   g_state.channel_state[ch] = 0;
+  g_state.channel_sound_index[ch] = 0;
+  g_state.channel_play_pos[ch] = 0.0;
   return true;
 }
 
@@ -1160,6 +1180,20 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch) {
     return false;
   }
   return g_state.channel_state[ch] != 0;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_play_pos(int32_t ch, int32_t* snd, double* pos) {
+  if (!g_state.initialized || ch < 0 || ch >= CHANNEL_CAPACITY || snd == NULL ||
+      pos == NULL) {
+    return false;
+  }
+  if (g_state.channel_state[ch] == 0) {
+    return false;
+  }
+
+  *snd = g_state.channel_sound_index[ch];
+  *pos = g_state.channel_play_pos[ch];
+  return true;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(

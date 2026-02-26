@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -39,6 +39,7 @@ void main() {
       expect(flutterxel.play, isA<Function>());
       expect(flutterxel.playm, isA<Function>());
       expect(flutterxel.stop, isA<Function>());
+      expect(flutterxel.playPos, isA<Function>());
       expect(flutterxel.load, isA<Function>());
       expect(flutterxel.save, isA<Function>());
     },
@@ -316,5 +317,20 @@ void main() {
     flutterxel.stop();
     expect(flutterxel.isChannelPlaying(0), isFalse);
     expect(flutterxel.isChannelPlaying(1), isFalse);
+  });
+
+  test('playPos returns null when idle and sound index when playing', () {
+    flutterxel.init(8, 8);
+
+    expect(flutterxel.playPos(0), isNull);
+    flutterxel.play(0, 7);
+
+    final pos = flutterxel.playPos(0);
+    expect(pos, isNotNull);
+    expect(pos!.snd, 7);
+    expect(pos.pos, 0.0);
+
+    flutterxel.stop(0);
+    expect(flutterxel.playPos(0), isNull);
   });
 }

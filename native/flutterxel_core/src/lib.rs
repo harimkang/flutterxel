@@ -24,6 +24,14 @@ enum PlaySource {
     Mml(String),
 }
 
+fn play_source_index(source: &PlaySource) -> i32 {
+    match source {
+        PlaySource::Index(index) => *index,
+        PlaySource::Sequence(seq) => seq.first().copied().unwrap_or(0),
+        PlaySource::Mml(_) => 0,
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct PlayCall {
@@ -2097,6 +2105,28 @@ pub extern "C" fn flutterxel_core_is_channel_playing(ch: i32) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_play_pos(ch: i32, snd: *mut i32, pos: *mut f64) -> bool {
+    if snd.is_null() || pos.is_null() {
+        return false;
+    }
+
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    let Some(call) = state.channel_playback.get(&ch) else {
+        return false;
+    };
+
+    unsafe {
+        *snd = play_source_index(&call.source);
+        *pos = 0.0;
+    }
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_load(
     filename: *const c_char,
     exclude_images: i8,
@@ -3155,6 +3185,36 @@ mod tests {
         ));
 
         assert!(flutterxel_core_is_channel_playing(1));
+    }
+
+    #[test]
+    fn play_pos_reports_none_when_idle_and_value_when_playing() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        let mut snd = -1;
+        let mut pos = -1.0;
+        assert!(!flutterxel_core_play_pos(0, &mut snd, &mut pos));
+
+        assert!(flutterxel_core_play(
+            0,
+            0,
+            7,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            f64::NAN,
+            -1,
+            -1
+        ));
+        snd = -1;
+        pos = -1.0;
+        assert!(flutterxel_core_play_pos(0, &mut snd, &mut pos));
+        assert_eq!(snd, 7);
+        assert_eq!(pos, 0.0);
+
+        assert!(flutterxel_core_stop(0));
+        assert!(!flutterxel_core_play_pos(0, &mut snd, &mut pos));
     }
 
     #[test]
