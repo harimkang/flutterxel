@@ -4,6 +4,73 @@ import 'dart:io';
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 import 'package:flutter_test/flutter_test.dart';
 
+String _writeTestPcm16Wav(
+  Directory dir, {
+  required String name,
+  required int sampleRate,
+  required int channels,
+  required int frames,
+}) {
+  final file = File('${dir.path}/$name');
+  final bytesPerSample = 2;
+  final blockAlign = channels * bytesPerSample;
+  final byteRate = sampleRate * blockAlign;
+  final dataSize = frames * blockAlign;
+  final riffSize = 36 + dataSize;
+  final bytes = <int>[
+    // RIFF header
+    0x52,
+    0x49,
+    0x46,
+    0x46,
+    riffSize & 0xFF,
+    (riffSize >> 8) & 0xFF,
+    (riffSize >> 16) & 0xFF,
+    (riffSize >> 24) & 0xFF,
+    0x57,
+    0x41,
+    0x56,
+    0x45,
+    // fmt chunk
+    0x66,
+    0x6D,
+    0x74,
+    0x20,
+    16,
+    0,
+    0,
+    0,
+    1,
+    0,
+    channels & 0xFF,
+    (channels >> 8) & 0xFF,
+    sampleRate & 0xFF,
+    (sampleRate >> 8) & 0xFF,
+    (sampleRate >> 16) & 0xFF,
+    (sampleRate >> 24) & 0xFF,
+    byteRate & 0xFF,
+    (byteRate >> 8) & 0xFF,
+    (byteRate >> 16) & 0xFF,
+    (byteRate >> 24) & 0xFF,
+    blockAlign & 0xFF,
+    (blockAlign >> 8) & 0xFF,
+    16,
+    0,
+    // data chunk
+    0x64,
+    0x61,
+    0x74,
+    0x61,
+    dataSize & 0xFF,
+    (dataSize >> 8) & 0xFF,
+    (dataSize >> 16) & 0xFF,
+    (dataSize >> 24) & 0xFF,
+  ];
+  bytes.addAll(List<int>.filled(dataSize, 0, growable: false));
+  file.writeAsBytesSync(bytes, flush: true);
+  return file.path;
+}
+
 void main() {
   tearDown(() {
     flutterxel.stopRunLoop();
@@ -308,7 +375,7 @@ void main() {
 
     sound.set_notes('c3c3');
     sound.speed = 2;
-    expect(sound.total_sec(), 1.0);
+    expect(sound.total_sec(), closeTo(2 * 2 / 120, 1e-9));
     sound.mml('T120 CDE');
     expect(sound.total_sec(), closeTo(1.49996, 1e-4));
     sound.mml('[C]2');
@@ -316,13 +383,63 @@ void main() {
     sound.mml('[C]');
     expect(sound.total_sec(), isNull);
     sound.mml();
-    expect(sound.total_sec(), 1.0);
+    expect(sound.total_sec(), closeTo(2 * 2 / 120, 1e-9));
 
     expect(() => sound.set_notes('c'), throwsFormatException);
     expect(() => sound.set_tones('x'), throwsFormatException);
     expect(() => sound.set_volumes('9'), throwsFormatException);
     expect(() => sound.set_effects('z'), throwsFormatException);
     expect(() => sound.mml('T0 C'), throwsFormatException);
+  });
+
+  test('sound pcm mode and save/music save wav output behavior', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync('flutterxel-audio-');
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final sound = flutterxel.Sound();
+    sound.set_notes('c3c3');
+    sound.speed = 30;
+    expect(sound.total_sec(), closeTo(2 * 30 / 120, 1e-9));
+
+    final pcmPath = _writeTestPcm16Wav(
+      tempDir,
+      name: 'input.wav',
+      sampleRate: 22050,
+      channels: 1,
+      frames: 2205,
+    );
+    sound.pcm(pcmPath);
+    expect(sound.total_sec(), closeTo(0.1, 1e-6));
+    sound.pcm();
+    expect(sound.total_sec(), closeTo(2 * 30 / 120, 1e-9));
+    expect(
+      () => sound.pcm('${tempDir.path}/missing.wav'),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    final soundOut = File('${tempDir.path}/sound_out.wav');
+    expect(() => sound.save(soundOut.path, 0), throwsArgumentError);
+    sound.save(soundOut.path, 0.05);
+    expect(soundOut.existsSync(), isTrue);
+    final soundBytes = soundOut.readAsBytesSync();
+    expect(soundBytes.length, greaterThanOrEqualTo(44));
+    expect(String.fromCharCodes(soundBytes.sublist(0, 4)), 'RIFF');
+    expect(String.fromCharCodes(soundBytes.sublist(8, 12)), 'WAVE');
+
+    final music = flutterxel.Music();
+    final musicOut = File('${tempDir.path}/music_out.wav');
+    expect(() => music.save(musicOut.path, -1), throwsArgumentError);
+    music.save(musicOut.path, 0.05);
+    expect(musicOut.existsSync(), isTrue);
+    final musicBytes = musicOut.readAsBytesSync();
+    expect(musicBytes.length, greaterThanOrEqualTo(44));
+    expect(String.fromCharCodes(musicBytes.sublist(0, 4)), 'RIFF');
+    expect(String.fromCharCodes(musicBytes.sublist(8, 12)), 'WAVE');
   });
 
   test('tilemap primitives, blt and collide update tile data', () {

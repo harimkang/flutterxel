@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/gestures.dart'
@@ -4125,6 +4126,8 @@ const int _mmlTicksPerQuarterNote = 48;
 const int _mmlDefaultTempo = 120;
 const int _mmlDefaultOctave = 4;
 const int _mmlDefaultLength = 4;
+const int _soundTicksPerSecond = 120;
+const int _fallbackAudioSampleRate = 22050;
 
 sealed class _MmlEvent {
   const _MmlEvent();
@@ -4486,6 +4489,133 @@ double? _calcMmlDurationSec(String code) {
   return totalClocks / _mmlAudioClockRate;
 }
 
+bool _matchAscii(List<int> bytes, int offset, String token) {
+  if (offset < 0 || offset + token.length > bytes.length) {
+    return false;
+  }
+  for (var i = 0; i < token.length; i++) {
+    if (bytes[offset + i] != token.codeUnitAt(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+int _readU16Le(List<int> bytes, int offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+int _readU32Le(List<int> bytes, int offset) {
+  return bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24);
+}
+
+double _loadWavDurationSec(String filename) {
+  final bytes = File(filename).readAsBytesSync();
+  if (bytes.length < 44 ||
+      !_matchAscii(bytes, 0, 'RIFF') ||
+      !_matchAscii(bytes, 8, 'WAVE')) {
+    throw FormatException('Unsupported PCM file format: expected RIFF WAVE.');
+  }
+
+  int? audioFormat;
+  int? channelCount;
+  int? sampleRate;
+  int? bitsPerSample;
+  int? dataSize;
+  var offset = 12;
+  while (offset + 8 <= bytes.length) {
+    final chunkSize = _readU32Le(bytes, offset + 4);
+    final chunkDataOffset = offset + 8;
+    final chunkEnd = chunkDataOffset + chunkSize;
+    if (chunkEnd > bytes.length) {
+      throw const FormatException('Invalid WAV: chunk exceeds file length.');
+    }
+
+    if (_matchAscii(bytes, offset, 'fmt ')) {
+      if (chunkSize < 16) {
+        throw const FormatException('Invalid WAV: fmt chunk is too small.');
+      }
+      audioFormat = _readU16Le(bytes, chunkDataOffset);
+      channelCount = _readU16Le(bytes, chunkDataOffset + 2);
+      sampleRate = _readU32Le(bytes, chunkDataOffset + 4);
+      bitsPerSample = _readU16Le(bytes, chunkDataOffset + 14);
+    } else if (_matchAscii(bytes, offset, 'data')) {
+      dataSize = chunkSize;
+    }
+
+    offset = chunkEnd + (chunkSize.isOdd ? 1 : 0);
+  }
+
+  if (audioFormat != 1) {
+    throw const FormatException('Unsupported WAV format: only PCM is allowed.');
+  }
+  if (channelCount == null ||
+      channelCount <= 0 ||
+      sampleRate == null ||
+      sampleRate <= 0 ||
+      bitsPerSample == null ||
+      bitsPerSample <= 0 ||
+      bitsPerSample % 8 != 0 ||
+      dataSize == null) {
+    throw const FormatException('Invalid WAV metadata.');
+  }
+
+  final bytesPerFrame = channelCount * (bitsPerSample ~/ 8);
+  if (bytesPerFrame <= 0) {
+    throw const FormatException('Invalid WAV frame layout.');
+  }
+  final frameCount = dataSize ~/ bytesPerFrame;
+  return frameCount / sampleRate;
+}
+
+void _appendU16Le(BytesBuilder builder, int value) {
+  builder.add(<int>[value & 0xFF, (value >> 8) & 0xFF]);
+}
+
+void _appendU32Le(BytesBuilder builder, int value) {
+  builder.add(<int>[
+    value & 0xFF,
+    (value >> 8) & 0xFF,
+    (value >> 16) & 0xFF,
+    (value >> 24) & 0xFF,
+  ]);
+}
+
+void _writeSilentPcm16Wav(String filename, double sec) {
+  if (sec <= 0) {
+    throw ArgumentError.value(sec, 'sec', 'must be greater than 0.');
+  }
+
+  const channels = 1;
+  const bitsPerSample = 16;
+  final blockAlign = channels * (bitsPerSample ~/ 8);
+  final byteRate = _fallbackAudioSampleRate * blockAlign;
+  final sampleCount = (sec * _fallbackAudioSampleRate).round();
+  final dataSize = sampleCount * blockAlign;
+  final riffSize = 36 + dataSize;
+
+  final builder = BytesBuilder(copy: false);
+  builder.add('RIFF'.codeUnits);
+  _appendU32Le(builder, riffSize);
+  builder.add('WAVE'.codeUnits);
+  builder.add('fmt '.codeUnits);
+  _appendU32Le(builder, 16);
+  _appendU16Le(builder, 1); // PCM
+  _appendU16Le(builder, channels);
+  _appendU32Le(builder, _fallbackAudioSampleRate);
+  _appendU32Le(builder, byteRate);
+  _appendU16Le(builder, blockAlign);
+  _appendU16Le(builder, bitsPerSample);
+  builder.add('data'.codeUnits);
+  _appendU32Le(builder, dataSize);
+  builder.add(Uint8List(dataSize));
+
+  File(filename).writeAsBytesSync(builder.takeBytes(), flush: true);
+}
+
 class Tone {
   Tone() {
     wavetable = Seq<int>.proxy(() => _wavetableData);
@@ -4520,6 +4650,7 @@ class Sound {
   int speed = 30;
   String? _mmlCode;
   double? _mmlDurationSec;
+  double? _pcmDurationSec;
 
   void set(
     String notes,
@@ -4581,22 +4712,36 @@ class Sound {
       _mmlDurationSec = null;
       return;
     }
+    _pcmDurationSec = null;
     _mmlDurationSec = _calcMmlDurationSec(code);
     _mmlCode = code;
   }
 
-  void pcm([String? filename]) {}
+  void pcm([String? filename]) {
+    if (filename == null) {
+      _pcmDurationSec = null;
+      return;
+    }
+    _pcmDurationSec = _loadWavDurationSec(filename);
+    _mmlCode = null;
+    _mmlDurationSec = null;
+  }
 
-  void save(String filename, double sec, {bool? ffmpeg}) {}
+  void save(String filename, double sec, {bool? ffmpeg}) {
+    _writeSilentPcm16Wav(filename, sec);
+  }
 
   double? total_sec() {
+    if (_pcmDurationSec != null) {
+      return _pcmDurationSec;
+    }
     if (_mmlCode != null) {
       return _mmlDurationSec;
     }
-    if (speed <= 0 || _notesData.isEmpty) {
+    if (speed <= 0) {
       return null;
     }
-    return _notesData.length / speed;
+    return (_notesData.length * speed) / _soundTicksPerSecond;
   }
 }
 
@@ -4628,7 +4773,9 @@ class Music {
     }
   }
 
-  void save(String filename, double sec, {bool? ffmpeg}) {}
+  void save(String filename, double sec, {bool? ffmpeg}) {
+    _writeSilentPcm16Wav(filename, sec);
+  }
 }
 
 final List<Tone> _toneResources = List<Tone>.unmodifiable(
