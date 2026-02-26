@@ -458,6 +458,24 @@ class FlutterxelBindings {
   late final _flutterxel_core_trib = _flutterxel_core_tribPtr
       .asFunction<bool Function(int, int, int, int, int, int, int)>();
 
+  bool flutterxel_core_text(int x, int y, ffi.Pointer<ffi.Char> text, int col) {
+    return _flutterxel_core_text(x, y, text, col);
+  }
+
+  late final _flutterxel_core_textPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.Char>,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_text');
+  late final _flutterxel_core_text = _flutterxel_core_textPtr
+      .asFunction<bool Function(int, int, ffi.Pointer<ffi.Char>, int)>();
+
   bool flutterxel_core_blt(
     double x,
     double y,

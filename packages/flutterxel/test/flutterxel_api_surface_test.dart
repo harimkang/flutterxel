@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/text/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -30,6 +30,7 @@ void main() {
       expect(flutterxel.circb, isA<Function>());
       expect(flutterxel.tri, isA<Function>());
       expect(flutterxel.trib, isA<Function>());
+      expect(flutterxel.text, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
       expect(flutterxel.playm, isA<Function>());
@@ -194,6 +195,17 @@ void main() {
     flutterxel.pal();
     flutterxel.pset(3, 2, 2);
     expect(flutterxel.pget(3, 2), 2);
+  });
+
+  test('text draws glyph pixels and skips spaces', () {
+    flutterxel.init(20, 10);
+    flutterxel.cls(0);
+
+    flutterxel.text(1, 1, 'A', 11);
+    expect(flutterxel.pget(1, 1), 11);
+
+    flutterxel.text(6, 1, ' ', 12);
+    expect(flutterxel.pget(6, 1), 0);
   });
 
   test('quit stops loop and resets initialized runtime state', () {

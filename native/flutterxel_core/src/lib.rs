@@ -1165,6 +1165,28 @@ fn draw_trib(
     draw_line(state, x3, y3, x1, y1, col);
 }
 
+fn draw_text(state: &mut RuntimeState, x: i32, y: i32, text: &str, col: i32) {
+    let mut cursor_x = x;
+    let mut cursor_y = y;
+    let line_start_x = x;
+    for ch in text.chars() {
+        if ch == '\n' {
+            cursor_x = line_start_x;
+            cursor_y += 6;
+            continue;
+        }
+
+        if ch != ' ' {
+            for dy in 0..6 {
+                for dx in 0..4 {
+                    set_frame_pixel(state, cursor_x + dx, cursor_y + dy, col);
+                }
+            }
+        }
+        cursor_x += 4;
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn flutterxel_core_version_major() -> u32 {
     ABI_VERSION_MAJOR
@@ -1621,6 +1643,24 @@ pub extern "C" fn flutterxel_core_trib(
         return false;
     }
     draw_trib(&mut state, x1, y1, x2, y2, x3, y3, col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_text(x: i32, y: i32, text: *const c_char, col: i32) -> bool {
+    if text.is_null() {
+        return false;
+    }
+    let c_str = unsafe { CStr::from_ptr(text) };
+    let Ok(text) = c_str.to_str() else {
+        return false;
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    draw_text(&mut state, x, y, text, col);
     true
 }
 
@@ -2158,6 +2198,21 @@ mod tests {
         assert!(flutterxel_core_pal(OPTIONAL_I32_NONE, OPTIONAL_I32_NONE));
         assert!(flutterxel_core_pset(3, 2, 2));
         assert_eq!(flutterxel_core_pget(3, 2), 2);
+    }
+
+    #[test]
+    fn text_draws_pixels_for_non_space_and_skips_spaces() {
+        let _guard = test_lock();
+        init_runtime(20, 10);
+        assert!(flutterxel_core_cls(0));
+
+        let text_a = CString::new("A").expect("valid cstring");
+        assert!(flutterxel_core_text(1, 1, text_a.as_ptr(), 11));
+        assert_eq!(flutterxel_core_pget(1, 1), 11);
+
+        let text_space = CString::new(" ").expect("valid cstring");
+        assert!(flutterxel_core_text(6, 1, text_space.as_ptr(), 12));
+        assert_eq!(flutterxel_core_pget(6, 1), 0);
     }
 
     #[test]

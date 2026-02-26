@@ -785,6 +785,38 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_trib(
   return true;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_text(
+    int32_t x,
+    int32_t y,
+    const char* text,
+    int32_t col) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL || text == NULL) {
+    return false;
+  }
+
+  int32_t cursor_x = x;
+  int32_t cursor_y = y;
+  int32_t line_start_x = x;
+  for (size_t i = 0; text[i] != '\0'; i++) {
+    char ch = text[i];
+    if (ch == '\n') {
+      cursor_x = line_start_x;
+      cursor_y += 6;
+      continue;
+    }
+
+    if (ch != ' ') {
+      for (int32_t dy = 0; dy < 6; dy++) {
+        for (int32_t dx = 0; dx < 4; dx++) {
+          set_frame_pixel(cursor_x + dx, cursor_y + dy, col);
+        }
+      }
+    }
+    cursor_x += 4;
+  }
+  return true;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double x,
     double y,

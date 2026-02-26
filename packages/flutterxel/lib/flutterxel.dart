@@ -741,6 +741,44 @@ void trib(int x1, int y1, int x2, int y2, int x3, int y3, int col) {
   }
 }
 
+/// Pyxel-compatible text API.
+void text(int x, int y, String s, int col) {
+  _ensureInitialized('text');
+
+  final bindings = _getBindingsOrNull();
+  final textPtr = s.toNativeUtf8().cast<ffi.Char>();
+  try {
+    final ok = bindings?.flutterxel_core_text(x, y, textPtr, col) ?? true;
+    if (!ok) {
+      throw StateError('flutterxel_core_text failed.');
+    }
+  } finally {
+    calloc.free(textPtr);
+  }
+
+  if (bindings == null) {
+    var cursorX = x;
+    var cursorY = y;
+    final lineStartX = x;
+    for (final rune in s.runes) {
+      final ch = String.fromCharCode(rune);
+      if (ch == '\n') {
+        cursorX = lineStartX;
+        cursorY += 6;
+        continue;
+      }
+      if (ch != ' ') {
+        for (var dy = 0; dy < 6; dy++) {
+          for (var dx = 0; dx < 4; dx++) {
+            _fallbackSetPixel(cursorX + dx, cursorY + dy, col);
+          }
+        }
+      }
+      cursorX += 4;
+    }
+  }
+}
+
 /// Pyxel-compatible blt API.
 void blt(
   double x,
