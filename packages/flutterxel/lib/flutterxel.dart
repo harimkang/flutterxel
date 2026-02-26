@@ -2933,6 +2933,179 @@ final List<Channel> channels = List<Channel>.unmodifiable(
   List<Channel>.generate(NUM_CHANNELS, Channel._, growable: false),
 );
 
+List<int> _parseSoundField(String source) {
+  final trimmed = source.trim();
+  if (trimmed.isEmpty) {
+    return const <int>[];
+  }
+  final tokens = trimmed.split(RegExp(r'[\s,]+'));
+  if (tokens.length > 1) {
+    return tokens
+        .map((token) => int.tryParse(token) ?? token.runes.first)
+        .toList();
+  }
+  return trimmed.runes.toList(growable: false);
+}
+
+class Tone {
+  Tone() {
+    wavetable = Seq<int>.proxy(() => _wavetableData);
+    waveform = Seq<int>.proxy(() => _wavetableData);
+  }
+
+  int mode = TONE_TRIANGLE;
+  int sample_bits = 4;
+  final List<int> _wavetableData = List<int>.filled(32, 0, growable: false);
+  late final Seq<int> wavetable;
+  late final Seq<int> waveform;
+  double gain = 1.0;
+}
+
+class Sound {
+  Sound() {
+    notes = Seq<int>.proxy(() => _notesData);
+    tones = Seq<int>.proxy(() => _tonesData);
+    volumes = Seq<int>.proxy(() => _volumesData);
+    effects = Seq<int>.proxy(() => _effectsData);
+  }
+
+  final List<int> _notesData = <int>[];
+  final List<int> _tonesData = <int>[];
+  final List<int> _volumesData = <int>[];
+  final List<int> _effectsData = <int>[];
+
+  late final Seq<int> notes;
+  late final Seq<int> tones;
+  late final Seq<int> volumes;
+  late final Seq<int> effects;
+  int speed = 30;
+
+  void set(
+    String notes,
+    String tones,
+    String volumes,
+    String effects,
+    int speed,
+  ) {
+    set_notes(notes);
+    set_tones(tones);
+    set_volumes(volumes);
+    set_effects(effects);
+    this.speed = speed;
+  }
+
+  void set_notes(String notes) {
+    _notesData
+      ..clear()
+      ..addAll(_parseSoundField(notes));
+  }
+
+  void set_tones(String tones) {
+    _tonesData
+      ..clear()
+      ..addAll(_parseSoundField(tones));
+  }
+
+  void set_volumes(String volumes) {
+    _volumesData
+      ..clear()
+      ..addAll(_parseSoundField(volumes));
+  }
+
+  void set_effects(String effects) {
+    _effectsData
+      ..clear()
+      ..addAll(_parseSoundField(effects));
+  }
+
+  void mml([String? code, bool? old_syntax]) {
+    if (code != null) {
+      set_notes(code);
+    }
+  }
+
+  void pcm([String? filename]) {}
+
+  void save(String filename, double sec, {bool? ffmpeg}) {}
+
+  double? total_sec() {
+    if (speed <= 0 || _notesData.isEmpty) {
+      return null;
+    }
+    return _notesData.length / speed;
+  }
+}
+
+class Music {
+  Music() : _seqData = List<List<int>>.generate(NUM_CHANNELS, (_) => <int>[]) {
+    _seqViews = List<Seq<int>>.generate(
+      NUM_CHANNELS,
+      (index) => Seq<int>.proxy(() => _seqData[index]),
+    );
+    seqs = Seq<Seq<int>>.proxy(() => _seqViews);
+  }
+
+  final List<List<int>> _seqData;
+  late final List<Seq<int>> _seqViews;
+  late final Seq<Seq<int>> seqs;
+
+  void set(
+    List<int> seq1, [
+    List<int>? seq2,
+    List<int>? seq3,
+    List<int>? seq4,
+  ]) {
+    final values = <List<int>?>[seq1, seq2, seq3, seq4];
+    for (var i = 0; i < _seqData.length && i < values.length; i++) {
+      final seq = values[i];
+      _seqData[i]
+        ..clear()
+        ..addAll(seq ?? const <int>[]);
+    }
+  }
+
+  void save(String filename, double sec, {bool? ffmpeg}) {}
+}
+
+final List<Tone> _toneResources = List<Tone>.unmodifiable(
+  List<Tone>.generate(NUM_TONES, (_) => Tone(), growable: false),
+);
+final List<Sound> _soundResources = List<Sound>.unmodifiable(
+  List<Sound>.generate(NUM_SOUNDS, (_) => Sound(), growable: false),
+);
+final List<Music> _musicResources = List<Music>.unmodifiable(
+  List<Music>.generate(NUM_MUSICS, (_) => Music(), growable: false),
+);
+
+final Seq<Tone> tones = Seq<Tone>.proxy(() => _toneResources);
+final Seq<Sound> sounds = Seq<Sound>.proxy(() => _soundResources);
+final Seq<Music> musics = Seq<Music>.proxy(() => _musicResources);
+
+List<String> gen_bgm(int preset, int instr, {int? seed, bool? play}) {
+  final random = math.Random(seed ?? ((preset + 1) * 65537 + instr));
+  const notes = <String>['c', 'd', 'e', 'f', 'g', 'a', 'b', 'r'];
+  final generated = List<String>.generate(NUM_CHANNELS, (channel) {
+    final length = 8 + random.nextInt(8);
+    final buffer = StringBuffer();
+    for (var i = 0; i < length; i++) {
+      final note = notes[random.nextInt(notes.length)];
+      if (note == 'r') {
+        buffer.write('r');
+      } else {
+        buffer.write('$note${3 + (channel % 2)}');
+      }
+    }
+    return buffer.toString();
+  }, growable: false);
+
+  if (play == true && _isInitialized) {
+    for (var channel = 0; channel < generated.length; channel++) {
+      _playImpl(channel, generated[channel], loop: true);
+    }
+  }
+  return generated;
+}
+
 class Flutterxel {
   Flutterxel._();
 

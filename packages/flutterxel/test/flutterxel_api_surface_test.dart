@@ -112,8 +112,14 @@ void main() {
     expect(flutterxel.KEY_UNKNOWN, 0x00);
     expect(flutterxel.KEY_BACKSPACE, 0x08);
     expect(flutterxel.KEY_F1, 0x4000003A);
+    expect(flutterxel.KEY_MODE, 0x40000101);
+    expect(flutterxel.KEY_AUDIOFASTFORWARD, 0x4000011E);
     expect(flutterxel.MOUSE_BUTTON_X1, flutterxel.MOUSE_KEY_START_INDEX + 7);
     expect(flutterxel.MOUSE_BUTTON_X2, flutterxel.MOUSE_KEY_START_INDEX + 8);
+    expect(
+      flutterxel.MOUSE_BUTTON_UNKNOWN,
+      flutterxel.MOUSE_KEY_START_INDEX + 9,
+    );
     expect(flutterxel.GAMEPAD1_BUTTON_A, flutterxel.GAMEPAD1_AXIS_LEFTX + 6);
     expect(flutterxel.TONE_TRIANGLE, 0);
     expect(flutterxel.TONE_NOISE, 3);
@@ -247,6 +253,33 @@ void main() {
     expect(flutterxel.pget(1, 1), 3);
     flutterxel.blt(0, 0, image0, 0, 0, 1, 1);
     flutterxel.bltm(0, 0, tilemap0, 0, 0, 1, 1);
+  });
+
+  test('audio resources expose Tone/Sound/Music-style API', () {
+    flutterxel.init(8, 8);
+
+    expect(flutterxel.tones.length, flutterxel.NUM_TONES);
+    expect(flutterxel.sounds.length, flutterxel.NUM_SOUNDS);
+    expect(flutterxel.musics.length, flutterxel.NUM_MUSICS);
+    expect(flutterxel.tones.first, isA<flutterxel.Tone>());
+    expect(flutterxel.sounds.first, isA<flutterxel.Sound>());
+    expect(flutterxel.musics.first, isA<flutterxel.Music>());
+
+    final sound0 = flutterxel.sounds.first;
+    sound0.set_notes('c3e3g3');
+    sound0.set_tones('0123');
+    sound0.set_volumes('7654');
+    sound0.set_effects('0123');
+    expect(sound0.notes.isNotEmpty, isTrue);
+    expect(sound0.total_sec(), isA<double>());
+
+    final music0 = flutterxel.musics.first;
+    music0.set(<int>[0, 1], <int>[2, 3]);
+    expect(music0.seqs.first, isA<flutterxel.Seq<int>>());
+
+    final generated = flutterxel.gen_bgm(0, 0, seed: 7, play: true);
+    expect(generated.length, flutterxel.NUM_CHANNELS);
+    expect(flutterxel.isChannelPlaying(0), isTrue);
   });
 
   test('flip advances frame and clears transient wheel values', () {
