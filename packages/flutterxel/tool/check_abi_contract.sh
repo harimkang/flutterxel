@@ -17,6 +17,7 @@ SYMBOLS=(
   flutterxel_core_cls
   flutterxel_core_blt
   flutterxel_core_play
+  flutterxel_core_stop
   flutterxel_core_is_channel_playing
   flutterxel_core_load
   flutterxel_core_save

@@ -100,6 +100,9 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_play(
     int8_t loop,
     int8_t resume);
 
+// pyxel.stop(ch=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_stop(int32_t ch);
+
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch);
 
 // pyxel.load(filename, *, exclude_images=None, exclude_tilemaps=None,

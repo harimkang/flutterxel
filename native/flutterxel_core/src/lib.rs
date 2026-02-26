@@ -1296,6 +1296,24 @@ pub extern "C" fn flutterxel_core_play(
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_stop(ch: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    match decode_optional_i32(ch) {
+        Some(channel) => {
+            state.channel_playback.remove(&channel);
+        }
+        None => {
+            state.channel_playback.clear();
+        }
+    }
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_is_channel_playing(ch: i32) -> bool {
     let state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -2147,5 +2165,45 @@ mod tests {
         ));
 
         assert!(flutterxel_core_is_channel_playing(1));
+    }
+
+    #[test]
+    fn stop_clears_single_channel_or_all_channels() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_play(
+            1,
+            0,
+            3,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            f64::NAN,
+            1,
+            -1
+        ));
+        assert!(flutterxel_core_play(
+            2,
+            0,
+            4,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            f64::NAN,
+            1,
+            -1
+        ));
+
+        assert!(flutterxel_core_is_channel_playing(1));
+        assert!(flutterxel_core_is_channel_playing(2));
+
+        assert!(flutterxel_core_stop(1));
+        assert!(!flutterxel_core_is_channel_playing(1));
+        assert!(flutterxel_core_is_channel_playing(2));
+
+        assert!(flutterxel_core_stop(OPTIONAL_I32_NONE));
+        assert!(!flutterxel_core_is_channel_playing(1));
+        assert!(!flutterxel_core_is_channel_playing(2));
     }
 }

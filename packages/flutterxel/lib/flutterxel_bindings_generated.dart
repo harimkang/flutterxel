@@ -345,6 +345,17 @@ class FlutterxelBindings {
         )
       >();
 
+  bool flutterxel_core_stop(int ch) {
+    return _flutterxel_core_stop(ch);
+  }
+
+  late final _flutterxel_core_stopPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_stop',
+      );
+  late final _flutterxel_core_stop = _flutterxel_core_stopPtr
+      .asFunction<bool Function(int)>();
+
   bool flutterxel_core_is_channel_playing(int ch) {
     return _flutterxel_core_is_channel_playing(ch);
   }

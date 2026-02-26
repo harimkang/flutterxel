@@ -5,6 +5,8 @@ import 'dart:ffi' as ffi;
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/gestures.dart'
+    show PointerScrollEvent, PointerSignalEvent;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -27,9 +29,12 @@ const int KEY_UP = 0x40000052;
 const int MOUSE_KEY_START_INDEX = 0x50000100;
 const int MOUSE_POS_X = MOUSE_KEY_START_INDEX;
 const int MOUSE_POS_Y = MOUSE_KEY_START_INDEX + 1;
+const int MOUSE_WHEEL_X = MOUSE_KEY_START_INDEX + 2;
+const int MOUSE_WHEEL_Y = MOUSE_KEY_START_INDEX + 3;
 const int MOUSE_BUTTON_LEFT = MOUSE_KEY_START_INDEX + 4;
 const int MOUSE_BUTTON_MIDDLE = MOUSE_KEY_START_INDEX + 5;
 const int MOUSE_BUTTON_RIGHT = MOUSE_KEY_START_INDEX + 6;
+const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
 
 final Map<LogicalKeyboardKey, int> _defaultKeyboardMapping =
     <LogicalKeyboardKey, int>{
@@ -54,6 +59,7 @@ final Set<int> _fallbackPressedKeys = <int>{};
 final Map<int, int> _fallbackPressedFrame = <int, int>{};
 final Map<int, int> _fallbackReleasedFrame = <int, int>{};
 final Map<int, int> _fallbackInputValues = <int, int>{};
+final Set<int> _fallbackPlayingChannels = <int>{};
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -169,6 +175,7 @@ void init(
     _fallbackPressedFrame.clear();
     _fallbackReleasedFrame.clear();
     _fallbackInputValues.clear();
+    _fallbackPlayingChannels.clear();
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -218,7 +225,20 @@ void _runFrame(void Function() update, void Function() draw) {
   _fallbackReleasedFrame.removeWhere(
     (_, releasedFrame) => releasedFrame != frameCount,
   );
+  _clearTransientInputValues();
   _frameNotifier.value = frameCount;
+}
+
+void _clearTransientInputValues() {
+  if (!_isInitialized) {
+    return;
+  }
+
+  for (final key in _transientValueKeys) {
+    if ((_fallbackInputValues[key] ?? 0) != 0) {
+      setBtnValue(key, 0);
+    }
+  }
 }
 
 bool get isRunning => _runLoopTimer?.isActive ?? false;
@@ -442,6 +462,7 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
     if (!ok) {
       throw StateError('flutterxel_core_play failed.');
     }
+    _fallbackPlayingChannels.add(ch);
   } finally {
     if (seqPtr != ffi.nullptr) {
       calloc.free(seqPtr);
@@ -452,13 +473,33 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   }
 }
 
+/// Pyxel-compatible stop API.
+void stop([int? ch]) {
+  _ensureInitialized('stop');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_stop(_encodeOptionalI32(ch)) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_stop failed.');
+  }
+
+  if (ch == null) {
+    _fallbackPlayingChannels.clear();
+  } else {
+    _fallbackPlayingChannels.remove(ch);
+  }
+}
+
 /// Returns whether a channel is currently marked as playing in the core.
 bool isChannelPlaying(int ch) {
   if (!_isInitialized) {
     return false;
   }
   final bindings = _getBindingsOrNull();
-  return bindings?.flutterxel_core_is_channel_playing(ch) ?? false;
+  if (bindings != null) {
+    return bindings.flutterxel_core_is_channel_playing(ch);
+  }
+  return _fallbackPlayingChannels.contains(ch);
 }
 
 /// Pyxel-compatible load API.
@@ -657,6 +698,18 @@ class _FlutterxelViewState extends State<FlutterxelView> {
     _updatePointerPosition(event);
   }
 
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (!widget.captureInput || !_isInitialized) {
+      return;
+    }
+    if (event is! PointerScrollEvent) {
+      return;
+    }
+
+    setBtnValue(MOUSE_WHEEL_X, event.scrollDelta.dx.round());
+    setBtnValue(MOUSE_WHEEL_Y, event.scrollDelta.dy.round());
+  }
+
   void _updatePointerPosition(PointerEvent event) {
     final x = (event.localPosition.dx / widget.pixelScale).floor();
     final y = (event.localPosition.dy / widget.pixelScale).floor();
@@ -707,6 +760,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
         onPointerDown: _handlePointerDown,
         onPointerHover: _handlePointerMove,
         onPointerMove: _handlePointerMove,
+        onPointerSignal: _handlePointerSignal,
         onPointerUp: _handlePointerUp,
         onPointerCancel: _handlePointerUp,
         child: view,

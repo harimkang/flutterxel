@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 
@@ -96,5 +97,40 @@ void main() {
 
     await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
     expect(flutterxel.btn(flutterxel.KEY_LEFT), isFalse);
+  });
+
+  testWidgets('FlutterxelView maps pointer scroll to mouse wheel btnv values', (
+    tester,
+  ) async {
+    flutterxel.init(16, 16, fps: 30);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(child: flutterxel.FlutterxelView(pixelScale: 2)),
+        ),
+      ),
+    );
+
+    final viewFinder = find.byType(flutterxel.FlutterxelView);
+    expect(viewFinder, findsOneWidget);
+
+    final center = tester.getCenter(viewFinder);
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: center,
+        kind: PointerDeviceKind.mouse,
+        scrollDelta: const Offset(3, -9),
+      ),
+    );
+    await tester.pump();
+
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_X), 3);
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_Y), -9);
+
+    flutterxel.run(() {}, () {});
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_X), 0);
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_Y), 0);
+    flutterxel.stopRunLoop();
   });
 }

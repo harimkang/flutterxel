@@ -492,6 +492,23 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
   return false;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_stop(int32_t ch) {
+  if (!g_state.initialized) {
+    return false;
+  }
+
+  if (ch == OPTIONAL_I32_NONE) {
+    memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+    return true;
+  }
+
+  if (ch < 0 || ch >= CHANNEL_CAPACITY) {
+    return true;
+  }
+  g_state.channel_state[ch] = 0;
+  return true;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch) {
   if (!g_state.initialized || ch < 0 || ch >= CHANNEL_CAPACITY) {
     return false;

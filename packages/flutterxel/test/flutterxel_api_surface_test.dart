@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/btn/btnp/btnr/btnv/cls/blt/play/load/save API surface',
+    'exposes init/run/btn/btnp/btnr/btnv/cls/blt/play/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -18,6 +18,7 @@ void main() {
       expect(flutterxel.cls, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
+      expect(flutterxel.stop, isA<Function>());
       expect(flutterxel.load, isA<Function>());
       expect(flutterxel.save, isA<Function>());
     },
@@ -57,6 +58,8 @@ void main() {
       flutterxel.play(0, <int>[1, 2, 3], sec: null, loop: null, resume: null);
       flutterxel.play(0, 'c3e3g3c4r', sec: 1.5, loop: false, resume: true);
       expect(flutterxel.isChannelPlaying(0), isA<bool>());
+      flutterxel.stop(0);
+      expect(flutterxel.isChannelPlaying(0), isFalse);
 
       flutterxel.cls(0);
       flutterxel.blt(0, 0, 0, 0, 0, 8, 8, colkey: 2, rotate: 0.0, scale: 1.0);
@@ -122,5 +125,27 @@ void main() {
 
     flutterxel.setBtnValue(1001, 33);
     expect(flutterxel.btnv(1001), 33);
+
+    flutterxel.setBtnValue(flutterxel.MOUSE_WHEEL_Y, 4);
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_Y), 4);
+    flutterxel.run(() {}, () {});
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_Y), 0);
+  });
+
+  test('stop controls channel playback state by channel or globally', () {
+    flutterxel.init(8, 8);
+
+    flutterxel.play(0, 1);
+    flutterxel.play(1, 2);
+    expect(flutterxel.isChannelPlaying(0), isTrue);
+    expect(flutterxel.isChannelPlaying(1), isTrue);
+
+    flutterxel.stop(0);
+    expect(flutterxel.isChannelPlaying(0), isFalse);
+    expect(flutterxel.isChannelPlaying(1), isTrue);
+
+    flutterxel.stop();
+    expect(flutterxel.isChannelPlaying(0), isFalse);
+    expect(flutterxel.isChannelPlaying(1), isFalse);
   });
 }
