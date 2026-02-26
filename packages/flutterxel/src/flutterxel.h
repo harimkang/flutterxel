@@ -87,6 +87,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
     int8_t loop,
     int8_t resume);
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_playm(int32_t msc, bool loop);
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_stop(int32_t ch);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch);

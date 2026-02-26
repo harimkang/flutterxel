@@ -21,7 +21,7 @@ Build a Pyxel-compatible runtime for Flutter with a Rust core over FFI, targetin
 ## Runtime Layering
 
 1. Dart API layer:
-   - Exposes Pyxel-like APIs (`init/run/btn/btnp/btnr/btnv/cls/blt/play/stop/load/save`)
+   - Exposes Pyxel-like APIs (`init/run/btn/btnp/btnr/btnv/cls/blt/play/playm/stop/load/save`)
    - Keeps Flutter-facing types and lifecycle control
 2. FFI bridge:
    - Maps Dart calls to C ABI functions
@@ -31,7 +31,7 @@ Build a Pyxel-compatible runtime for Flutter with a Rust core over FFI, targetin
 
 Current implemented bridge includes:
 
-- Core API skeleton: `init/run/btn/btnp/btnr/btnv/cls/blt/play/stop/load/save`
+- Core API skeleton: `init/run/btn/btnp/btnr/btnv/cls/blt/play/playm/stop/load/save`
 - Runtime helper ABI: framebuffer pointer/length, frame counter, input-state bridge
 - `.pyxres` compatibility: ZIP archive + `pyxel_resource.toml` format handling and image/tilemap/sound/music round-trip in Rust core
 

@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/btn/btnp/btnr/btnv/cls/blt/play/stop/load/save API surface',
+    'exposes init/run/btn/btnp/btnr/btnv/cls/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -18,6 +18,7 @@ void main() {
       expect(flutterxel.cls, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
+      expect(flutterxel.playm, isA<Function>());
       expect(flutterxel.stop, isA<Function>());
       expect(flutterxel.load, isA<Function>());
       expect(flutterxel.save, isA<Function>());
@@ -25,7 +26,7 @@ void main() {
   );
 
   test(
-    'accepts Pyxel-compatible named options for init/load/save/play/blt',
+    'accepts Pyxel-compatible named options for init/load/save/play/playm/blt',
     () {
       flutterxel.init(
         160,
@@ -58,6 +59,8 @@ void main() {
       flutterxel.play(0, <int>[1, 2, 3], sec: null, loop: null, resume: null);
       flutterxel.play(0, 'c3e3g3c4r', sec: 1.5, loop: false, resume: true);
       expect(flutterxel.isChannelPlaying(0), isA<bool>());
+      flutterxel.playm(0, loop: true);
+      expect(flutterxel.isChannelPlaying(0), isTrue);
       flutterxel.stop(0);
       expect(flutterxel.isChannelPlaying(0), isFalse);
 

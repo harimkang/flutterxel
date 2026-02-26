@@ -345,6 +345,17 @@ class FlutterxelBindings {
         )
       >();
 
+  bool flutterxel_core_playm(int msc, bool loop) {
+    return _flutterxel_core_playm(msc, loop);
+  }
+
+  late final _flutterxel_core_playmPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Bool)>>(
+        'flutterxel_core_playm',
+      );
+  late final _flutterxel_core_playm = _flutterxel_core_playmPtr
+      .asFunction<bool Function(int, bool)>();
+
   bool flutterxel_core_stop(int ch) {
     return _flutterxel_core_stop(ch);
   }

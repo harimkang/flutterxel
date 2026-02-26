@@ -492,6 +492,18 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
   return false;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_playm(int32_t msc, bool loop) {
+  (void)loop;
+
+  if (!g_state.initialized || msc < 0) {
+    return false;
+  }
+
+  memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  g_state.channel_state[0] = 1;
+  return true;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_stop(int32_t ch) {
   if (!g_state.initialized) {
     return false;

@@ -473,6 +473,22 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   }
 }
 
+/// Pyxel-compatible playm API.
+void playm(int msc, {bool loop = false}) {
+  _ensureInitialized('playm');
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_playm(msc, loop) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_playm failed.');
+  }
+
+  for (var channel = 0; channel < 4; channel++) {
+    _fallbackPlayingChannels.remove(channel);
+  }
+  _fallbackPlayingChannels.add(0);
+}
+
 /// Pyxel-compatible stop API.
 void stop([int? ch]) {
   _ensureInitialized('stop');

@@ -1296,6 +1296,53 @@ pub extern "C" fn flutterxel_core_play(
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_playm(msc: i32, loop_opt: bool) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || msc < 0 {
+        return false;
+    }
+
+    // pyxel music playback controls channels 0..3.
+    for channel in 0..4 {
+        state.channel_playback.remove(&(channel as i32));
+    }
+
+    if let Some(music) = state.musics.get(&msc).cloned() {
+        let mut applied = false;
+        for (channel, seq) in music.seqs.iter().enumerate() {
+            if seq.is_empty() {
+                continue;
+            }
+            let call = PlayCall {
+                ch: channel as i32,
+                source: PlaySource::Sequence(seq.clone()),
+                sec: None,
+                loop_opt: Some(loop_opt),
+                resume_opt: None,
+            };
+            state.channel_playback.insert(channel as i32, call.clone());
+            state.last_play = Some(call);
+            applied = true;
+        }
+        if applied {
+            return true;
+        }
+    }
+
+    // Keep skeleton behavior deterministic when no music resource is present.
+    let call = PlayCall {
+        ch: 0,
+        source: PlaySource::Index(msc),
+        sec: None,
+        loop_opt: Some(loop_opt),
+        resume_opt: None,
+    };
+    state.channel_playback.insert(0, call.clone());
+    state.last_play = Some(call);
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_stop(ch: i32) -> bool {
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -2165,6 +2212,30 @@ mod tests {
         ));
 
         assert!(flutterxel_core_is_channel_playing(1));
+    }
+
+    #[test]
+    fn playm_uses_music_sequences_or_falls_back_to_channel_zero() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.musics.insert(
+                0,
+                MusicResource {
+                    seqs: vec![vec![10, 11], Vec::new(), vec![12], vec![13, 14]],
+                },
+            );
+        }
+
+        assert!(flutterxel_core_playm(0, true));
+        assert!(flutterxel_core_is_channel_playing(0));
+        assert!(!flutterxel_core_is_channel_playing(1));
+        assert!(flutterxel_core_is_channel_playing(2));
+        assert!(flutterxel_core_is_channel_playing(3));
+
+        assert!(flutterxel_core_playm(9, false));
+        assert!(flutterxel_core_is_channel_playing(0));
     }
 
     #[test]

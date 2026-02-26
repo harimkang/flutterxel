@@ -100,6 +100,9 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_play(
     int8_t loop,
     int8_t resume);
 
+// pyxel.playm(msc, *, loop=False)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_playm(int32_t msc, bool loop);
+
 // pyxel.stop(ch=None)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_stop(int32_t ch);
 
