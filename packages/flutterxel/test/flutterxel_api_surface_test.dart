@@ -344,6 +344,47 @@ void main() {
     expect(tm.pget(0, 0), (1, 1));
   });
 
+  test('detached image clip/camera and blt work on local buffers', () {
+    flutterxel.init(8, 8);
+
+    final img = flutterxel.Image(8, 8);
+    final src = flutterxel.Image(2, 2);
+
+    img.cls(0);
+    img.camera(1, 0);
+    img.pset(1, 0, 3);
+    img.camera();
+    expect(img.pget(0, 0), 3);
+
+    img.clip(1, 1, 2, 2);
+    img.pset(0, 0, 9);
+    img.rect(0, 0, 3, 3, 4);
+    expect(img.pget(1, 1), 4);
+    expect(img.pget(0, 0), 0);
+    expect(img.pget(2, 2), 4);
+    expect(img.pget(3, 3), 0);
+
+    img.clip();
+    expect(img.pget(0, 0), 3);
+
+    src.cls(0);
+    src.pset(0, 0, 7);
+    src.pset(1, 0, 8);
+    img.cls(0);
+    img.blt(0, 0, src, 0, 0, 2, 1);
+    expect(img.pget(0, 0), 7);
+    expect(img.pget(1, 0), 8);
+
+    img.blt(0, 1, src, 0, 0, -2, 1);
+    expect(img.pget(0, 1), 8);
+    expect(img.pget(1, 1), 7);
+
+    img.cls(0);
+    img.blt(0, 0, src, 0, 0, 2, 1, colkey: 7);
+    expect(img.pget(0, 0), 0);
+    expect(img.pget(1, 0), 8);
+  });
+
   test('flip advances frame and clears transient wheel values', () {
     flutterxel.init(8, 8);
 

@@ -2474,27 +2474,51 @@ class Image {
       _isScreen = false,
       _width = width,
       _height = height,
-      _pixels = List<int>.filled(width * height, 0, growable: false);
+      _pixels = List<int>.filled(width * height, 0, growable: false),
+      _clipX = 0,
+      _clipY = 0,
+      _clipW = width,
+      _clipH = height,
+      _cameraX = 0,
+      _cameraY = 0;
 
   Image._resource(int imageId)
     : _imageId = imageId,
       _isScreen = false,
       _width = IMAGE_SIZE,
       _height = IMAGE_SIZE,
-      _pixels = null;
+      _pixels = null,
+      _clipX = 0,
+      _clipY = 0,
+      _clipW = IMAGE_SIZE,
+      _clipH = IMAGE_SIZE,
+      _cameraX = 0,
+      _cameraY = 0;
 
   Image._screen()
     : _imageId = null,
       _isScreen = true,
       _width = 0,
       _height = 0,
-      _pixels = null;
+      _pixels = null,
+      _clipX = 0,
+      _clipY = 0,
+      _clipW = 0,
+      _clipH = 0,
+      _cameraX = 0,
+      _cameraY = 0;
 
   final int _width;
   final int _height;
   final int? _imageId;
   final bool _isScreen;
   final List<int>? _pixels;
+  int _clipX;
+  int _clipY;
+  int _clipW;
+  int _clipH;
+  int _cameraX;
+  int _cameraY;
 
   int get width => _isScreen ? _runtimeWidth() : _width;
   int get height => _isScreen ? _runtimeHeight() : _height;
@@ -2515,6 +2539,16 @@ class Image {
 
   int _resolveX(num x) => x.round();
   int _resolveY(num y) => y.round();
+
+  bool _inLocalClip(int x, int y) {
+    if (_clipW <= 0 || _clipH <= 0) {
+      return false;
+    }
+    return x >= _clipX &&
+        y >= _clipY &&
+        x < _clipX + _clipW &&
+        y < _clipY + _clipH;
+  }
 
   void _setLocalPixel(int x, int y, int col) {
     if (_imageId != null) {
@@ -2585,13 +2619,44 @@ class Image {
   void clip([num? x, num? y, num? w, num? h]) {
     if (_isScreen) {
       _screenClip(x, y, w, h);
+      return;
     }
+    if (x == null && y == null && w == null && h == null) {
+      _clipX = 0;
+      _clipY = 0;
+      _clipW = width;
+      _clipH = height;
+      return;
+    }
+
+    final clipX = (x ?? 0).round();
+    final clipY = (y ?? 0).round();
+    final clipW = math.max(0, (w ?? width).round());
+    final clipH = math.max(0, (h ?? height).round());
+
+    final x0 = clipX.clamp(0, width).toInt();
+    final y0 = clipY.clamp(0, height).toInt();
+    var x1 = (clipX + clipW).clamp(0, width).toInt();
+    var y1 = (clipY + clipH).clamp(0, height).toInt();
+    if (x1 < x0) {
+      x1 = x0;
+    }
+    if (y1 < y0) {
+      y1 = y0;
+    }
+    _clipX = x0;
+    _clipY = y0;
+    _clipW = x1 - x0;
+    _clipH = y1 - y0;
   }
 
   void camera([num? x, num? y]) {
     if (_isScreen) {
       _screenCamera(x, y);
+      return;
     }
+    _cameraX = (x ?? 0).round();
+    _cameraY = (y ?? 0).round();
   }
 
   void pal([int? col1, int? col2]) {
@@ -2631,7 +2696,12 @@ class Image {
     if (_isScreen) {
       return _screenPget(x, y);
     }
-    return _getLocalPixel(_resolveX(x), _resolveY(y));
+    final xi = _resolveX(x);
+    final yi = _resolveY(y);
+    if (!_inLocalClip(xi, yi)) {
+      return 0;
+    }
+    return _getLocalPixel(xi, yi);
   }
 
   void pset(num x, num y, int col) {
@@ -2639,66 +2709,279 @@ class Image {
       _screenPset(x, y, col);
       return;
     }
-    _setLocalPixel(_resolveX(x), _resolveY(y), col);
+    final xi = _resolveX(x) - _cameraX;
+    final yi = _resolveY(y) - _cameraY;
+    if (!_inLocalClip(xi, yi)) {
+      return;
+    }
+    _setLocalPixel(xi, yi, col);
   }
 
   void line(num x1, num y1, num x2, num y2, int col) {
     if (_isScreen) {
       _screenLine(x1, y1, x2, y2, col);
+      return;
+    }
+    var cx = x1.round();
+    var cy = y1.round();
+    final tx = x2.round();
+    final ty = y2.round();
+    final dx = (tx - cx).abs();
+    final sx = cx < tx ? 1 : -1;
+    final dy = -(ty - cy).abs();
+    final sy = cy < ty ? 1 : -1;
+    var err = dx + dy;
+    while (true) {
+      pset(cx, cy, col);
+      if (cx == tx && cy == ty) {
+        break;
+      }
+      final e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        cx += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        cy += sy;
+      }
     }
   }
 
   void rect(num x, num y, num w, num h, int col) {
     if (_isScreen) {
       _screenRect(x, y, w, h, col);
+      return;
+    }
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    for (var py = y0; py < y0 + hh; py++) {
+      for (var px = x0; px < x0 + ww; px++) {
+        pset(px, py, col);
+      }
     }
   }
 
   void rectb(num x, num y, num w, num h, int col) {
     if (_isScreen) {
       _screenRectb(x, y, w, h, col);
+      return;
+    }
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    final right = x0 + ww - 1;
+    final bottom = y0 + hh - 1;
+    for (var px = x0; px <= right; px++) {
+      pset(px, y0, col);
+      pset(px, bottom, col);
+    }
+    for (var py = y0 + 1; py < bottom; py++) {
+      pset(x0, py, col);
+      pset(right, py, col);
     }
   }
 
   void circ(num x, num y, num r, int col) {
     if (_isScreen) {
       _screenCirc(x, y, r, col);
+      return;
+    }
+    final cx = x.round();
+    final cy = y.round();
+    final rr = r.round();
+    if (rr < 0) {
+      return;
+    }
+    final rSq = rr * rr;
+    for (var dy = -rr; dy <= rr; dy++) {
+      final remain = rSq - dy * dy;
+      final maxDx = math.sqrt(remain).floor();
+      for (var dx = -maxDx; dx <= maxDx; dx++) {
+        pset(cx + dx, cy + dy, col);
+      }
     }
   }
 
   void circb(num x, num y, num r, int col) {
     if (_isScreen) {
       _screenCircb(x, y, r, col);
+      return;
+    }
+    final cx = x.round();
+    final cy = y.round();
+    final rr = r.round();
+    if (rr < 0) {
+      return;
+    }
+    var px = rr;
+    var py = 0;
+    var err = 1 - px;
+    while (px >= py) {
+      pset(cx + px, cy + py, col);
+      pset(cx - px, cy + py, col);
+      pset(cx + px, cy - py, col);
+      pset(cx - px, cy - py, col);
+      pset(cx + py, cy + px, col);
+      pset(cx - py, cy + px, col);
+      pset(cx + py, cy - px, col);
+      pset(cx - py, cy - px, col);
+      py += 1;
+      if (err < 0) {
+        err += 2 * py + 1;
+      } else {
+        px -= 1;
+        err += 2 * (py - px + 1);
+      }
     }
   }
 
   void elli(num x, num y, num w, num h, int col) {
     if (_isScreen) {
       _screenElli(x, y, w, h, col);
+      return;
+    }
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    for (var py = 0; py < hh; py++) {
+      for (var px = 0; px < ww; px++) {
+        if (_fallbackEllipseContains(px, py, ww, hh)) {
+          pset(x0 + px, y0 + py, col);
+        }
+      }
     }
   }
 
   void ellib(num x, num y, num w, num h, int col) {
     if (_isScreen) {
       _screenEllib(x, y, w, h, col);
+      return;
+    }
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    for (var py = 0; py < hh; py++) {
+      for (var px = 0; px < ww; px++) {
+        if (!_fallbackEllipseContains(px, py, ww, hh)) {
+          continue;
+        }
+        final isEdge =
+            !_fallbackEllipseContains(px - 1, py, ww, hh) ||
+            !_fallbackEllipseContains(px + 1, py, ww, hh) ||
+            !_fallbackEllipseContains(px, py - 1, ww, hh) ||
+            !_fallbackEllipseContains(px, py + 1, ww, hh);
+        if (isEdge) {
+          pset(x0 + px, y0 + py, col);
+        }
+      }
     }
   }
 
   void tri(num x1, num y1, num x2, num y2, num x3, num y3, int col) {
     if (_isScreen) {
       _screenTri(x1, y1, x2, y2, x3, y3, col);
+      return;
+    }
+    final ax = x1.round();
+    final ay = y1.round();
+    final bx = x2.round();
+    final by = y2.round();
+    final cx = x3.round();
+    final cy = y3.round();
+    final minX = [ax, bx, cx].reduce(math.min);
+    final maxX = [ax, bx, cx].reduce(math.max);
+    final minY = [ay, by, cy].reduce(math.min);
+    final maxY = [ay, by, cy].reduce(math.max);
+
+    int edge(int sx, int sy, int ex, int ey, int px, int py) {
+      return (px - sx) * (ey - sy) - (py - sy) * (ex - sx);
+    }
+
+    for (var py = minY; py <= maxY; py++) {
+      for (var px = minX; px <= maxX; px++) {
+        final w1 = edge(ax, ay, bx, by, px, py);
+        final w2 = edge(bx, by, cx, cy, px, py);
+        final w3 = edge(cx, cy, ax, ay, px, py);
+        final allNonNegative = w1 >= 0 && w2 >= 0 && w3 >= 0;
+        final allNonPositive = w1 <= 0 && w2 <= 0 && w3 <= 0;
+        if (allNonNegative || allNonPositive) {
+          pset(px, py, col);
+        }
+      }
     }
   }
 
   void trib(num x1, num y1, num x2, num y2, num x3, num y3, int col) {
     if (_isScreen) {
       _screenTrib(x1, y1, x2, y2, x3, y3, col);
+      return;
     }
+    line(x1, y1, x2, y2, col);
+    line(x2, y2, x3, y3, col);
+    line(x3, y3, x1, y1, col);
   }
 
   void fill(num x, num y, int col) {
     if (_isScreen) {
       _screenFill(x, y, col);
+      return;
+    }
+    final sx = x.round() - _cameraX;
+    final sy = y.round() - _cameraY;
+    if (sx < 0 ||
+        sy < 0 ||
+        sx >= width ||
+        sy >= height ||
+        !_inLocalClip(sx, sy)) {
+      return;
+    }
+    final target = _getLocalPixel(sx, sy);
+    if (target == col) {
+      return;
+    }
+
+    final stack = <int>[sx, sy];
+    while (stack.isNotEmpty) {
+      final cy = stack.removeLast();
+      final cx = stack.removeLast();
+      if (cx < 0 ||
+          cy < 0 ||
+          cx >= width ||
+          cy >= height ||
+          !_inLocalClip(cx, cy)) {
+        continue;
+      }
+      if (_getLocalPixel(cx, cy) != target) {
+        continue;
+      }
+      _setLocalPixel(cx, cy, col);
+      stack
+        ..add(cx - 1)
+        ..add(cy)
+        ..add(cx + 1)
+        ..add(cy)
+        ..add(cx)
+        ..add(cy - 1)
+        ..add(cx)
+        ..add(cy + 1);
     }
   }
 
@@ -2727,6 +3010,54 @@ class Image {
         rotate: rotate,
         scale: scale,
       );
+      return;
+    }
+
+    final srcPixelAt = switch (img) {
+      int imageId => (int sx, int sy) => _fallbackGetImagePixel(
+        imageId,
+        sx,
+        sy,
+      ),
+      Image source => (int sx, int sy) => source._getLocalPixel(sx, sy),
+      _ => throw UnsupportedError(
+        'image.blt img supports int id or Image source.',
+      ),
+    };
+
+    final widthPixels = w.abs().round();
+    final heightPixels = h.abs().round();
+    if (widthPixels <= 0 || heightPixels <= 0) {
+      return;
+    }
+    final dstX = x.round();
+    final dstY = y.round();
+    final srcX = u.round();
+    final srcY = v.round();
+    final flipX = w < 0;
+    final flipY = h < 0;
+
+    final sampled = List<int>.filled(
+      widthPixels * heightPixels,
+      0,
+      growable: false,
+    );
+    for (var dy = 0; dy < heightPixels; dy++) {
+      for (var dx = 0; dx < widthPixels; dx++) {
+        final sx = srcX + (flipX ? (widthPixels - 1 - dx) : dx);
+        final sy = srcY + (flipY ? (heightPixels - 1 - dy) : dy);
+        sampled[dy * widthPixels + dx] = srcPixelAt(sx, sy);
+      }
+    }
+
+    for (var dy = 0; dy < heightPixels; dy++) {
+      for (var dx = 0; dx < widthPixels; dx++) {
+        final value = sampled[dy * widthPixels + dx];
+        if (colkey != null && value == colkey) {
+          continue;
+        }
+        pset(dstX + dx, dstY + dy, value);
+      }
     }
   }
 
@@ -2755,6 +3086,63 @@ class Image {
         rotate: rotate,
         scale: scale,
       );
+      return;
+    }
+
+    final srcTileAt = switch (tm) {
+      int tilemapId => (int tx, int ty) => _fallbackGetTile(tilemapId, tx, ty),
+      Tilemap source => (int tx, int ty) => source._readTileRaw(tx, ty),
+      _ => throw UnsupportedError(
+        'image.bltm tm supports int id or Tilemap source.',
+      ),
+    };
+    final srcImage = switch (tm) {
+      int tilemapId => _fallbackEnsureTilemap(tilemapId).imgsrc,
+      Tilemap source => source.imgsrc,
+      _ => 0,
+    };
+
+    int imagePixel(int tileX, int tileY, int px, int py) {
+      final imageX = tileX * TILE_SIZE + px;
+      final imageY = tileY * TILE_SIZE + py;
+      return switch (srcImage) {
+        int imageId => _fallbackGetImagePixel(imageId, imageX, imageY),
+        Image source => source._getLocalPixel(imageX, imageY),
+        _ => 0,
+      };
+    }
+
+    final widthTiles = w.abs().round();
+    final heightTiles = h.abs().round();
+    if (widthTiles <= 0 || heightTiles <= 0) {
+      return;
+    }
+    final dstX = x.round();
+    final dstY = y.round();
+    final srcX = u.round();
+    final srcY = v.round();
+    final flipX = w < 0;
+    final flipY = h < 0;
+
+    for (var tileDy = 0; tileDy < heightTiles; tileDy++) {
+      for (var tileDx = 0; tileDx < widthTiles; tileDx++) {
+        final tileX = srcX + (flipX ? (widthTiles - 1 - tileDx) : tileDx);
+        final tileY = srcY + (flipY ? (heightTiles - 1 - tileDy) : tileDy);
+        final tile = srcTileAt(tileX, tileY);
+        for (var py = 0; py < TILE_SIZE; py++) {
+          for (var px = 0; px < TILE_SIZE; px++) {
+            final value = imagePixel(tile.$1, tile.$2, px, py);
+            if (colkey != null && value == colkey) {
+              continue;
+            }
+            pset(
+              dstX + tileDx * TILE_SIZE + px,
+              dstY + tileDy * TILE_SIZE + py,
+              value,
+            );
+          }
+        }
+      }
     }
   }
 
