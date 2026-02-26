@@ -17,6 +17,9 @@ SYMBOLS=(
   flutterxel_core_set_btn_state
   flutterxel_core_set_btn_value
   flutterxel_core_cls
+  flutterxel_core_camera
+  flutterxel_core_clip
+  flutterxel_core_pal
   flutterxel_core_pset
   flutterxel_core_pget
   flutterxel_core_line

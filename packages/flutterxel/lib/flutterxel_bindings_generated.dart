@@ -260,6 +260,41 @@ class FlutterxelBindings {
   late final _flutterxel_core_cls = _flutterxel_core_clsPtr
       .asFunction<bool Function(int)>();
 
+  bool flutterxel_core_camera(int x, int y) {
+    return _flutterxel_core_camera(x, y);
+  }
+
+  late final _flutterxel_core_cameraPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_camera',
+      );
+  late final _flutterxel_core_camera = _flutterxel_core_cameraPtr
+      .asFunction<bool Function(int, int)>();
+
+  bool flutterxel_core_clip(int x, int y, int w, int h) {
+    return _flutterxel_core_clip(x, y, w, h);
+  }
+
+  late final _flutterxel_core_clipPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32, ffi.Int32)
+        >
+      >('flutterxel_core_clip');
+  late final _flutterxel_core_clip = _flutterxel_core_clipPtr
+      .asFunction<bool Function(int, int, int, int)>();
+
+  bool flutterxel_core_pal(int col1, int col2) {
+    return _flutterxel_core_pal(col1, col2);
+  }
+
+  late final _flutterxel_core_palPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_pal',
+      );
+  late final _flutterxel_core_pal = _flutterxel_core_palPtr
+      .asFunction<bool Function(int, int)>();
+
   bool flutterxel_core_pset(int x, int y, int col) {
     return _flutterxel_core_pset(x, y, col);
   }

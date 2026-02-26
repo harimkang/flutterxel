@@ -21,6 +21,13 @@ typedef struct FlutterxelState {
   int32_t height;
   uint64_t frame_count;
   int32_t clear_color;
+  int32_t camera_x;
+  int32_t camera_y;
+  int32_t clip_x;
+  int32_t clip_y;
+  int32_t clip_w;
+  int32_t clip_h;
+  int32_t palette_map[16];
   int32_t* frame_buffer;
   size_t frame_buffer_len;
   int32_t pressed_keys[PRESSED_KEY_CAPACITY];
@@ -104,16 +111,38 @@ static int find_value_key_index(int32_t key) {
   return -1;
 }
 
+static void reset_palette_map(void) {
+  for (int32_t i = 0; i < 16; i++) {
+    g_state.palette_map[i] = i;
+  }
+}
+
+static int32_t apply_palette(int32_t col) {
+  if (col < 0 || col >= 16) {
+    return col;
+  }
+  return g_state.palette_map[col];
+}
+
 static bool set_frame_pixel(int32_t x, int32_t y, int32_t col) {
   if (!g_state.initialized || g_state.frame_buffer == NULL) {
     return false;
   }
-  if (x < 0 || x >= g_state.width || y < 0 || y >= g_state.height) {
+
+  int32_t sx = x - g_state.camera_x;
+  int32_t sy = y - g_state.camera_y;
+  if (sx < 0 || sx >= g_state.width || sy < 0 || sy >= g_state.height) {
+    return true;
+  }
+  if (sx < g_state.clip_x || sy < g_state.clip_y) {
+    return true;
+  }
+  if (sx >= g_state.clip_x + g_state.clip_w || sy >= g_state.clip_y + g_state.clip_h) {
     return true;
   }
 
-  size_t index = (size_t)y * (size_t)g_state.width + (size_t)x;
-  g_state.frame_buffer[index] = col;
+  size_t index = (size_t)sy * (size_t)g_state.width + (size_t)sx;
+  g_state.frame_buffer[index] = apply_palette(col);
   return true;
 }
 
@@ -178,6 +207,12 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.height = height;
   g_state.frame_count = 0;
   g_state.clear_color = 0;
+  g_state.camera_x = 0;
+  g_state.camera_y = 0;
+  g_state.clip_x = 0;
+  g_state.clip_y = 0;
+  g_state.clip_w = width;
+  g_state.clip_h = height;
   g_state.pressed_key_count = 0;
   g_state.released_key_count = 0;
   g_state.value_count = 0;
@@ -188,6 +223,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   memset(g_state.value_keys, 0, sizeof(g_state.value_keys));
   memset(g_state.value_values, 0, sizeof(g_state.value_values));
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  reset_palette_map();
   seed_default_image_bank();
   return true;
 }
@@ -203,6 +239,12 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.height = 0;
   g_state.frame_count = 0;
   g_state.clear_color = 0;
+  g_state.camera_x = 0;
+  g_state.camera_y = 0;
+  g_state.clip_x = 0;
+  g_state.clip_y = 0;
+  g_state.clip_w = 0;
+  g_state.clip_h = 0;
   g_state.frame_buffer_len = 0;
   g_state.pressed_key_count = 0;
   g_state.released_key_count = 0;
@@ -216,6 +258,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   memset(g_state.value_values, 0, sizeof(g_state.value_values));
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
   memset(g_state.image_bank0, 0, sizeof(g_state.image_bank0));
+  reset_palette_map();
   return true;
 }
 
@@ -438,6 +481,81 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_cls(int32_t col) {
   g_state.clear_color = col;
   for (size_t i = 0; i < g_state.frame_buffer_len; i++) {
     g_state.frame_buffer[i] = col;
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_camera(int32_t x, int32_t y) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  g_state.camera_x = x;
+  g_state.camera_y = y;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_clip(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h) {
+  if (!g_state.initialized) {
+    return false;
+  }
+
+  int32_t x0 = x;
+  int32_t y0 = y;
+  int32_t x1 = x + w;
+  int32_t y1 = y + h;
+
+  if (x0 < 0) x0 = 0;
+  if (y0 < 0) y0 = 0;
+  if (x1 < 0) x1 = 0;
+  if (y1 < 0) y1 = 0;
+  if (x0 > g_state.width) x0 = g_state.width;
+  if (y0 > g_state.height) y0 = g_state.height;
+  if (x1 > g_state.width) x1 = g_state.width;
+  if (y1 > g_state.height) y1 = g_state.height;
+
+  if (x1 < x0) {
+    int32_t tmp = x1;
+    x1 = x0;
+    x0 = tmp;
+  }
+  if (y1 < y0) {
+    int32_t tmp = y1;
+    y1 = y0;
+    y0 = tmp;
+  }
+
+  g_state.clip_x = x0;
+  g_state.clip_y = y0;
+  g_state.clip_w = x1 - x0;
+  g_state.clip_h = y1 - y0;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_pal(int32_t col1, int32_t col2) {
+  if (!g_state.initialized) {
+    return false;
+  }
+
+  bool col1_none = col1 == OPTIONAL_I32_NONE;
+  bool col2_none = col2 == OPTIONAL_I32_NONE;
+  if (col1_none && col2_none) {
+    reset_palette_map();
+    return true;
+  }
+  if (col1_none && !col2_none) {
+    return false;
+  }
+
+  if (col1 >= 0 && col1 < 16) {
+    if (col2_none) {
+      g_state.palette_map[col1] = col1;
+    } else {
+      g_state.palette_map[col1] = col2;
+    }
   }
   return true;
 }
@@ -716,12 +834,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
 
       int32_t dst_x = base_dx + dx;
       int32_t dst_y = base_dy + dy;
-      if (dst_x < 0 || dst_x >= g_state.width || dst_y < 0 || dst_y >= g_state.height) {
-        continue;
-      }
-
-      size_t dst_index = (size_t)dst_y * (size_t)g_state.width + (size_t)dst_x;
-      g_state.frame_buffer[dst_index] = src_color;
+      set_frame_pixel(dst_x, dst_y, src_color);
     }
   }
 

@@ -67,6 +67,12 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key,
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_value(int32_t key,
                                                       int32_t value);
 FFI_PLUGIN_EXPORT bool flutterxel_core_cls(int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_camera(int32_t x, int32_t y);
+FFI_PLUGIN_EXPORT bool flutterxel_core_clip(int32_t x,
+                                             int32_t y,
+                                             int32_t w,
+                                             int32_t h);
+FFI_PLUGIN_EXPORT bool flutterxel_core_pal(int32_t col1, int32_t col2);
 FFI_PLUGIN_EXPORT bool flutterxel_core_pset(int32_t x, int32_t y, int32_t col);
 FFI_PLUGIN_EXPORT int32_t flutterxel_core_pget(int32_t x, int32_t y);
 FFI_PLUGIN_EXPORT bool flutterxel_core_line(int32_t x1,

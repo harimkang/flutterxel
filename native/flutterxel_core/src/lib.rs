@@ -83,6 +83,13 @@ struct RuntimeState {
     capture_scale: Option<i32>,
     capture_sec: Option<i32>,
     clear_color: i32,
+    camera_x: i32,
+    camera_y: i32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    palette_map: [i32; 16],
     pressed_keys: HashSet<i32>,
     pressed_key_frame: HashMap<i32, u64>,
     released_key_frame: HashMap<i32, u64>,
@@ -114,6 +121,13 @@ impl Default for RuntimeState {
             capture_scale: None,
             capture_sec: None,
             clear_color: 0,
+            camera_x: 0,
+            camera_y: 0,
+            clip_x: 0,
+            clip_y: 0,
+            clip_w: 0,
+            clip_h: 0,
+            palette_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             pressed_keys: HashSet::new(),
             pressed_key_frame: HashMap::new(),
             released_key_frame: HashMap::new(),
@@ -910,7 +924,7 @@ fn build_resource_toml(
 }
 
 fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
-    let Some(source) = state.image_banks.get(&call.img) else {
+    let Some(source) = state.image_banks.get(&call.img).cloned() else {
         return false;
     };
 
@@ -954,24 +968,38 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
 
             let dst_x = base_dx + dx;
             let dst_y = base_dy + dy;
-            if dst_x < 0 || dst_x >= state.width || dst_y < 0 || dst_y >= state.height {
-                continue;
-            }
-
-            let dst_index = dst_y as usize * state.width as usize + dst_x as usize;
-            state.frame_buffer[dst_index] = color;
+            set_frame_pixel(state, dst_x, dst_y, color);
         }
     }
 
     true
 }
 
+fn apply_palette(state: &RuntimeState, col: i32) -> i32 {
+    if let Ok(index) = usize::try_from(col) {
+        if index < state.palette_map.len() {
+            return state.palette_map[index];
+        }
+    }
+    col
+}
+
 fn set_frame_pixel(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
-    if x < 0 || x >= state.width || y < 0 || y >= state.height {
+    let sx = x - state.camera_x;
+    let sy = y - state.camera_y;
+
+    if sx < 0 || sx >= state.width || sy < 0 || sy >= state.height {
         return;
     }
-    let index = y as usize * state.width as usize + x as usize;
-    state.frame_buffer[index] = col;
+    if sx < state.clip_x || sy < state.clip_y {
+        return;
+    }
+    if sx >= state.clip_x + state.clip_w || sy >= state.clip_y + state.clip_h {
+        return;
+    }
+
+    let index = sy as usize * state.width as usize + sx as usize;
+    state.frame_buffer[index] = apply_palette(state, col);
 }
 
 fn get_frame_pixel(state: &RuntimeState, x: i32, y: i32) -> i32 {
@@ -1183,6 +1211,13 @@ pub extern "C" fn flutterxel_core_init(
     state.capture_scale = decode_optional_i32(capture_scale);
     state.capture_sec = decode_optional_i32(capture_sec);
     state.clear_color = 0;
+    state.camera_x = 0;
+    state.camera_y = 0;
+    state.clip_x = 0;
+    state.clip_y = 0;
+    state.clip_w = width;
+    state.clip_h = height;
+    state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
@@ -1218,6 +1253,13 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.capture_scale = None;
     state.capture_sec = None;
     state.clear_color = 0;
+    state.camera_x = 0;
+    state.camera_y = 0;
+    state.clip_x = 0;
+    state.clip_y = 0;
+    state.clip_w = 0;
+    state.clip_h = 0;
+    state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
@@ -1400,6 +1442,81 @@ pub extern "C" fn flutterxel_core_cls(col: i32) -> bool {
     state.clear_color = col;
     state.frame_buffer.fill(col);
     true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_camera(x: i32, y: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.camera_x = x;
+    state.camera_y = y;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_clip(x: i32, y: i32, w: i32, h: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    let mut x0 = x;
+    let mut y0 = y;
+    let mut x1 = x.saturating_add(w);
+    let mut y1 = y.saturating_add(h);
+    x0 = x0.clamp(0, state.width);
+    y0 = y0.clamp(0, state.height);
+    x1 = x1.clamp(0, state.width);
+    y1 = y1.clamp(0, state.height);
+
+    if x1 < x0 {
+        std::mem::swap(&mut x0, &mut x1);
+    }
+    if y1 < y0 {
+        std::mem::swap(&mut y0, &mut y1);
+    }
+
+    state.clip_x = x0;
+    state.clip_y = y0;
+    state.clip_w = x1.saturating_sub(x0);
+    state.clip_h = y1.saturating_sub(y0);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_pal(col1: i32, col2: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    let opt_col1 = decode_optional_i32(col1);
+    let opt_col2 = decode_optional_i32(col2);
+    match (opt_col1, opt_col2) {
+        (None, None) => {
+            state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+            true
+        }
+        (Some(src), None) => {
+            if let Ok(index) = usize::try_from(src) {
+                if index < state.palette_map.len() {
+                    state.palette_map[index] = src;
+                }
+            }
+            true
+        }
+        (Some(src), Some(dst)) => {
+            if let Ok(index) = usize::try_from(src) {
+                if index < state.palette_map.len() {
+                    state.palette_map[index] = dst;
+                }
+            }
+            true
+        }
+        (None, Some(_)) => false,
+    }
 }
 
 #[no_mangle]
@@ -2015,6 +2132,32 @@ mod tests {
         assert_eq!(flutterxel_core_pget(1, 1), 10);
         assert_eq!(flutterxel_core_pget(3, 1), 10);
         assert_eq!(flutterxel_core_pget(3, 2), 0);
+    }
+
+    #[test]
+    fn camera_clip_and_pal_affect_drawing() {
+        let _guard = test_lock();
+        init_runtime(8, 8);
+        assert!(flutterxel_core_cls(0));
+
+        assert!(flutterxel_core_camera(2, 1));
+        assert!(flutterxel_core_pset(2, 1, 3));
+        assert_eq!(flutterxel_core_pget(0, 0), 3);
+        assert!(flutterxel_core_camera(0, 0));
+
+        assert!(flutterxel_core_clip(1, 1, 2, 2));
+        assert!(flutterxel_core_pset(0, 0, 4));
+        assert_eq!(flutterxel_core_pget(0, 0), 3);
+        assert!(flutterxel_core_pset(1, 1, 5));
+        assert_eq!(flutterxel_core_pget(1, 1), 5);
+        assert!(flutterxel_core_clip(0, 0, 8, 8));
+
+        assert!(flutterxel_core_pal(2, 7));
+        assert!(flutterxel_core_pset(2, 2, 2));
+        assert_eq!(flutterxel_core_pget(2, 2), 7);
+        assert!(flutterxel_core_pal(OPTIONAL_I32_NONE, OPTIONAL_I32_NONE));
+        assert!(flutterxel_core_pset(3, 2, 2));
+        assert_eq!(flutterxel_core_pget(3, 2), 2);
     }
 
     #[test]

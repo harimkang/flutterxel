@@ -62,6 +62,13 @@ final Map<int, int> _fallbackReleasedFrame = <int, int>{};
 final Map<int, int> _fallbackInputValues = <int, int>{};
 final Set<int> _fallbackPlayingChannels = <int>{};
 List<int> _fallbackFrameBuffer = <int>[];
+int _fallbackCameraX = 0;
+int _fallbackCameraY = 0;
+int _fallbackClipX = 0;
+int _fallbackClipY = 0;
+int _fallbackClipW = 0;
+int _fallbackClipH = 0;
+List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -141,12 +148,29 @@ int? _fallbackPixelIndex(int x, int y) {
   return y * width + x;
 }
 
+int _fallbackMapColor(int col) {
+  if (col >= 0 && col < _fallbackPaletteMap.length) {
+    return _fallbackPaletteMap[col];
+  }
+  return col;
+}
+
 void _fallbackSetPixel(int x, int y, int col) {
-  final index = _fallbackPixelIndex(x, y);
+  final sx = x - _fallbackCameraX;
+  final sy = y - _fallbackCameraY;
+  if (sx < _fallbackClipX || sy < _fallbackClipY) {
+    return;
+  }
+  if (sx >= _fallbackClipX + _fallbackClipW ||
+      sy >= _fallbackClipY + _fallbackClipH) {
+    return;
+  }
+
+  final index = _fallbackPixelIndex(sx, sy);
   if (index == null) {
     return;
   }
-  _fallbackFrameBuffer[index] = col;
+  _fallbackFrameBuffer[index] = _fallbackMapColor(col);
 }
 
 int _fallbackGetPixel(int x, int y) {
@@ -202,6 +226,13 @@ void init(
     _fallbackInputValues.clear();
     _fallbackPlayingChannels.clear();
     _fallbackFrameBuffer = List<int>.filled(width * height, 0, growable: false);
+    _fallbackCameraX = 0;
+    _fallbackCameraY = 0;
+    _fallbackClipX = 0;
+    _fallbackClipY = 0;
+    _fallbackClipW = width;
+    _fallbackClipH = height;
+    _fallbackPaletteMap = List<int>.generate(16, (index) => index);
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -231,6 +262,13 @@ void quit() {
   _fallbackInputValues.clear();
   _fallbackPlayingChannels.clear();
   _fallbackFrameBuffer = <int>[];
+  _fallbackCameraX = 0;
+  _fallbackCameraY = 0;
+  _fallbackClipX = 0;
+  _fallbackClipY = 0;
+  _fallbackClipW = 0;
+  _fallbackClipH = 0;
+  _fallbackPaletteMap = List<int>.generate(16, (index) => index);
   _isInitialized = false;
 }
 
@@ -414,6 +452,83 @@ void cls(int col) {
   }
   if (bindings == null) {
     _fallbackFrameBuffer.fillRange(0, _fallbackFrameBuffer.length, col);
+  }
+}
+
+/// Pyxel-compatible camera API.
+void camera([int x = 0, int y = 0]) {
+  _ensureInitialized('camera');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_camera(x, y) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_camera failed.');
+  }
+  if (bindings == null) {
+    _fallbackCameraX = x;
+    _fallbackCameraY = y;
+  }
+}
+
+/// Pyxel-compatible clip API.
+void clip([int? x, int? y, int? w, int? h]) {
+  _ensureInitialized('clip');
+  final clipX = x ?? 0;
+  final clipY = y ?? 0;
+  final clipW = w ?? width;
+  final clipH = h ?? height;
+
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_clip(clipX, clipY, clipW, clipH) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_clip failed.');
+  }
+  if (bindings == null) {
+    var x0 = clipX.clamp(0, width).toInt();
+    var y0 = clipY.clamp(0, height).toInt();
+    var x1 = (clipX + clipW).clamp(0, width).toInt();
+    var y1 = (clipY + clipH).clamp(0, height).toInt();
+    if (x1 < x0) {
+      final temp = x1;
+      x1 = x0;
+      x0 = temp;
+    }
+    if (y1 < y0) {
+      final temp = y1;
+      y1 = y0;
+      y0 = temp;
+    }
+    _fallbackClipX = x0;
+    _fallbackClipY = y0;
+    _fallbackClipW = x1 - x0;
+    _fallbackClipH = y1 - y0;
+  }
+}
+
+/// Pyxel-compatible pal API.
+void pal([int? col1, int? col2]) {
+  _ensureInitialized('pal');
+  if (col1 == null && col2 != null) {
+    throw ArgumentError('pal(col1, col2): col1 is required when col2 is set.');
+  }
+
+  final bindings = _getBindingsOrNull();
+  final ok =
+      bindings?.flutterxel_core_pal(
+        _encodeOptionalI32(col1),
+        _encodeOptionalI32(col2),
+      ) ??
+      true;
+  if (!ok) {
+    throw StateError('flutterxel_core_pal failed.');
+  }
+  if (bindings == null) {
+    if (col1 == null && col2 == null) {
+      _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+      return;
+    }
+    if (col1 != null && col1 >= 0 && col1 < _fallbackPaletteMap.length) {
+      _fallbackPaletteMap[col1] = col2 ?? col1;
+    }
   }
 }
 

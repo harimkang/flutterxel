@@ -7,12 +7,15 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
       expect(flutterxel.flip, isA<Function>());
       expect(flutterxel.quit, isA<Function>());
+      expect(flutterxel.camera, isA<Function>());
+      expect(flutterxel.clip, isA<Function>());
+      expect(flutterxel.pal, isA<Function>());
       expect(flutterxel.btn, isA<Function>());
       expect(flutterxel.btnp, isA<Function>());
       expect(flutterxel.btnr, isA<Function>());
@@ -167,6 +170,30 @@ void main() {
     expect(flutterxel.pget(1, 1), 10);
     expect(flutterxel.pget(3, 1), 10);
     expect(flutterxel.pget(3, 2), 0);
+  });
+
+  test('camera clip and pal affect drawing primitives', () {
+    flutterxel.init(8, 8);
+    flutterxel.cls(0);
+
+    flutterxel.camera(2, 1);
+    flutterxel.pset(2, 1, 3);
+    expect(flutterxel.pget(0, 0), 3);
+    flutterxel.camera();
+
+    flutterxel.clip(1, 1, 2, 2);
+    flutterxel.pset(0, 0, 4);
+    expect(flutterxel.pget(0, 0), 3);
+    flutterxel.pset(1, 1, 5);
+    expect(flutterxel.pget(1, 1), 5);
+    flutterxel.clip();
+
+    flutterxel.pal(2, 7);
+    flutterxel.pset(2, 2, 2);
+    expect(flutterxel.pget(2, 2), 7);
+    flutterxel.pal();
+    flutterxel.pset(3, 2, 2);
+    expect(flutterxel.pget(3, 2), 2);
   });
 
   test('quit stops loop and resets initialized runtime state', () {

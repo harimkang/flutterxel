@@ -80,6 +80,15 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_value(int32_t key,
 
 // pyxel.cls(col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_cls(int32_t col);
+// pyxel.camera(x=0, y=0)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_camera(int32_t x, int32_t y);
+// pyxel.clip(x=None, y=None, w=None, h=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_clip(int32_t x,
+                                                 int32_t y,
+                                                 int32_t w,
+                                                 int32_t h);
+// pyxel.pal(col1=None, col2=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_pal(int32_t col1, int32_t col2);
 
 // pyxel.pset(x, y, col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_pset(int32_t x,
