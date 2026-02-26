@@ -48,6 +48,28 @@ struct BltCall {
     scale: Option<f64>,
 }
 
+#[derive(Debug, Clone)]
+struct TilemapResource {
+    width: u32,
+    height: u32,
+    imgsrc: i32,
+    data: Vec<(i32, i32)>,
+}
+
+#[derive(Debug, Clone)]
+struct SoundResource {
+    notes: Vec<i32>,
+    tones: Vec<i32>,
+    volumes: Vec<i32>,
+    effects: Vec<i32>,
+    speed: i32,
+}
+
+#[derive(Debug, Clone)]
+struct MusicResource {
+    seqs: Vec<Vec<i32>>,
+}
+
 #[derive(Debug)]
 struct RuntimeState {
     initialized: bool,
@@ -65,6 +87,9 @@ struct RuntimeState {
     frame_buffer: Vec<i32>,
     image_banks: HashMap<i32, Vec<i32>>,
     image_bank_size: i32,
+    tilemaps: HashMap<i32, TilemapResource>,
+    sounds: HashMap<i32, SoundResource>,
+    musics: HashMap<i32, MusicResource>,
     channel_playback: HashMap<i32, PlayCall>,
     last_blt: Option<BltCall>,
     last_play: Option<PlayCall>,
@@ -90,6 +115,9 @@ impl Default for RuntimeState {
             frame_buffer: Vec::new(),
             image_banks: HashMap::new(),
             image_bank_size: 16,
+            tilemaps: HashMap::new(),
+            sounds: HashMap::new(),
+            musics: HashMap::new(),
             channel_playback: HashMap::new(),
             last_blt: None,
             last_play: None,
@@ -171,6 +199,16 @@ fn parse_u32_value(value: &toml::Value) -> Option<u32> {
     value.as_integer().and_then(|raw| u32::try_from(raw).ok())
 }
 
+fn parse_i32_list(value: &toml::Value) -> Option<Vec<i32>> {
+    let values = value.as_array()?;
+    values.iter().map(parse_i32_value).collect()
+}
+
+fn parse_vec_i32_list(value: &toml::Value) -> Option<Vec<Vec<i32>>> {
+    let rows = value.as_array()?;
+    rows.iter().map(parse_i32_list).collect()
+}
+
 fn frame_buffer_len(width: i32, height: i32) -> Option<usize> {
     let width = usize::try_from(width).ok()?;
     let height = usize::try_from(height).ok()?;
@@ -234,6 +272,93 @@ fn parse_image_data(data_value: &toml::Value, width: usize, height: usize) -> Op
     }
 
     Some(parsed_rows.into_iter().flatten().collect())
+}
+
+fn tilemap_to_rows(tilemap: &TilemapResource) -> Option<Vec<Vec<i32>>> {
+    let width = usize::try_from(tilemap.width).ok()?;
+    let height = usize::try_from(tilemap.height).ok()?;
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let cell_count = width.checked_mul(height)?;
+    let mut data = tilemap.data.clone();
+    if data.is_empty() {
+        data.push((0, 0));
+    }
+    let fill = *data.last().unwrap_or(&(0, 0));
+    if data.len() < cell_count {
+        data.resize(cell_count, fill);
+    }
+    if data.len() > cell_count {
+        data.truncate(cell_count);
+    }
+
+    let mut rows = Vec::with_capacity(height);
+    for y in 0..height {
+        let mut row = Vec::with_capacity(width * 2);
+        for x in 0..width {
+            let (tx, ty) = data[y * width + x];
+            row.push(tx);
+            row.push(ty);
+        }
+        rows.push(row);
+    }
+    Some(rows)
+}
+
+fn parse_tilemap_data(
+    data_value: &toml::Value,
+    width: usize,
+    height: usize,
+) -> Option<Vec<(i32, i32)>> {
+    let rows = data_value.as_array()?;
+    let mut parsed_rows = Vec::new();
+
+    for row_value in rows {
+        let row_entries = row_value.as_array()?;
+        let mut row = Vec::new();
+        for value in row_entries {
+            row.push(parse_i32_value(value)?);
+        }
+        if row.is_empty() {
+            row.push(0);
+        }
+        parsed_rows.push(row);
+    }
+
+    if parsed_rows.is_empty() {
+        parsed_rows.push(vec![0]);
+    }
+
+    let expected_row_len = width.checked_mul(2)?;
+    for row in &mut parsed_rows {
+        let fill = *row.last().unwrap_or(&0);
+        if row.len() < expected_row_len {
+            row.resize(expected_row_len, fill);
+        }
+        if row.len() > expected_row_len {
+            row.truncate(expected_row_len);
+        }
+    }
+
+    while parsed_rows.len() < height {
+        let last_row = parsed_rows
+            .last()
+            .cloned()
+            .unwrap_or_else(|| vec![0; expected_row_len.max(1)]);
+        parsed_rows.push(last_row);
+    }
+    if parsed_rows.len() > height {
+        parsed_rows.truncate(height);
+    }
+
+    let flat: Vec<i32> = parsed_rows.into_iter().flatten().collect();
+    let mut cells = Vec::with_capacity(width * height);
+    for pair in flat.chunks_exact(2) {
+        cells.push((pair[0], pair[1]));
+    }
+    Some(cells)
 }
 
 fn build_resource_images_value(state: &RuntimeState, exclude_images: bool) -> Option<toml::Value> {
@@ -381,7 +506,356 @@ fn load_resource_images(
     true
 }
 
-fn build_resource_toml(state: &RuntimeState, exclude_images: bool) -> Option<String> {
+fn build_resource_tilemaps_value(
+    state: &RuntimeState,
+    exclude_tilemaps: bool,
+) -> Option<toml::Value> {
+    if exclude_tilemaps {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let max_tilemap_index = state
+        .tilemaps
+        .keys()
+        .copied()
+        .filter(|index| *index >= 0)
+        .max()
+        .unwrap_or(-1);
+    if max_tilemap_index < 0 {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let mut tilemaps = Vec::new();
+    for tilemap_index in 0..=max_tilemap_index {
+        let tilemap = state
+            .tilemaps
+            .get(&tilemap_index)
+            .cloned()
+            .unwrap_or(TilemapResource {
+                width: 1,
+                height: 1,
+                imgsrc: 0,
+                data: vec![(0, 0)],
+            });
+        let rows = tilemap_to_rows(&tilemap)?;
+
+        let mut table = toml::map::Map::new();
+        table.insert(
+            "width".to_string(),
+            toml::Value::Integer(tilemap.width as i64),
+        );
+        table.insert(
+            "height".to_string(),
+            toml::Value::Integer(tilemap.height as i64),
+        );
+        table.insert(
+            "imgsrc".to_string(),
+            toml::Value::Integer(tilemap.imgsrc as i64),
+        );
+        table.insert(
+            "data".to_string(),
+            toml::Value::Array(
+                rows.into_iter()
+                    .map(|row| {
+                        toml::Value::Array(
+                            row.into_iter()
+                                .map(|value| toml::Value::Integer(value as i64))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+        );
+        tilemaps.push(toml::Value::Table(table));
+    }
+
+    Some(toml::Value::Array(tilemaps))
+}
+
+fn load_resource_tilemaps(
+    state: &mut RuntimeState,
+    manifest: &toml::Value,
+    exclude_tilemaps: bool,
+) -> bool {
+    if exclude_tilemaps {
+        return true;
+    }
+    let Some(tilemaps_value) = manifest.get("tilemaps") else {
+        return true;
+    };
+    let Some(tilemaps) = tilemaps_value.as_array() else {
+        return false;
+    };
+    if tilemaps.is_empty() {
+        return true;
+    }
+
+    let mut parsed_tilemaps = HashMap::new();
+    for (tilemap_index, tilemap_value) in tilemaps.iter().enumerate() {
+        let Some(table) = tilemap_value.as_table() else {
+            return false;
+        };
+        let Some(width) = table.get("width").and_then(parse_u32_value) else {
+            return false;
+        };
+        let Some(height) = table.get("height").and_then(parse_u32_value) else {
+            return false;
+        };
+        let Some(imgsrc) = table.get("imgsrc").and_then(parse_i32_value) else {
+            return false;
+        };
+        if width == 0 || height == 0 {
+            return false;
+        }
+
+        let width_usize = width as usize;
+        let height_usize = height as usize;
+        let Some(data_value) = table.get("data") else {
+            return false;
+        };
+        let Some(data) = parse_tilemap_data(data_value, width_usize, height_usize) else {
+            return false;
+        };
+
+        parsed_tilemaps.insert(
+            tilemap_index as i32,
+            TilemapResource {
+                width,
+                height,
+                imgsrc,
+                data,
+            },
+        );
+    }
+
+    state.tilemaps = parsed_tilemaps;
+    true
+}
+
+fn build_resource_sounds_value(state: &RuntimeState, exclude_sounds: bool) -> Option<toml::Value> {
+    if exclude_sounds {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let max_sound_index = state
+        .sounds
+        .keys()
+        .copied()
+        .filter(|index| *index >= 0)
+        .max()
+        .unwrap_or(-1);
+    if max_sound_index < 0 {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let mut sounds = Vec::new();
+    for sound_index in 0..=max_sound_index {
+        let sound = state
+            .sounds
+            .get(&sound_index)
+            .cloned()
+            .unwrap_or(SoundResource {
+                notes: Vec::new(),
+                tones: Vec::new(),
+                volumes: Vec::new(),
+                effects: Vec::new(),
+                speed: 30,
+            });
+
+        let mut table = toml::map::Map::new();
+        table.insert(
+            "notes".to_string(),
+            toml::Value::Array(
+                sound
+                    .notes
+                    .iter()
+                    .map(|value| toml::Value::Integer(*value as i64))
+                    .collect(),
+            ),
+        );
+        table.insert(
+            "tones".to_string(),
+            toml::Value::Array(
+                sound
+                    .tones
+                    .iter()
+                    .map(|value| toml::Value::Integer(*value as i64))
+                    .collect(),
+            ),
+        );
+        table.insert(
+            "volumes".to_string(),
+            toml::Value::Array(
+                sound
+                    .volumes
+                    .iter()
+                    .map(|value| toml::Value::Integer(*value as i64))
+                    .collect(),
+            ),
+        );
+        table.insert(
+            "effects".to_string(),
+            toml::Value::Array(
+                sound
+                    .effects
+                    .iter()
+                    .map(|value| toml::Value::Integer(*value as i64))
+                    .collect(),
+            ),
+        );
+        table.insert(
+            "speed".to_string(),
+            toml::Value::Integer(sound.speed as i64),
+        );
+        sounds.push(toml::Value::Table(table));
+    }
+
+    Some(toml::Value::Array(sounds))
+}
+
+fn load_resource_sounds(
+    state: &mut RuntimeState,
+    manifest: &toml::Value,
+    exclude_sounds: bool,
+) -> bool {
+    if exclude_sounds {
+        return true;
+    }
+    let Some(sounds_value) = manifest.get("sounds") else {
+        return true;
+    };
+    let Some(sounds) = sounds_value.as_array() else {
+        return false;
+    };
+    if sounds.is_empty() {
+        return true;
+    }
+
+    let mut parsed_sounds = HashMap::new();
+    for (sound_index, sound_value) in sounds.iter().enumerate() {
+        let Some(table) = sound_value.as_table() else {
+            return false;
+        };
+        let Some(notes) = table.get("notes").and_then(parse_i32_list) else {
+            return false;
+        };
+        let Some(tones) = table.get("tones").and_then(parse_i32_list) else {
+            return false;
+        };
+        let Some(volumes) = table.get("volumes").and_then(parse_i32_list) else {
+            return false;
+        };
+        let Some(effects) = table.get("effects").and_then(parse_i32_list) else {
+            return false;
+        };
+        let Some(speed) = table.get("speed").and_then(parse_i32_value) else {
+            return false;
+        };
+
+        parsed_sounds.insert(
+            sound_index as i32,
+            SoundResource {
+                notes,
+                tones,
+                volumes,
+                effects,
+                speed,
+            },
+        );
+    }
+
+    state.sounds = parsed_sounds;
+    true
+}
+
+fn build_resource_musics_value(state: &RuntimeState, exclude_musics: bool) -> Option<toml::Value> {
+    if exclude_musics {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let max_music_index = state
+        .musics
+        .keys()
+        .copied()
+        .filter(|index| *index >= 0)
+        .max()
+        .unwrap_or(-1);
+    if max_music_index < 0 {
+        return Some(toml::Value::Array(Vec::new()));
+    }
+
+    let mut musics = Vec::new();
+    for music_index in 0..=max_music_index {
+        let music = state
+            .musics
+            .get(&music_index)
+            .cloned()
+            .unwrap_or(MusicResource { seqs: Vec::new() });
+
+        let mut table = toml::map::Map::new();
+        table.insert(
+            "seqs".to_string(),
+            toml::Value::Array(
+                music
+                    .seqs
+                    .iter()
+                    .map(|seq| {
+                        toml::Value::Array(
+                            seq.iter()
+                                .map(|value| toml::Value::Integer(*value as i64))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+        );
+        musics.push(toml::Value::Table(table));
+    }
+
+    Some(toml::Value::Array(musics))
+}
+
+fn load_resource_musics(
+    state: &mut RuntimeState,
+    manifest: &toml::Value,
+    exclude_musics: bool,
+) -> bool {
+    if exclude_musics {
+        return true;
+    }
+    let Some(musics_value) = manifest.get("musics") else {
+        return true;
+    };
+    let Some(musics) = musics_value.as_array() else {
+        return false;
+    };
+    if musics.is_empty() {
+        return true;
+    }
+
+    let mut parsed_musics = HashMap::new();
+    for (music_index, music_value) in musics.iter().enumerate() {
+        let Some(table) = music_value.as_table() else {
+            return false;
+        };
+        let Some(seqs) = table.get("seqs").and_then(parse_vec_i32_list) else {
+            return false;
+        };
+
+        parsed_musics.insert(music_index as i32, MusicResource { seqs });
+    }
+
+    state.musics = parsed_musics;
+    true
+}
+
+fn build_resource_toml(
+    state: &RuntimeState,
+    exclude_images: bool,
+    exclude_tilemaps: bool,
+    exclude_sounds: bool,
+    exclude_musics: bool,
+) -> Option<String> {
     let mut root = toml::map::Map::new();
     root.insert(
         "format_version".to_string(),
@@ -391,9 +865,18 @@ fn build_resource_toml(state: &RuntimeState, exclude_images: bool) -> Option<Str
         "images".to_string(),
         build_resource_images_value(state, exclude_images)?,
     );
-    root.insert("tilemaps".to_string(), toml::Value::Array(Vec::new()));
-    root.insert("sounds".to_string(), toml::Value::Array(Vec::new()));
-    root.insert("musics".to_string(), toml::Value::Array(Vec::new()));
+    root.insert(
+        "tilemaps".to_string(),
+        build_resource_tilemaps_value(state, exclude_tilemaps)?,
+    );
+    root.insert(
+        "sounds".to_string(),
+        build_resource_sounds_value(state, exclude_sounds)?,
+    );
+    root.insert(
+        "musics".to_string(),
+        build_resource_musics_value(state, exclude_musics)?,
+    );
 
     let mut runtime_table = toml::map::Map::new();
     runtime_table.insert(
@@ -529,6 +1012,9 @@ pub extern "C" fn flutterxel_core_init(
     };
     state.frame_buffer = vec![0; frame_buffer_len];
     state.image_banks.clear();
+    state.tilemaps.clear();
+    state.sounds.clear();
+    state.musics.clear();
     state.channel_playback.clear();
     state.last_blt = None;
     state.last_play = None;
@@ -759,9 +1245,9 @@ pub extern "C" fn flutterxel_core_load(
         return false;
     };
     let exclude_images = exclude_images.unwrap_or(false);
-    let _exclude_tilemaps = exclude_tilemaps.unwrap_or(false);
-    let _exclude_sounds = exclude_sounds.unwrap_or(false);
-    let _exclude_musics = exclude_musics.unwrap_or(false);
+    let exclude_tilemaps = exclude_tilemaps.unwrap_or(false);
+    let exclude_sounds = exclude_sounds.unwrap_or(false);
+    let exclude_musics = exclude_musics.unwrap_or(false);
 
     let c_str = unsafe { CStr::from_ptr(filename) };
     let Ok(path) = c_str.to_str() else {
@@ -843,6 +1329,15 @@ pub extern "C" fn flutterxel_core_load(
     if !load_resource_images(&mut state, &manifest, exclude_images) {
         return false;
     }
+    if !load_resource_tilemaps(&mut state, &manifest, exclude_tilemaps) {
+        return false;
+    }
+    if !load_resource_sounds(&mut state, &manifest, exclude_sounds) {
+        return false;
+    }
+    if !load_resource_musics(&mut state, &manifest, exclude_musics) {
+        return false;
+    }
 
     state.last_loaded = Some(path.to_string());
     true
@@ -872,9 +1367,9 @@ pub extern "C" fn flutterxel_core_save(
         return false;
     };
     let exclude_images = exclude_images.unwrap_or(false);
-    let _exclude_tilemaps = exclude_tilemaps.unwrap_or(false);
-    let _exclude_sounds = exclude_sounds.unwrap_or(false);
-    let _exclude_musics = exclude_musics.unwrap_or(false);
+    let exclude_tilemaps = exclude_tilemaps.unwrap_or(false);
+    let exclude_sounds = exclude_sounds.unwrap_or(false);
+    let exclude_musics = exclude_musics.unwrap_or(false);
 
     let c_str = unsafe { CStr::from_ptr(filename) };
     let Ok(path) = c_str.to_str() else {
@@ -886,7 +1381,13 @@ pub extern "C" fn flutterxel_core_save(
         if !state.initialized {
             return false;
         }
-        let Some(toml_text) = build_resource_toml(&state, exclude_images) else {
+        let Some(toml_text) = build_resource_toml(
+            &state,
+            exclude_images,
+            exclude_tilemaps,
+            exclude_sounds,
+            exclude_musics,
+        ) else {
             return false;
         };
         toml_text
@@ -1213,6 +1714,180 @@ mod tests {
             state.frame_buffer.clone()
         };
         assert_eq!(frame_buffer, vec![9, 9, 9, 9]);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_then_load_roundtrips_tilemaps_sounds_and_musics() {
+        let _guard = test_lock();
+        init_runtime(2, 2);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 2,
+                    height: 2,
+                    imgsrc: 1,
+                    data: vec![(1, 2), (3, 4), (5, 6), (7, 8)],
+                },
+            );
+            state.sounds.insert(
+                0,
+                SoundResource {
+                    notes: vec![28, 30, -1],
+                    tones: vec![1],
+                    volumes: vec![6, 5],
+                    effects: vec![2, 3],
+                    speed: 25,
+                },
+            );
+            state.musics.insert(
+                0,
+                MusicResource {
+                    seqs: vec![vec![0, 1, 2], vec![3]],
+                },
+            );
+        }
+
+        let path = tmp_resource_path("resource_roundtrip");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, -1, -1, -1));
+
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 2,
+                    height: 2,
+                    imgsrc: 9,
+                    data: vec![(9, 9), (9, 9), (9, 9), (9, 9)],
+                },
+            );
+            state.sounds.insert(
+                0,
+                SoundResource {
+                    notes: vec![1, 1, 1],
+                    tones: vec![3],
+                    volumes: vec![1],
+                    effects: vec![1],
+                    speed: 40,
+                },
+            );
+            state.musics.insert(
+                0,
+                MusicResource {
+                    seqs: vec![vec![9, 9]],
+                },
+            );
+        }
+
+        assert!(flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
+
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        let tilemap = state.tilemaps.get(&0).expect("tilemap should exist");
+        assert_eq!(tilemap.width, 2);
+        assert_eq!(tilemap.height, 2);
+        assert_eq!(tilemap.imgsrc, 1);
+        assert_eq!(tilemap.data, vec![(1, 2), (3, 4), (5, 6), (7, 8)]);
+
+        let sound = state.sounds.get(&0).expect("sound should exist");
+        assert_eq!(sound.notes, vec![28, 30, -1]);
+        assert_eq!(sound.tones, vec![1]);
+        assert_eq!(sound.volumes, vec![6, 5]);
+        assert_eq!(sound.effects, vec![2, 3]);
+        assert_eq!(sound.speed, 25);
+
+        let music = state.musics.get(&0).expect("music should exist");
+        assert_eq!(music.seqs, vec![vec![0, 1, 2], vec![3]]);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_with_exclude_resource_flags_keeps_existing_tilemaps_sounds_musics() {
+        let _guard = test_lock();
+        init_runtime(2, 2);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 2,
+                    height: 2,
+                    imgsrc: 1,
+                    data: vec![(1, 2), (3, 4), (5, 6), (7, 8)],
+                },
+            );
+            state.sounds.insert(
+                0,
+                SoundResource {
+                    notes: vec![28, 30, -1],
+                    tones: vec![1],
+                    volumes: vec![6, 5],
+                    effects: vec![2, 3],
+                    speed: 25,
+                },
+            );
+            state.musics.insert(
+                0,
+                MusicResource {
+                    seqs: vec![vec![0, 1, 2], vec![3]],
+                },
+            );
+        }
+
+        let path = tmp_resource_path("resource_exclude");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, -1, -1, -1));
+
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 2,
+                    height: 2,
+                    imgsrc: 9,
+                    data: vec![(9, 9), (9, 9), (9, 9), (9, 9)],
+                },
+            );
+            state.sounds.insert(
+                0,
+                SoundResource {
+                    notes: vec![1, 1, 1],
+                    tones: vec![3],
+                    volumes: vec![1],
+                    effects: vec![1],
+                    speed: 40,
+                },
+            );
+            state.musics.insert(
+                0,
+                MusicResource {
+                    seqs: vec![vec![9, 9]],
+                },
+            );
+        }
+
+        assert!(flutterxel_core_load(c_path.as_ptr(), -1, 1, 1, 1));
+
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        let tilemap = state.tilemaps.get(&0).expect("tilemap should exist");
+        assert_eq!(tilemap.imgsrc, 9);
+        assert_eq!(tilemap.data, vec![(9, 9), (9, 9), (9, 9), (9, 9)]);
+
+        let sound = state.sounds.get(&0).expect("sound should exist");
+        assert_eq!(sound.notes, vec![1, 1, 1]);
+        assert_eq!(sound.tones, vec![3]);
+        assert_eq!(sound.volumes, vec![1]);
+        assert_eq!(sound.effects, vec![1]);
+        assert_eq!(sound.speed, 40);
+
+        let music = state.musics.get(&0).expect("music should exist");
+        assert_eq!(music.seqs, vec![vec![9, 9]]);
+
         let _ = fs::remove_file(path);
     }
 
