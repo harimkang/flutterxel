@@ -1063,6 +1063,11 @@ pub extern "C" fn flutterxel_core_run(
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_flip() -> bool {
+    flutterxel_core_run(None, std::ptr::null_mut(), None, std::ptr::null_mut())
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_frame_count() -> u64 {
     let state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -1749,6 +1754,21 @@ mod tests {
             std::ptr::null_mut()
         ));
         assert!(!flutterxel_core_btnr(32));
+    }
+
+    #[test]
+    fn flip_advances_frame_and_clears_single_frame_release_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert_eq!(flutterxel_core_frame_count(), 0);
+        assert!(flutterxel_core_set_btn_state(33, true));
+        assert!(flutterxel_core_set_btn_state(33, false));
+        assert!(flutterxel_core_btnr(33));
+
+        assert!(flutterxel_core_flip());
+        assert_eq!(flutterxel_core_frame_count(), 1);
+        assert!(!flutterxel_core_btnr(33));
     }
 
     #[test]

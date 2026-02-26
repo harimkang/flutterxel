@@ -131,6 +131,15 @@ class FlutterxelBindings {
         )
       >();
 
+  bool flutterxel_core_flip() {
+    return _flutterxel_core_flip();
+  }
+
+  late final _flutterxel_core_flipPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function()>>('flutterxel_core_flip');
+  late final _flutterxel_core_flip = _flutterxel_core_flipPtr
+      .asFunction<bool Function()>();
+
   int flutterxel_core_frame_count() {
     return _flutterxel_core_frame_count();
   }

@@ -51,6 +51,9 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_run(
     FlutterxelCoreFrameCallback draw,
     void* draw_user_data);
 
+// pyxel.flip()
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_flip(void);
+
 FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_frame_count(void);
 FLUTTERXEL_CORE_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
 FLUTTERXEL_CORE_EXPORT size_t flutterxel_core_framebuffer_len(void);

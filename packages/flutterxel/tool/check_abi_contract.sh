@@ -8,6 +8,7 @@ BINDINGS="$ROOT_DIR/packages/flutterxel/lib/flutterxel_bindings_generated.dart"
 SYMBOLS=(
   flutterxel_core_init
   flutterxel_core_run
+  flutterxel_core_flip
   flutterxel_core_btn
   flutterxel_core_btnp
   flutterxel_core_btnr

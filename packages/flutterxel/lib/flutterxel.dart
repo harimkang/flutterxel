@@ -203,22 +203,18 @@ void run(void Function() update, void Function() draw) {
 void _runFrame(void Function() update, void Function() draw) {
   update();
   draw();
+  flip();
+}
+
+/// Pyxel-compatible flip API.
+void flip() {
+  _ensureInitialized('flip');
 
   final bindings = _getBindingsOrNull();
-  final nullFrameCallback = ffi.nullptr
-      .cast<ffi.NativeFunction<FlutterxelCoreFrameCallbackFunction>>();
-
-  final ok =
-      bindings?.flutterxel_core_run(
-        nullFrameCallback,
-        ffi.nullptr,
-        nullFrameCallback,
-        ffi.nullptr,
-      ) ??
-      true;
+  final ok = bindings?.flutterxel_core_flip() ?? true;
 
   if (!ok) {
-    throw StateError('flutterxel_core_run failed.');
+    throw StateError('flutterxel_core_flip failed.');
   }
 
   frameCount = bindings?.flutterxel_core_frame_count() ?? (frameCount + 1);

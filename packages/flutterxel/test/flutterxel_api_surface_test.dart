@@ -7,10 +7,11 @@ void main() {
   });
 
   test(
-    'exposes init/run/btn/btnp/btnr/btnv/cls/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/btn/btnp/btnr/btnv/cls/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
+      expect(flutterxel.flip, isA<Function>());
       expect(flutterxel.btn, isA<Function>());
       expect(flutterxel.btnp, isA<Function>());
       expect(flutterxel.btnr, isA<Function>());
@@ -89,6 +90,18 @@ void main() {
     expect(updateCalled, isTrue);
     expect(drawCalled, isTrue);
     flutterxel.stopRunLoop();
+  });
+
+  test('flip advances frame and clears transient wheel values', () {
+    flutterxel.init(8, 8);
+
+    expect(flutterxel.frameCount, 0);
+    flutterxel.setBtnValue(flutterxel.MOUSE_WHEEL_X, 7);
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_X), 7);
+
+    flutterxel.flip();
+    expect(flutterxel.frameCount, 1);
+    expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_X), 0);
   });
 
   test('exposes runtime bridge helpers for input and framebuffer', () {

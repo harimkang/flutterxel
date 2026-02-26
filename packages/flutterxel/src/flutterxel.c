@@ -195,6 +195,10 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
   return true;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_flip(void) {
+  return flutterxel_core_run(NULL, NULL, NULL, NULL);
+}
+
 FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void) {
   if (!g_state.initialized) {
     return 0;
