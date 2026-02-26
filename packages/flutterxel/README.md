@@ -18,6 +18,7 @@ This package is scaffolded and ready for progressive implementation:
 - Runtime architecture and implementation plans are documented in the repository `docs/` directory.
 - A Rust core runtime implementation is present at `../../native/flutterxel_core`.
 - Runtime API skeleton includes `init/run/btn/cls/blt/play/load/save`.
+- `load/save` uses `.pyxres` ZIP archives with `pyxel_resource.toml` (`format_version <= 4`) in Rust core.
 - Native artifact layout for prebuilt Rust binaries is documented at `native/README.md`.
 
 ## Native Artifact Bundling

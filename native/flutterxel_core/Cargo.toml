@@ -10,4 +10,5 @@ name = "flutterxel_core"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-
+toml = "0.8"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }

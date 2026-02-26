@@ -1,14 +1,19 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{Read, Write};
 use std::os::raw::{c_char, c_void};
 use std::sync::{Mutex, OnceLock};
+use zip::write::FileOptions;
+use zip::{ZipArchive, ZipWriter};
 
 const ABI_VERSION_MAJOR: u32 = 0;
 const ABI_VERSION_MINOR: u32 = 3;
 const ABI_VERSION_PATCH: u32 = 0;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
-const RESOURCE_MAGIC: &str = "FLUTTERXEL_RES_V1";
+const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
+const RESOURCE_FORMAT_VERSION: u32 = 4;
+const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -166,6 +171,34 @@ fn validate_optional_resource_flags(
         && decode_optional_bool(exclude_musics).is_some()
 }
 
+fn parse_i32_value(value: &toml::Value) -> Option<i32> {
+    value.as_integer().and_then(|raw| i32::try_from(raw).ok())
+}
+
+fn parse_u64_value(value: &toml::Value) -> Option<u64> {
+    value.as_integer().and_then(|raw| u64::try_from(raw).ok())
+}
+
+fn parse_u32_value(value: &toml::Value) -> Option<u32> {
+    value.as_integer().and_then(|raw| u32::try_from(raw).ok())
+}
+
+fn frame_buffer_len(width: i32, height: i32) -> Option<usize> {
+    let width = usize::try_from(width).ok()?;
+    let height = usize::try_from(height).ok()?;
+    width.checked_mul(height)
+}
+
+fn build_resource_toml(state: &RuntimeState) -> String {
+    format!(
+        "format_version = {RESOURCE_FORMAT_VERSION}\nimages = []\ntilemaps = []\nsounds = []\nmusics = []\n[{RESOURCE_RUNTIME_SECTION}]\nwidth = {width}\nheight = {height}\nframe_count = {frame_count}\nclear_color = {clear_color}\n",
+        width = state.width,
+        height = state.height,
+        frame_count = state.frame_count,
+        clear_color = state.clear_color,
+    )
+}
+
 fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     let Some(source) = state.image_banks.get(&call.img) else {
         return false;
@@ -270,7 +303,10 @@ pub extern "C" fn flutterxel_core_init(
     state.capture_sec = decode_optional_i32(capture_sec);
     state.clear_color = 0;
     state.pressed_keys.clear();
-    state.frame_buffer = vec![0; width as usize * height as usize];
+    let Some(frame_buffer_len) = frame_buffer_len(width, height) else {
+        return false;
+    };
+    state.frame_buffer = vec![0; frame_buffer_len];
     state.image_banks.clear();
     state.channel_playback.clear();
     state.last_blt = None;
@@ -503,10 +539,27 @@ pub extern "C" fn flutterxel_core_load(
         return false;
     };
 
-    let Ok(contents) = fs::read_to_string(path) else {
+    let Ok(file) = File::open(path) else {
         return false;
     };
-    if !contents.starts_with(RESOURCE_MAGIC) {
+    let Ok(mut archive) = ZipArchive::new(file) else {
+        return false;
+    };
+    let Ok(mut manifest_entry) = archive.by_name(RESOURCE_ARCHIVE_NAME) else {
+        return false;
+    };
+    let mut toml_text = String::new();
+    if manifest_entry.read_to_string(&mut toml_text).is_err() {
+        return false;
+    }
+
+    let Ok(manifest) = toml::from_str::<toml::Value>(&toml_text) else {
+        return false;
+    };
+    let Some(format_version) = manifest.get("format_version").and_then(parse_u32_value) else {
+        return false;
+    };
+    if format_version > RESOURCE_FORMAT_VERSION {
         return false;
     }
 
@@ -514,6 +567,51 @@ pub extern "C" fn flutterxel_core_load(
     if !state.initialized {
         return false;
     }
+
+    if let Some(runtime) = manifest
+        .get(RESOURCE_RUNTIME_SECTION)
+        .and_then(toml::Value::as_table)
+    {
+        let mut loaded_width = state.width;
+        let mut loaded_height = state.height;
+
+        if let Some(value) = runtime.get("width") {
+            let Some(parsed_width) = parse_i32_value(value) else {
+                return false;
+            };
+            loaded_width = parsed_width;
+        }
+        if let Some(value) = runtime.get("height") {
+            let Some(parsed_height) = parse_i32_value(value) else {
+                return false;
+            };
+            loaded_height = parsed_height;
+        }
+        if loaded_width <= 0 || loaded_height <= 0 {
+            return false;
+        }
+
+        if let Some(value) = runtime.get("frame_count") {
+            let Some(parsed_frame_count) = parse_u64_value(value) else {
+                return false;
+            };
+            state.frame_count = parsed_frame_count;
+        }
+        if let Some(value) = runtime.get("clear_color") {
+            let Some(parsed_clear_color) = parse_i32_value(value) else {
+                return false;
+            };
+            state.clear_color = parsed_clear_color;
+        }
+
+        let Some(buffer_len) = frame_buffer_len(loaded_width, loaded_height) else {
+            return false;
+        };
+        state.width = loaded_width;
+        state.height = loaded_height;
+        state.frame_buffer = vec![state.clear_color; buffer_len];
+    }
+
     state.last_loaded = Some(path.to_string());
     true
 }
@@ -543,24 +641,35 @@ pub extern "C" fn flutterxel_core_save(
         return false;
     };
 
+    let payload = {
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        if !state.initialized {
+            return false;
+        }
+        build_resource_toml(&state)
+    };
+
+    let Ok(file) = File::create(path) else {
+        return false;
+    };
+    let mut zip = ZipWriter::new(file);
+    if zip
+        .start_file(RESOURCE_ARCHIVE_NAME, FileOptions::default())
+        .is_err()
+    {
+        return false;
+    }
+    if zip.write_all(payload.as_bytes()).is_err() {
+        return false;
+    }
+    if zip.finish().is_err() {
+        return false;
+    }
+
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
         return false;
     }
-
-    let payload = format!(
-        "{magic}\nwidth={width}\nheight={height}\nframe_count={frame_count}\nclear_color={clear_color}\n",
-        magic = RESOURCE_MAGIC,
-        width = state.width,
-        height = state.height,
-        frame_count = state.frame_count,
-        clear_color = state.clear_color,
-    );
-
-    if fs::write(path, payload).is_err() {
-        return false;
-    }
-
     state.last_saved = Some(path.to_string());
     true
 }
@@ -569,6 +678,8 @@ pub extern "C" fn flutterxel_core_save(
 mod tests {
     use super::*;
     use std::ffi::CString;
+    use std::fs::File;
+    use std::io::{Read, Write};
     use std::path::PathBuf;
     use std::sync::{Mutex, OnceLock};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -603,6 +714,27 @@ mod tests {
             .as_nanos();
         path.push(format!("flutterxel_core_{label}_{stamp}.pyxres"));
         path
+    }
+
+    fn write_resource_archive(path: &PathBuf, toml_text: &str) {
+        let file = File::create(path).expect("create resource archive");
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file(RESOURCE_ARCHIVE_NAME, zip::write::FileOptions::default())
+            .expect("start resource archive entry");
+        zip.write_all(toml_text.as_bytes())
+            .expect("write resource archive entry");
+        zip.finish().expect("finish resource archive");
+    }
+
+    fn read_resource_archive_toml(path: &PathBuf) -> String {
+        let file = File::open(path).expect("open resource archive");
+        let mut archive = zip::ZipArchive::new(file).expect("read zip archive");
+        let mut entry = archive
+            .by_name(RESOURCE_ARCHIVE_NAME)
+            .expect("find resource manifest");
+        let mut text = String::new();
+        entry.read_to_string(&mut text).expect("read manifest text");
+        text
     }
 
     #[test]
@@ -671,7 +803,7 @@ mod tests {
     }
 
     #[test]
-    fn save_then_load_accepts_minimal_resource_payload() {
+    fn save_then_load_accepts_zip_resource_archive() {
         let _guard = test_lock();
         init_runtime(4, 4);
         assert!(flutterxel_core_cls(9));
@@ -689,6 +821,71 @@ mod tests {
         };
         assert_eq!(last_saved.as_deref(), Some(path_string.as_str()));
         assert_eq!(last_loaded.as_deref(), Some(path_string.as_str()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_writes_resource_manifest_toml_into_zip_archive() {
+        let _guard = test_lock();
+        init_runtime(8, 6);
+        assert!(flutterxel_core_cls(11));
+
+        let path = tmp_resource_path("zip_save");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, -1, -1, -1));
+
+        let toml_text = read_resource_archive_toml(&path);
+        assert!(toml_text.contains(&format!("format_version = {}", RESOURCE_FORMAT_VERSION)));
+        assert!(toml_text.contains("[runtime]"));
+        assert!(toml_text.contains("width = 8"));
+        assert!(toml_text.contains("height = 6"));
+        assert!(toml_text.contains("clear_color = 11"));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_rejects_future_resource_format_version() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        let path = tmp_resource_path("future_version");
+        write_resource_archive(
+            &path,
+            &format!(
+                "format_version = {}\n[runtime]\nwidth = 4\nheight = 4\nframe_count = 0\nclear_color = 0\n",
+                RESOURCE_FORMAT_VERSION + 1
+            ),
+        );
+
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(!flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_accepts_pyxel_style_manifest_without_runtime_section() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        let path = tmp_resource_path("pyxel_style");
+        write_resource_archive(
+            &path,
+            &format!(
+                "format_version = {}\nimages = []\ntilemaps = []\nsounds = []\nmusics = []\n",
+                RESOURCE_FORMAT_VERSION
+            ),
+        );
+
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
+
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        assert_eq!(state.width, 4);
+        assert_eq!(state.height, 4);
+        assert_eq!(state.frame_buffer.len(), 16);
+
         let _ = fs::remove_file(path);
     }
 
