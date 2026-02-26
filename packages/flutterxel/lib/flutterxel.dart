@@ -2768,20 +2768,38 @@ class Image {
 class Tilemap {
   Tilemap(this.width, this.height, this.imgsrc)
     : _tilemapId = null,
-      _detachedData = List<int>.filled(width * height * 2, 0, growable: false);
+      _detachedData = List<int>.filled(width * height * 2, 0, growable: false),
+      _clipX = 0,
+      _clipY = 0,
+      _clipW = width,
+      _clipH = height,
+      _cameraX = 0,
+      _cameraY = 0;
 
   Tilemap._resource(int tilemapId)
     : width = TILEMAP_SIZE,
       height = TILEMAP_SIZE,
       imgsrc = 0,
       _tilemapId = tilemapId,
-      _detachedData = null;
+      _detachedData = null,
+      _clipX = 0,
+      _clipY = 0,
+      _clipW = TILEMAP_SIZE,
+      _clipH = TILEMAP_SIZE,
+      _cameraX = 0,
+      _cameraY = 0;
 
   final int width;
   final int height;
   Object imgsrc;
   final int? _tilemapId;
   final List<int>? _detachedData;
+  int _clipX;
+  int _clipY;
+  int _clipW;
+  int _clipH;
+  int _cameraX;
+  int _cameraY;
 
   int? _resourceTilemapId() => _tilemapId;
 
@@ -2819,9 +2837,83 @@ class Tilemap {
     set(x, y, file.readAsLinesSync());
   }
 
-  void clip([num? x, num? y, num? w, num? h]) {}
+  void clip([num? x, num? y, num? w, num? h]) {
+    if (x == null && y == null && w == null && h == null) {
+      _clipX = 0;
+      _clipY = 0;
+      _clipW = width;
+      _clipH = height;
+      return;
+    }
 
-  void camera([num? x, num? y]) {}
+    final clipX = (x ?? 0).round();
+    final clipY = (y ?? 0).round();
+    final clipW = math.max(0, (w ?? width).round());
+    final clipH = math.max(0, (h ?? height).round());
+
+    var x0 = clipX.clamp(0, width).toInt();
+    var y0 = clipY.clamp(0, height).toInt();
+    var x1 = (clipX + clipW).clamp(0, width).toInt();
+    var y1 = (clipY + clipH).clamp(0, height).toInt();
+    if (x1 < x0) {
+      x1 = x0;
+    }
+    if (y1 < y0) {
+      y1 = y0;
+    }
+
+    _clipX = x0;
+    _clipY = y0;
+    _clipW = x1 - x0;
+    _clipH = y1 - y0;
+  }
+
+  void camera([num? x, num? y]) {
+    _cameraX = (x ?? 0).round();
+    _cameraY = (y ?? 0).round();
+  }
+
+  bool _inClipRect(int x, int y) {
+    if (_clipW <= 0 || _clipH <= 0) {
+      return false;
+    }
+    return x >= _clipX &&
+        y >= _clipY &&
+        x < _clipX + _clipW &&
+        y < _clipY + _clipH;
+  }
+
+  (int, int) _readTileRaw(int x, int y) {
+    if (_tilemapId != null) {
+      return _fallbackGetTile(_tilemapId, x, y);
+    }
+    final data = _detachedData;
+    if (data == null || x < 0 || y < 0 || x >= width || y >= height) {
+      return (0, 0);
+    }
+    final pairIndex = (y * width + x) * 2;
+    if (pairIndex + 1 >= data.length) {
+      return (0, 0);
+    }
+    return (data[pairIndex], data[pairIndex + 1]);
+  }
+
+  void _writeTileRaw(int x, int y, (int, int) tile) {
+    if (_tilemapId != null) {
+      _fallbackSetTile(_tilemapId, x, y, tile.$1, tile.$2);
+      return;
+    }
+    final data = _detachedData;
+    if (data == null || x < 0 || y < 0 || x >= width || y >= height) {
+      return;
+    }
+    final pairIndex = (y * width + x) * 2;
+    if (pairIndex + 1 >= data.length) {
+      return;
+    }
+    data[pairIndex] = tile.$1;
+    data[pairIndex + 1] = tile.$2;
+  }
 
   void cls((int, int) tile) {
     if (_tilemapId != null) {
@@ -2846,37 +2938,19 @@ class Tilemap {
   (int, int) pget(num x, num y) {
     final xi = x.round();
     final yi = y.round();
-    if (_tilemapId != null) {
-      return _fallbackGetTile(_tilemapId, xi, yi);
-    }
-    final data = _detachedData;
-    if (data == null || xi < 0 || yi < 0 || xi >= width || yi >= height) {
+    if (!_inClipRect(xi, yi)) {
       return (0, 0);
     }
-    final pairIndex = (yi * width + xi) * 2;
-    if (pairIndex + 1 >= data.length) {
-      return (0, 0);
-    }
-    return (data[pairIndex], data[pairIndex + 1]);
+    return _readTileRaw(xi, yi);
   }
 
   void pset(num x, num y, (int, int) tile) {
-    final xi = x.round();
-    final yi = y.round();
-    if (_tilemapId != null) {
-      _fallbackSetTile(_tilemapId, xi, yi, tile.$1, tile.$2);
+    final xi = x.round() - _cameraX;
+    final yi = y.round() - _cameraY;
+    if (!_inClipRect(xi, yi)) {
       return;
     }
-    final data = _detachedData;
-    if (data == null || xi < 0 || yi < 0 || xi >= width || yi >= height) {
-      return;
-    }
-    final pairIndex = (yi * width + xi) * 2;
-    if (pairIndex + 1 >= data.length) {
-      return;
-    }
-    data[pairIndex] = tile.$1;
-    data[pairIndex + 1] = tile.$2;
+    _writeTileRaw(xi, yi, tile);
   }
 
   void line(num x1, num y1, num x2, num y2, (int, int) tile) {
@@ -3122,7 +3196,7 @@ class Tilemap {
       if (tx < 0 || ty < 0 || tx >= width || ty >= height) {
         return false;
       }
-      return wallSet.contains(pget(tx, ty));
+      return wallSet.contains(_readTileRaw(tx, ty));
     }
 
     double resolveX(double cx, double cy, double deltaX) {
@@ -3229,7 +3303,7 @@ class Tilemap {
   }) {
     final srcTileAt = switch (tm) {
       int tmId => (int tx, int ty) => _fallbackGetTile(tmId, tx, ty),
-      Tilemap source => (int tx, int ty) => source.pget(tx, ty),
+      Tilemap source => (int tx, int ty) => source._readTileRaw(tx, ty),
       _ => throw UnsupportedError(
         'tilemap.blt tm supports int id or Tilemap source.',
       ),

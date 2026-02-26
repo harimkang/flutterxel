@@ -320,6 +320,30 @@ void main() {
     expect(tm0.collide(0, 0, 8, 8, 8, 0, <(int, int)>[(6, 6)]), (0.0, 0.0));
   });
 
+  test('tilemap clip and camera affect tile writes and reads', () {
+    flutterxel.init(8, 8);
+    final tm = flutterxel.tilemaps[0];
+
+    tm.cls((0, 0));
+    tm.camera(1, 0);
+    tm.pset(1, 0, (1, 1));
+    tm.camera();
+    expect(tm.pget(0, 0), (1, 1));
+
+    tm.clip(1, 1, 1, 1);
+    tm.pset(0, 0, (2, 2));
+    tm.pset(1, 1, (3, 3));
+    expect(tm.pget(1, 1), (3, 3));
+    expect(tm.pget(0, 0), (0, 0));
+
+    tm.line(0, 0, 2, 2, (4, 4));
+    expect(tm.pget(1, 1), (4, 4));
+    expect(tm.pget(2, 2), (0, 0));
+
+    tm.clip();
+    expect(tm.pget(0, 0), (1, 1));
+  });
+
   test('flip advances frame and clears transient wheel values', () {
     flutterxel.init(8, 8);
 
