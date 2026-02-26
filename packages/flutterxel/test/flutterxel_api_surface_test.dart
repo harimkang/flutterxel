@@ -78,6 +78,21 @@ bool _hasCommand(String command) {
   return result.exitCode == 0;
 }
 
+String? _readPyxresManifest(String path) {
+  if (!_hasCommand('unzip')) {
+    return null;
+  }
+  final result = Process.runSync('unzip', <String>[
+    '-p',
+    path,
+    'pyxel_resource.toml',
+  ]);
+  if (result.exitCode != 0) {
+    return null;
+  }
+  return (result.stdout as String).trim();
+}
+
 void main() {
   tearDown(() {
     flutterxel.stopRunLoop();
@@ -360,6 +375,74 @@ void main() {
     expect(generated.length, flutterxel.NUM_CHANNELS);
     expect(flutterxel.isChannelPlaying(0), isTrue);
   });
+
+  test(
+    'Seq mutation APIs support addAll/clear on Sound and Music resources',
+    () {
+      final tempDir = Directory.systemTemp.createTempSync(
+        'flutterxel-seq-sync-',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      if (!_hasCommand('unzip')) {
+        return;
+      }
+
+      flutterxel.init(8, 8);
+
+      final sound = flutterxel.sounds[3];
+      sound.notes
+        ..clear()
+        ..addAll(<int>[12, 24, -1]);
+      sound.tones
+        ..clear()
+        ..addAll(<int>[0, 1, 2]);
+      sound.volumes
+        ..clear()
+        ..addAll(<int>[7, 6, 5]);
+      sound.effects
+        ..clear()
+        ..addAll(<int>[0, 2, 3]);
+
+      final music = flutterxel.musics[2];
+      music.seqs[0]
+        ..clear()
+        ..addAll(<int>[3, 4, 5]);
+      music.seqs[2]
+        ..clear()
+        ..addAll(<int>[6]);
+
+      expect(sound.notes.toList(), <int>[12, 24, -1]);
+      expect(sound.tones.toList(), <int>[0, 1, 2]);
+      expect(sound.volumes.toList(), <int>[7, 6, 5]);
+      expect(sound.effects.toList(), <int>[0, 2, 3]);
+      expect(music.seqs[0].toList(), <int>[3, 4, 5]);
+      expect(music.seqs[2].toList(), <int>[6]);
+
+      flutterxel.play(0, sound, sec: 0.1);
+      expect(flutterxel.playPos(0), isNotNull);
+      expect(flutterxel.playPos(0)!.snd, 3);
+      flutterxel.stop(0);
+
+      final resourcePath = '${tempDir.path}/seq_sync.pyxres';
+      flutterxel.save(resourcePath);
+      final manifest = _readPyxresManifest(resourcePath);
+      if (manifest != null) {
+        expect(manifest, contains(RegExp(r'notes\s*=\s*\[12,\s*24,\s*-1\]')));
+        expect(manifest, contains(RegExp(r'tones\s*=\s*\[0,\s*1,\s*2\]')));
+        expect(manifest, contains(RegExp(r'volumes\s*=\s*\[7,\s*6,\s*5\]')));
+        expect(manifest, contains(RegExp(r'effects\s*=\s*\[0,\s*2,\s*3\]')));
+        expect(
+          manifest,
+          contains(RegExp(r'seqs\s*=\s*\[\[3,\s*4,\s*5\],\s*\[\],\s*\[6\]')),
+        );
+      }
+    },
+  );
 
   test('sound parsing helpers and mml mode update runtime sound state', () {
     flutterxel.init(8, 8);

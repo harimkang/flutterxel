@@ -37,3 +37,16 @@ Or via CLI:
 ```bash
 dart run flutterxel_tools:flutterxel_tools build-native --all
 ```
+
+## Release Artifacts
+
+On tag push (`v*`), GitHub Actions `native-artifacts` publishes two assets:
+
+- `flutterxel-native-artifacts.tgz`: platform-split bundle (`android/`, `ios/`)
+- `flutterxel-native-package-overlay.tgz`: direct overlay for repository/package layout (`packages/flutterxel/native/...`)
+
+To apply the overlay archive in a release branch:
+
+```bash
+tar -xzf flutterxel-native-package-overlay.tgz -C .
+```

@@ -16,6 +16,9 @@ on:
           - ios
         default: all
 
+permissions:
+  contents: write
+
 jobs:
   android:
     if: github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'android'
@@ -103,6 +106,20 @@ jobs:
         run: |
           mkdir -p release
           tar -czf release/flutterxel-native-artifacts.tgz -C dist .
+          mkdir -p overlay/packages/flutterxel/native
+          if [[ -d dist/android/jniLibs ]]; then
+            mkdir -p overlay/packages/flutterxel/native/android
+            cp -R dist/android/jniLibs overlay/packages/flutterxel/native/android/
+          fi
+          if [[ -d dist/ios/FlutterxelCore.xcframework ]]; then
+            mkdir -p overlay/packages/flutterxel/native/ios
+            cp -R dist/ios/FlutterxelCore.xcframework overlay/packages/flutterxel/native/ios/
+          fi
+          if [[ -f dist/ios/libflutterxel_core.a ]]; then
+            mkdir -p overlay/packages/flutterxel/native/ios
+            cp dist/ios/libflutterxel_core.a overlay/packages/flutterxel/native/ios/
+          fi
+          tar -czf release/flutterxel-native-package-overlay.tgz -C overlay .
 
       - name: Upload combined archive
         uses: actions/upload-artifact@v4
@@ -110,3 +127,18 @@ jobs:
           name: flutterxel-native-artifacts
           path: release/flutterxel-native-artifacts.tgz
           if-no-files-found: error
+
+      - name: Upload package overlay archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutterxel-native-package-overlay
+          path: release/flutterxel-native-package-overlay.tgz
+          if-no-files-found: error
+
+      - name: Publish release assets
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/flutterxel-native-artifacts.tgz
+            release/flutterxel-native-package-overlay.tgz

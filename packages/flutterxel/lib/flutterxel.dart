@@ -2600,18 +2600,25 @@ List<int> frameBufferSnapshot() {
 }
 
 class Seq<T> extends ListBase<T> {
-  Seq.proxy(this._source);
+  Seq.proxy(this._source, {void Function()? onMutated})
+    : _onMutated = onMutated;
 
   final List<T> Function() _source;
+  final void Function()? _onMutated;
 
   List<T> get _list => _source();
+  void _notifyMutation() => _onMutated?.call();
 
   @override
   int get length => _list.length;
 
   @override
   set length(int newLength) {
+    if (_list.length == newLength) {
+      return;
+    }
     _list.length = newLength;
+    _notifyMutation();
   }
 
   @override
@@ -2620,6 +2627,126 @@ class Seq<T> extends ListBase<T> {
   @override
   void operator []=(int index, T value) {
     _list[index] = value;
+    _notifyMutation();
+  }
+
+  @override
+  void add(T element) {
+    _list.add(element);
+    _notifyMutation();
+  }
+
+  @override
+  void addAll(Iterable<T> iterable) {
+    _list.addAll(iterable);
+    _notifyMutation();
+  }
+
+  @override
+  void clear() {
+    if (_list.isEmpty) {
+      return;
+    }
+    _list.clear();
+    _notifyMutation();
+  }
+
+  @override
+  void fillRange(int start, int end, [T? fill]) {
+    _list.fillRange(start, end, fill);
+    _notifyMutation();
+  }
+
+  @override
+  void insert(int index, T element) {
+    _list.insert(index, element);
+    _notifyMutation();
+  }
+
+  @override
+  void insertAll(int index, Iterable<T> iterable) {
+    _list.insertAll(index, iterable);
+    _notifyMutation();
+  }
+
+  @override
+  bool remove(Object? element) {
+    final removed = _list.remove(element);
+    if (removed) {
+      _notifyMutation();
+    }
+    return removed;
+  }
+
+  @override
+  T removeAt(int index) {
+    final value = _list.removeAt(index);
+    _notifyMutation();
+    return value;
+  }
+
+  @override
+  T removeLast() {
+    final value = _list.removeLast();
+    _notifyMutation();
+    return value;
+  }
+
+  @override
+  void removeRange(int start, int end) {
+    if (start == end) {
+      return;
+    }
+    _list.removeRange(start, end);
+    _notifyMutation();
+  }
+
+  @override
+  void removeWhere(bool Function(T element) test) {
+    final before = _list.length;
+    _list.removeWhere(test);
+    if (_list.length != before) {
+      _notifyMutation();
+    }
+  }
+
+  @override
+  void retainWhere(bool Function(T element) test) {
+    final before = _list.length;
+    _list.retainWhere(test);
+    if (_list.length != before) {
+      _notifyMutation();
+    }
+  }
+
+  @override
+  void replaceRange(int start, int end, Iterable<T> newContents) {
+    _list.replaceRange(start, end, newContents);
+    _notifyMutation();
+  }
+
+  @override
+  void setAll(int index, Iterable<T> iterable) {
+    _list.setAll(index, iterable);
+    _notifyMutation();
+  }
+
+  @override
+  void setRange(int start, int end, Iterable<T> iterable, [int skipCount = 0]) {
+    _list.setRange(start, end, iterable, skipCount);
+    _notifyMutation();
+  }
+
+  @override
+  void shuffle([math.Random? random]) {
+    _list.shuffle(random);
+    _notifyMutation();
+  }
+
+  @override
+  void sort([int Function(T a, T b)? compare]) {
+    _list.sort(compare);
+    _notifyMutation();
   }
 
   void append(T value) => add(value);
@@ -4974,17 +5101,17 @@ class Tone {
 
 class Sound {
   Sound() : _soundId = null {
-    notes = Seq<int>.proxy(() => _notesData);
-    tones = Seq<int>.proxy(() => _tonesData);
-    volumes = Seq<int>.proxy(() => _volumesData);
-    effects = Seq<int>.proxy(() => _effectsData);
+    notes = Seq<int>.proxy(() => _notesData, onMutated: _syncNotesToCore);
+    tones = Seq<int>.proxy(() => _tonesData, onMutated: _syncTonesToCore);
+    volumes = Seq<int>.proxy(() => _volumesData, onMutated: _syncVolumesToCore);
+    effects = Seq<int>.proxy(() => _effectsData, onMutated: _syncEffectsToCore);
   }
 
   Sound._resource(int soundId) : _soundId = soundId {
-    notes = Seq<int>.proxy(() => _notesData);
-    tones = Seq<int>.proxy(() => _tonesData);
-    volumes = Seq<int>.proxy(() => _volumesData);
-    effects = Seq<int>.proxy(() => _effectsData);
+    notes = Seq<int>.proxy(() => _notesData, onMutated: _syncNotesToCore);
+    tones = Seq<int>.proxy(() => _tonesData, onMutated: _syncTonesToCore);
+    volumes = Seq<int>.proxy(() => _volumesData, onMutated: _syncVolumesToCore);
+    effects = Seq<int>.proxy(() => _effectsData, onMutated: _syncEffectsToCore);
   }
 
   final int? _soundId;
@@ -5073,16 +5200,47 @@ class Sound {
     this.speed = speed;
   }
 
-  void set_notes(String notes) {
-    _notesData
-      ..clear()
-      ..addAll(_parseSoundNotes(notes));
+  void _syncNotesToCore() {
     _syncListToCore(
       _notesData,
       'flutterxel_core_sound_set_notes',
       (bindings, soundId, ptr, len) =>
           bindings.flutterxel_core_sound_set_notes(soundId, ptr, len),
     );
+  }
+
+  void _syncTonesToCore() {
+    _syncListToCore(
+      _tonesData,
+      'flutterxel_core_sound_set_tones',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_tones(soundId, ptr, len),
+    );
+  }
+
+  void _syncVolumesToCore() {
+    _syncListToCore(
+      _volumesData,
+      'flutterxel_core_sound_set_volumes',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_volumes(soundId, ptr, len),
+    );
+  }
+
+  void _syncEffectsToCore() {
+    _syncListToCore(
+      _effectsData,
+      'flutterxel_core_sound_set_effects',
+      (bindings, soundId, ptr, len) =>
+          bindings.flutterxel_core_sound_set_effects(soundId, ptr, len),
+    );
+  }
+
+  void set_notes(String notes) {
+    _notesData
+      ..clear()
+      ..addAll(_parseSoundNotes(notes));
+    _syncNotesToCore();
   }
 
   void note(String notes) {
@@ -5093,12 +5251,7 @@ class Sound {
     _tonesData
       ..clear()
       ..addAll(_parseSoundTones(tones));
-    _syncListToCore(
-      _tonesData,
-      'flutterxel_core_sound_set_tones',
-      (bindings, soundId, ptr, len) =>
-          bindings.flutterxel_core_sound_set_tones(soundId, ptr, len),
-    );
+    _syncTonesToCore();
   }
 
   void tone(String tones) {
@@ -5109,12 +5262,7 @@ class Sound {
     _volumesData
       ..clear()
       ..addAll(_parseSoundVolumes(volumes));
-    _syncListToCore(
-      _volumesData,
-      'flutterxel_core_sound_set_volumes',
-      (bindings, soundId, ptr, len) =>
-          bindings.flutterxel_core_sound_set_volumes(soundId, ptr, len),
-    );
+    _syncVolumesToCore();
   }
 
   void volume(String volumes) {
@@ -5125,12 +5273,7 @@ class Sound {
     _effectsData
       ..clear()
       ..addAll(_parseSoundEffects(effects));
-    _syncListToCore(
-      _effectsData,
-      'flutterxel_core_sound_set_effects',
-      (bindings, soundId, ptr, len) =>
-          bindings.flutterxel_core_sound_set_effects(soundId, ptr, len),
-    );
+    _syncEffectsToCore();
   }
 
   void effect(String effects) {
@@ -5183,7 +5326,10 @@ class Music {
       _seqData = List<List<int>>.generate(NUM_CHANNELS, (_) => <int>[]) {
     _seqViews = List<Seq<int>>.generate(
       NUM_CHANNELS,
-      (index) => Seq<int>.proxy(() => _seqData[index]),
+      (index) => Seq<int>.proxy(
+        () => _seqData[index],
+        onMutated: () => _syncSeqToCore(index),
+      ),
     );
     seqs = Seq<Seq<int>>.proxy(() => _seqViews);
   }
@@ -5193,7 +5339,10 @@ class Music {
       _seqData = List<List<int>>.generate(NUM_CHANNELS, (_) => <int>[]) {
     _seqViews = List<Seq<int>>.generate(
       NUM_CHANNELS,
-      (index) => Seq<int>.proxy(() => _seqData[index]),
+      (index) => Seq<int>.proxy(
+        () => _seqData[index],
+        onMutated: () => _syncSeqToCore(index),
+      ),
     );
     seqs = Seq<Seq<int>>.proxy(() => _seqViews);
   }

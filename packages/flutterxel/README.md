@@ -31,6 +31,8 @@ For release builds without requiring end-user Rust toolchains:
 
 Runtime loading prefers `flutterxel_core` and falls back to `flutterxel` scaffold library.
 
+Tag releases (`v*`) publish prebuilt native bundles via GitHub Actions, including a package-overlay archive that can be extracted directly into `packages/flutterxel/native`.
+
 ## Runtime Loop and View
 
 ```dart

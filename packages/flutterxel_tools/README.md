@@ -30,6 +30,11 @@ dart run flutterxel_tools:flutterxel_tools build-native --ios
 dart run flutterxel_tools:flutterxel_tools build-native --all --out-dir ./dist/native
 ```
 
+For tagged releases (`v*`), `.github/workflows/native_artifacts.yml` builds the same artifacts and uploads both:
+
+- platform bundle (`flutterxel-native-artifacts.tgz`)
+- package overlay (`flutterxel-native-package-overlay.tgz`)
+
 ## Monorepo Context
 
 `flutterxel_tools` is intentionally separated from `flutterxel` runtime so app projects can depend on runtime without pulling in tooling/editor dependencies.
