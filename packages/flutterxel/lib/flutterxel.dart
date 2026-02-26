@@ -1494,8 +1494,7 @@ void blt(
   }
 }
 
-/// Pyxel-compatible play API.
-void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
+void _playImpl(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   _ensureInitialized('play');
 
   final bindings = _getBindingsOrNull();
@@ -1562,6 +1561,11 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   }
 }
 
+/// Pyxel-compatible play API.
+void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
+  _playImpl(ch, snd, sec: sec, loop: loop, resume: resume);
+}
+
 /// Pyxel-compatible playm API.
 void playm(int msc, {bool loop = false}) {
   _ensureInitialized('playm');
@@ -1580,8 +1584,7 @@ void playm(int msc, {bool loop = false}) {
   _fallbackPlayPositions[0] = (snd: msc, pos: 0.0);
 }
 
-/// Pyxel-compatible stop API.
-void stop([int? ch]) {
+void _stopImpl(int? ch) {
   _ensureInitialized('stop');
 
   final bindings = _getBindingsOrNull();
@@ -1599,6 +1602,11 @@ void stop([int? ch]) {
   }
 }
 
+/// Pyxel-compatible stop API.
+void stop([int? ch]) {
+  _stopImpl(ch);
+}
+
 /// Returns whether a channel is currently marked as playing in the core.
 bool isChannelPlaying(int ch) {
   if (!_isInitialized) {
@@ -1611,8 +1619,7 @@ bool isChannelPlaying(int ch) {
   return _fallbackPlayingChannels.contains(ch);
 }
 
-/// Pyxel-compatible play_pos API.
-({int snd, double pos})? playPos(int ch) {
+({int snd, double pos})? _playPosImpl(int ch) {
   _ensureInitialized('play_pos');
 
   final bindings = _getBindingsOrNull();
@@ -1632,6 +1639,11 @@ bool isChannelPlaying(int ch) {
   }
 
   return _fallbackPlayPositions[ch];
+}
+
+/// Pyxel-compatible play_pos API.
+({int snd, double pos})? playPos(int ch) {
+  return _playPosImpl(ch);
 }
 
 ({int snd, double pos})? play_pos(int ch) => playPos(ch);
@@ -2088,6 +2100,35 @@ List<int> frameBufferSnapshot() {
 
   return ptr.asTypedList(len).toList(growable: false);
 }
+
+class Channel {
+  Channel._(this._channelIndex);
+
+  final int _channelIndex;
+
+  double gain = 0.125;
+  int detune = 0;
+
+  void play(Object snd, {double? sec, bool? loop, bool? resume}) {
+    _playImpl(_channelIndex, snd, sec: sec, loop: loop, resume: resume);
+  }
+
+  void stop() {
+    _stopImpl(_channelIndex);
+  }
+
+  ({int snd, double pos})? play_pos() {
+    return _playPosImpl(_channelIndex);
+  }
+
+  ({int snd, double pos})? playPos() {
+    return play_pos();
+  }
+}
+
+final List<Channel> channels = List<Channel>.unmodifiable(
+  List<Channel>.generate(NUM_CHANNELS, Channel._, growable: false),
+);
 
 class Flutterxel {
   Flutterxel._();

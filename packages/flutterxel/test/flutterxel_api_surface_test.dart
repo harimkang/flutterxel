@@ -206,6 +206,19 @@ void main() {
     flutterxel.stopRunLoop();
   });
 
+  test('channels exposes Channel-style audio control API', () {
+    flutterxel.init(8, 8);
+
+    expect(flutterxel.channels.length, flutterxel.NUM_CHANNELS);
+    expect(flutterxel.channels.first, isA<flutterxel.Channel>());
+
+    final channel0 = flutterxel.channels.first;
+    channel0.play(1);
+    expect(channel0.play_pos(), isNotNull);
+    channel0.stop();
+    expect(channel0.play_pos(), isNull);
+  });
+
   test('flip advances frame and clears transient wheel values', () {
     flutterxel.init(8, 8);
 
