@@ -17,6 +17,8 @@ const int _optionalI32None = -2147483648; // INT32_MIN
 const int _optionalBoolNone = -1;
 const int _optionalBoolFalse = 0;
 const int _optionalBoolTrue = 1;
+const int _i64Min = -0x8000000000000000;
+const int _i64Max = 0x7FFFFFFFFFFFFFFF;
 
 // Pyxel-compatible key codes (subset used for mobile-first input mapping).
 const int KEY_RETURN = 0x0D;
@@ -1569,6 +1571,130 @@ double noise(double x, [double? y, double? z]) {
     return bindings.flutterxel_core_noise(x, yValue, zValue);
   }
   return _fallbackSampleNoise(x, yValue, zValue);
+}
+
+/// Pyxel-compatible ceil API.
+int ceil(num x) {
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_ceil(x.toDouble());
+  }
+  return x.ceil();
+}
+
+/// Pyxel-compatible floor API.
+int floor(num x) {
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_floor(x.toDouble());
+  }
+  return x.floor();
+}
+
+/// Pyxel-compatible clamp API.
+num clamp(num x, num lower, num upper) {
+  final bindings = _getBindingsOrNull();
+  if (x is int && lower is int && upper is int) {
+    if (bindings != null &&
+        x >= _i64Min &&
+        x <= _i64Max &&
+        lower >= _i64Min &&
+        lower <= _i64Max &&
+        upper >= _i64Min &&
+        upper <= _i64Max) {
+      return bindings.flutterxel_core_clamp_i64(x, lower, upper);
+    }
+    final lo = math.min(lower, upper);
+    final hi = math.max(lower, upper);
+    if (x < lo) {
+      return lo;
+    }
+    if (x > hi) {
+      return hi;
+    }
+    return x;
+  }
+
+  final xValue = x.toDouble();
+  final lowerValue = lower.toDouble();
+  final upperValue = upper.toDouble();
+  if (bindings != null) {
+    return bindings.flutterxel_core_clamp_f64(xValue, lowerValue, upperValue);
+  }
+  final lo = math.min(lowerValue, upperValue);
+  final hi = math.max(lowerValue, upperValue);
+  if (xValue < lo) {
+    return lo;
+  }
+  if (xValue > hi) {
+    return hi;
+  }
+  return xValue;
+}
+
+/// Pyxel-compatible sgn API.
+num sgn(num x) {
+  final bindings = _getBindingsOrNull();
+  if (x is int) {
+    if (bindings != null && x >= _i64Min && x <= _i64Max) {
+      return bindings.flutterxel_core_sgn_i64(x);
+    }
+    if (x > 0) {
+      return 1;
+    }
+    if (x < 0) {
+      return -1;
+    }
+    return 0;
+  }
+
+  final xValue = x.toDouble();
+  if (bindings != null) {
+    return bindings.flutterxel_core_sgn_f64(xValue);
+  }
+  if (xValue > 0.0) {
+    return 1.0;
+  }
+  if (xValue < 0.0) {
+    return -1.0;
+  }
+  return 0.0;
+}
+
+/// Pyxel-compatible sqrt API.
+double sqrt(num x) {
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_sqrt(x.toDouble());
+  }
+  return math.sqrt(x.toDouble());
+}
+
+/// Pyxel-compatible sin API.
+double sin(num deg) {
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_sin(deg.toDouble());
+  }
+  return math.sin(deg.toDouble() * math.pi / 180.0);
+}
+
+/// Pyxel-compatible cos API.
+double cos(num deg) {
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_cos(deg.toDouble());
+  }
+  return math.cos(deg.toDouble() * math.pi / 180.0);
+}
+
+/// Pyxel-compatible atan2 API.
+double atan2(num y, num x) {
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    return bindings.flutterxel_core_atan2(y.toDouble(), x.toDouble());
+  }
+  return math.atan2(y.toDouble(), x.toDouble()) * 180.0 / math.pi;
 }
 
 /// Pyxel-compatible load API.

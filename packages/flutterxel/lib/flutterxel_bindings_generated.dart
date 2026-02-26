@@ -869,6 +869,118 @@ class FlutterxelBindings {
   late final _flutterxel_core_noise = _flutterxel_core_noisePtr
       .asFunction<double Function(double, double, double)>();
 
+  int flutterxel_core_ceil(double x) {
+    return _flutterxel_core_ceil(x);
+  }
+
+  late final _flutterxel_core_ceilPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Double)>>(
+        'flutterxel_core_ceil',
+      );
+  late final _flutterxel_core_ceil = _flutterxel_core_ceilPtr
+      .asFunction<int Function(double)>();
+
+  int flutterxel_core_floor(double x) {
+    return _flutterxel_core_floor(x);
+  }
+
+  late final _flutterxel_core_floorPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Double)>>(
+        'flutterxel_core_floor',
+      );
+  late final _flutterxel_core_floor = _flutterxel_core_floorPtr
+      .asFunction<int Function(double)>();
+
+  int flutterxel_core_clamp_i64(int x, int lower, int upper) {
+    return _flutterxel_core_clamp_i64(x, lower, upper);
+  }
+
+  late final _flutterxel_core_clamp_i64Ptr =
+      _lookup<
+        ffi.NativeFunction<ffi.Int64 Function(ffi.Int64, ffi.Int64, ffi.Int64)>
+      >('flutterxel_core_clamp_i64');
+  late final _flutterxel_core_clamp_i64 = _flutterxel_core_clamp_i64Ptr
+      .asFunction<int Function(int, int, int)>();
+
+  double flutterxel_core_clamp_f64(double x, double lower, double upper) {
+    return _flutterxel_core_clamp_f64(x, lower, upper);
+  }
+
+  late final _flutterxel_core_clamp_f64Ptr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Double Function(ffi.Double, ffi.Double, ffi.Double)
+        >
+      >('flutterxel_core_clamp_f64');
+  late final _flutterxel_core_clamp_f64 = _flutterxel_core_clamp_f64Ptr
+      .asFunction<double Function(double, double, double)>();
+
+  int flutterxel_core_sgn_i64(int x) {
+    return _flutterxel_core_sgn_i64(x);
+  }
+
+  late final _flutterxel_core_sgn_i64Ptr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Int64)>>(
+        'flutterxel_core_sgn_i64',
+      );
+  late final _flutterxel_core_sgn_i64 = _flutterxel_core_sgn_i64Ptr
+      .asFunction<int Function(int)>();
+
+  double flutterxel_core_sgn_f64(double x) {
+    return _flutterxel_core_sgn_f64(x);
+  }
+
+  late final _flutterxel_core_sgn_f64Ptr =
+      _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Double)>>(
+        'flutterxel_core_sgn_f64',
+      );
+  late final _flutterxel_core_sgn_f64 = _flutterxel_core_sgn_f64Ptr
+      .asFunction<double Function(double)>();
+
+  double flutterxel_core_sqrt(double x) {
+    return _flutterxel_core_sqrt(x);
+  }
+
+  late final _flutterxel_core_sqrtPtr =
+      _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Double)>>(
+        'flutterxel_core_sqrt',
+      );
+  late final _flutterxel_core_sqrt = _flutterxel_core_sqrtPtr
+      .asFunction<double Function(double)>();
+
+  double flutterxel_core_sin(double deg) {
+    return _flutterxel_core_sin(deg);
+  }
+
+  late final _flutterxel_core_sinPtr =
+      _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Double)>>(
+        'flutterxel_core_sin',
+      );
+  late final _flutterxel_core_sin = _flutterxel_core_sinPtr
+      .asFunction<double Function(double)>();
+
+  double flutterxel_core_cos(double deg) {
+    return _flutterxel_core_cos(deg);
+  }
+
+  late final _flutterxel_core_cosPtr =
+      _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Double)>>(
+        'flutterxel_core_cos',
+      );
+  late final _flutterxel_core_cos = _flutterxel_core_cosPtr
+      .asFunction<double Function(double)>();
+
+  double flutterxel_core_atan2(double y, double x) {
+    return _flutterxel_core_atan2(y, x);
+  }
+
+  late final _flutterxel_core_atan2Ptr =
+      _lookup<ffi.NativeFunction<ffi.Double Function(ffi.Double, ffi.Double)>>(
+        'flutterxel_core_atan2',
+      );
+  late final _flutterxel_core_atan2 = _flutterxel_core_atan2Ptr
+      .asFunction<double Function(double, double)>();
+
   bool flutterxel_core_load(
     ffi.Pointer<ffi.Char> filename,
     int exclude_images,

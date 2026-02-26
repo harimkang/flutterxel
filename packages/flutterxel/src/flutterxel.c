@@ -21,6 +21,7 @@
 #define MOUSE_KEY_START_INDEX 0x50000100
 #define MOUSE_POS_X MOUSE_KEY_START_INDEX
 #define MOUSE_POS_Y (MOUSE_KEY_START_INDEX + 1)
+#define PI_D 3.14159265358979323846
 
 typedef struct FlutterxelState {
   bool initialized;
@@ -1403,6 +1404,100 @@ FFI_PLUGIN_EXPORT double flutterxel_core_noise(double x, double y, double z) {
     return 0.0;
   }
   return sample_noise(g_state.noise_seed, x, y, z);
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_ceil(double x) {
+  if (isnan(x)) {
+    return 0;
+  }
+  double value = ceil(x);
+  if (value > (double)INT32_MAX) {
+    return INT32_MAX;
+  }
+  if (value < (double)INT32_MIN) {
+    return INT32_MIN;
+  }
+  return (int32_t)value;
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_floor(double x) {
+  if (isnan(x)) {
+    return 0;
+  }
+  double value = floor(x);
+  if (value > (double)INT32_MAX) {
+    return INT32_MAX;
+  }
+  if (value < (double)INT32_MIN) {
+    return INT32_MIN;
+  }
+  return (int32_t)value;
+}
+
+FFI_PLUGIN_EXPORT int64_t flutterxel_core_clamp_i64(
+    int64_t x,
+    int64_t lower,
+    int64_t upper) {
+  int64_t lo = lower <= upper ? lower : upper;
+  int64_t hi = lower <= upper ? upper : lower;
+  if (x < lo) {
+    return lo;
+  }
+  if (x > hi) {
+    return hi;
+  }
+  return x;
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_clamp_f64(
+    double x,
+    double lower,
+    double upper) {
+  double lo = lower <= upper ? lower : upper;
+  double hi = lower <= upper ? upper : lower;
+  if (x < lo) {
+    return lo;
+  }
+  if (x > hi) {
+    return hi;
+  }
+  return x;
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_sgn_i64(int64_t x) {
+  if (x > 0) {
+    return 1;
+  }
+  if (x < 0) {
+    return -1;
+  }
+  return 0;
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_sgn_f64(double x) {
+  if (x > 0.0) {
+    return 1.0;
+  }
+  if (x < 0.0) {
+    return -1.0;
+  }
+  return 0.0;
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_sqrt(double x) {
+  return sqrt(x);
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_sin(double deg) {
+  return sin(deg * PI_D / 180.0);
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_cos(double deg) {
+  return cos(deg * PI_D / 180.0);
+}
+
+FFI_PLUGIN_EXPORT double flutterxel_core_atan2(double y, double x) {
+  return atan2(y, x) * 180.0 / PI_D;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(

@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/show/flip/quit/reset/title/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise API surface',
+    'exposes init/run/show/flip/quit/reset/title/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -56,6 +56,14 @@ void main() {
       expect(flutterxel.rndf, isA<Function>());
       expect(flutterxel.nseed, isA<Function>());
       expect(flutterxel.noise, isA<Function>());
+      expect(flutterxel.ceil, isA<Function>());
+      expect(flutterxel.floor, isA<Function>());
+      expect(flutterxel.clamp, isA<Function>());
+      expect(flutterxel.sgn, isA<Function>());
+      expect(flutterxel.sqrt, isA<Function>());
+      expect(flutterxel.sin, isA<Function>());
+      expect(flutterxel.cos, isA<Function>());
+      expect(flutterxel.atan2, isA<Function>());
     },
   );
 
@@ -387,6 +395,25 @@ void main() {
     expect(value2, value1);
     expect(value3, value1);
     expect(value1, inInclusiveRange(-1.0, 1.0));
+  });
+
+  test('math helpers follow Pyxel-compatible numeric behavior', () {
+    expect(flutterxel.ceil(1.2), 2);
+    expect(flutterxel.floor(-1.2), -2);
+
+    expect(flutterxel.clamp(10, 0, 5), 5);
+    expect(flutterxel.clamp(10, 5, 0), 5);
+    expect(flutterxel.clamp(0.25, 0.5, -0.5), 0.25);
+
+    expect(flutterxel.sgn(-12), -1);
+    expect(flutterxel.sgn(0), 0);
+    expect(flutterxel.sgn(9), 1);
+    expect(flutterxel.sgn(-0.1), -1.0);
+
+    expect(flutterxel.sqrt(9), 3);
+    expect(flutterxel.sin(30), closeTo(0.5, 1e-9));
+    expect(flutterxel.cos(60), closeTo(0.5, 1e-9));
+    expect(flutterxel.atan2(1, 0), closeTo(90.0, 1e-9));
   });
 
   test('show advances frame and title accepts runtime title update', () {

@@ -54,6 +54,16 @@ SYMBOLS=(
   flutterxel_core_rndf
   flutterxel_core_nseed
   flutterxel_core_noise
+  flutterxel_core_ceil
+  flutterxel_core_floor
+  flutterxel_core_clamp_i64
+  flutterxel_core_clamp_f64
+  flutterxel_core_sgn_i64
+  flutterxel_core_sgn_f64
+  flutterxel_core_sqrt
+  flutterxel_core_sin
+  flutterxel_core_cos
+  flutterxel_core_atan2
   flutterxel_core_load
   flutterxel_core_save
   flutterxel_core_frame_count

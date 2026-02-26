@@ -237,6 +237,30 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_nseed(int32_t seed);
 FLUTTERXEL_CORE_EXPORT double flutterxel_core_noise(double x,
                                                     double y,
                                                     double z);
+// pyxel.ceil(x)
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_ceil(double x);
+// pyxel.floor(x)
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_floor(double x);
+// pyxel.clamp(x, lower, upper) for int values
+FLUTTERXEL_CORE_EXPORT int64_t flutterxel_core_clamp_i64(int64_t x,
+                                                         int64_t lower,
+                                                         int64_t upper);
+// pyxel.clamp(x, lower, upper) for float values
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_clamp_f64(double x,
+                                                        double lower,
+                                                        double upper);
+// pyxel.sgn(x) for int values
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_sgn_i64(int64_t x);
+// pyxel.sgn(x) for float values
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_sgn_f64(double x);
+// pyxel.sqrt(x)
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_sqrt(double x);
+// pyxel.sin(deg)
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_sin(double deg);
+// pyxel.cos(deg)
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_cos(double deg);
+// pyxel.atan2(y, x)
+FLUTTERXEL_CORE_EXPORT double flutterxel_core_atan2(double y, double x);
 
 // pyxel.load(filename, *, exclude_images=None, exclude_tilemaps=None,
 //            exclude_sounds=None, exclude_musics=None)

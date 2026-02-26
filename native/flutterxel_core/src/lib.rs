@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::f64::consts::PI;
 use std::ffi::CStr;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -2420,6 +2421,78 @@ pub extern "C" fn flutterxel_core_noise(x: f64, y: f64, z: f64) -> f64 {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_ceil(x: f64) -> i32 {
+    x.ceil() as i32
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_floor(x: f64) -> i32 {
+    x.floor() as i32
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_clamp_i64(x: i64, lower: i64, upper: i64) -> i64 {
+    let (lo, hi) = if lower <= upper {
+        (lower, upper)
+    } else {
+        (upper, lower)
+    };
+    x.clamp(lo, hi)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_clamp_f64(x: f64, lower: f64, upper: f64) -> f64 {
+    let (lo, hi) = if lower <= upper {
+        (lower, upper)
+    } else {
+        (upper, lower)
+    };
+    x.clamp(lo, hi)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sgn_i64(x: i64) -> i32 {
+    if x > 0 {
+        1
+    } else if x < 0 {
+        -1
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sgn_f64(x: f64) -> f64 {
+    if x > 0.0 {
+        1.0
+    } else if x < 0.0 {
+        -1.0
+    } else {
+        0.0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sqrt(x: f64) -> f64 {
+    x.sqrt()
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_sin(deg: f64) -> f64 {
+    (deg * PI / 180.0).sin()
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_cos(deg: f64) -> f64 {
+    (deg * PI / 180.0).cos()
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_atan2(y: f64, x: f64) -> f64 {
+    y.atan2(x) * 180.0 / PI
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_load(
     filename: *const c_char,
     exclude_images: i8,
@@ -3592,6 +3665,27 @@ mod tests {
         let value3 = flutterxel_core_noise(0.25, 0.5, 0.75);
         assert_eq!(value1, value3);
         assert!((-1.0..=1.0).contains(&value1));
+    }
+
+    #[test]
+    fn math_api_matches_pyxel_numeric_behavior() {
+        let _guard = test_lock();
+        assert_eq!(flutterxel_core_ceil(1.2), 2);
+        assert_eq!(flutterxel_core_floor(-1.2), -2);
+
+        assert_eq!(flutterxel_core_clamp_i64(10, 0, 5), 5);
+        assert_eq!(flutterxel_core_clamp_i64(10, 5, 0), 5);
+        assert_eq!(flutterxel_core_clamp_f64(0.25, 0.5, -0.5), 0.25);
+
+        assert_eq!(flutterxel_core_sgn_i64(-12), -1);
+        assert_eq!(flutterxel_core_sgn_i64(0), 0);
+        assert_eq!(flutterxel_core_sgn_i64(9), 1);
+        assert_eq!(flutterxel_core_sgn_f64(-0.1), -1.0);
+
+        assert_eq!(flutterxel_core_sqrt(9.0), 3.0);
+        assert!((flutterxel_core_sin(30.0) - 0.5).abs() < 1e-12);
+        assert!((flutterxel_core_cos(60.0) - 0.5).abs() < 1e-12);
+        assert!((flutterxel_core_atan2(1.0, 0.0) - 90.0).abs() < 1e-12);
     }
 
     #[test]

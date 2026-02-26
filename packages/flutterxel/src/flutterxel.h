@@ -181,6 +181,20 @@ FFI_PLUGIN_EXPORT int32_t flutterxel_core_rndi(int32_t a, int32_t b);
 FFI_PLUGIN_EXPORT double flutterxel_core_rndf(double a, double b);
 FFI_PLUGIN_EXPORT bool flutterxel_core_nseed(int32_t seed);
 FFI_PLUGIN_EXPORT double flutterxel_core_noise(double x, double y, double z);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_ceil(double x);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_floor(double x);
+FFI_PLUGIN_EXPORT int64_t flutterxel_core_clamp_i64(int64_t x,
+                                                     int64_t lower,
+                                                     int64_t upper);
+FFI_PLUGIN_EXPORT double flutterxel_core_clamp_f64(double x,
+                                                    double lower,
+                                                    double upper);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_sgn_i64(int64_t x);
+FFI_PLUGIN_EXPORT double flutterxel_core_sgn_f64(double x);
+FFI_PLUGIN_EXPORT double flutterxel_core_sqrt(double x);
+FFI_PLUGIN_EXPORT double flutterxel_core_sin(double deg);
+FFI_PLUGIN_EXPORT double flutterxel_core_cos(double deg);
+FFI_PLUGIN_EXPORT double flutterxel_core_atan2(double y, double x);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(
     const char* filename,
