@@ -219,6 +219,36 @@ void main() {
     expect(channel0.play_pos(), isNull);
   });
 
+  test('graphics resources expose Image/Tilemap-style API', () {
+    flutterxel.init(8, 8);
+
+    expect(flutterxel.colors.length, flutterxel.NUM_COLORS);
+    expect(flutterxel.images.length, flutterxel.NUM_IMAGES);
+    expect(flutterxel.tilemaps.length, flutterxel.NUM_TILEMAPS);
+    expect(flutterxel.screen, isA<flutterxel.Image>());
+    expect(flutterxel.cursor, isA<flutterxel.Image>());
+    expect(flutterxel.font, isA<flutterxel.Image>());
+
+    final image0 = flutterxel.images.first;
+    expect(image0.width, flutterxel.IMAGE_SIZE);
+    expect(image0.height, flutterxel.IMAGE_SIZE);
+
+    image0.cls(1);
+    image0.pset(0, 0, 2);
+    expect(image0.pget(0, 0), 2);
+
+    final tilemap0 = flutterxel.tilemaps.first;
+    tilemap0.cls((0, 0));
+    tilemap0.pset(0, 0, (1, 2));
+    expect(tilemap0.pget(0, 0), (1, 2));
+
+    flutterxel.screen.cls(0);
+    flutterxel.screen.pset(1, 1, 3);
+    expect(flutterxel.pget(1, 1), 3);
+    flutterxel.blt(0, 0, image0, 0, 0, 1, 1);
+    flutterxel.bltm(0, 0, tilemap0, 0, 0, 1, 1);
+  });
+
   test('flip advances frame and clears transient wheel values', () {
     flutterxel.init(8, 8);
 

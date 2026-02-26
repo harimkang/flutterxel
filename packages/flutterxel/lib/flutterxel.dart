@@ -1,6 +1,7 @@
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:math' as math;
@@ -29,17 +30,17 @@ const int _fallbackRngMask64 = 0xFFFFFFFFFFFFFFFF;
 const int _fallbackNoiseDefaultSeed = 0;
 
 class _FallbackTilemap {
-  const _FallbackTilemap({
+  _FallbackTilemap({
     required this.width,
     required this.height,
     required this.imgsrc,
     required this.data,
   });
 
-  final int width;
-  final int height;
-  final int imgsrc;
-  final List<int> data;
+  int width;
+  int height;
+  int imgsrc;
+  List<int> data;
 }
 
 final Map<LogicalKeyboardKey, int> _defaultKeyboardMapping =
@@ -95,7 +96,7 @@ List<int> _fallbackPaletteMap = List<int>.generate(
   NUM_COLORS,
   (index) => index,
 );
-int _fallbackImageBankSize = 16;
+int _fallbackImageBankSize = IMAGE_SIZE;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
 final Map<int, _FallbackTilemap> _fallbackTilemaps = <int, _FallbackTilemap>{};
 int _fallbackRngState = _fallbackRngDefaultState;
@@ -302,8 +303,88 @@ bool _fallbackEllipseContains(int px, int py, int w, int h) {
   return lhs <= rhs;
 }
 
+List<int> _fallbackEnsureImageBank(int imageId) {
+  final size = _fallbackImageBankSize;
+  final expected = size * size;
+  final existing = _fallbackImageBanks[imageId];
+  if (existing != null && existing.length == expected) {
+    return existing;
+  }
+  final created = List<int>.filled(expected, 0, growable: false);
+  _fallbackImageBanks[imageId] = created;
+  return created;
+}
+
+int _fallbackImageBankPixelIndex(int x, int y) {
+  if (x < 0 ||
+      y < 0 ||
+      x >= _fallbackImageBankSize ||
+      y >= _fallbackImageBankSize) {
+    return -1;
+  }
+  return y * _fallbackImageBankSize + x;
+}
+
+void _fallbackSetImagePixel(int imageId, int x, int y, int col) {
+  final index = _fallbackImageBankPixelIndex(x, y);
+  if (index < 0) {
+    return;
+  }
+  final bank = _fallbackEnsureImageBank(imageId);
+  bank[index] = col;
+}
+
+int _fallbackGetImagePixel(int imageId, int x, int y) {
+  final index = _fallbackImageBankPixelIndex(x, y);
+  if (index < 0) {
+    return 0;
+  }
+  final bank = _fallbackEnsureImageBank(imageId);
+  return bank[index];
+}
+
+_FallbackTilemap _fallbackEnsureTilemap(int tilemapId) {
+  final existing = _fallbackTilemaps[tilemapId];
+  if (existing != null) {
+    return existing;
+  }
+  final created = _FallbackTilemap(
+    width: TILEMAP_SIZE,
+    height: TILEMAP_SIZE,
+    imgsrc: 0,
+    data: List<int>.filled(TILEMAP_SIZE * TILEMAP_SIZE * 2, 0, growable: false),
+  );
+  _fallbackTilemaps[tilemapId] = created;
+  return created;
+}
+
+void _fallbackSetTile(int tilemapId, int x, int y, int tileX, int tileY) {
+  final tilemap = _fallbackEnsureTilemap(tilemapId);
+  if (x < 0 || y < 0 || x >= tilemap.width || y >= tilemap.height) {
+    return;
+  }
+  final pairIndex = (y * tilemap.width + x) * 2;
+  if (pairIndex + 1 >= tilemap.data.length) {
+    return;
+  }
+  tilemap.data[pairIndex] = tileX;
+  tilemap.data[pairIndex + 1] = tileY;
+}
+
+(int, int) _fallbackGetTile(int tilemapId, int x, int y) {
+  final tilemap = _fallbackEnsureTilemap(tilemapId);
+  if (x < 0 || y < 0 || x >= tilemap.width || y >= tilemap.height) {
+    return (0, 0);
+  }
+  final pairIndex = (y * tilemap.width + x) * 2;
+  if (pairIndex + 1 >= tilemap.data.length) {
+    return (0, 0);
+  }
+  return (tilemap.data[pairIndex], tilemap.data[pairIndex + 1]);
+}
+
 void _seedFallbackResources() {
-  _fallbackImageBankSize = 16;
+  _fallbackImageBankSize = IMAGE_SIZE;
   final bankSize = _fallbackImageBankSize;
   final bank = List<int>.filled(bankSize * bankSize, 0, growable: false);
   for (var y = 0; y < bankSize; y++) {
@@ -316,12 +397,7 @@ void _seedFallbackResources() {
     ..[0] = bank;
   _fallbackTilemaps
     ..clear()
-    ..[0] = const _FallbackTilemap(
-      width: 1,
-      height: 1,
-      imgsrc: 0,
-      data: <int>[0, 0],
-    );
+    ..[0] = _FallbackTilemap(width: 1, height: 1, imgsrc: 0, data: <int>[0, 0]);
 }
 
 /// Pyxel-compatible 1st-scope initialization API.
@@ -451,7 +527,7 @@ void _clearLocalRuntimeState() {
   _fallbackScreenMode = 0;
   _fallbackFullscreenEnabled = false;
   _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
-  _fallbackImageBankSize = 16;
+  _fallbackImageBankSize = IMAGE_SIZE;
   _fallbackImageBanks.clear();
   _fallbackTilemaps.clear();
   _fallbackRngState = _fallbackRngDefaultState;
@@ -1418,25 +1494,83 @@ void _fallbackDrawBltm(
   }
 }
 
-/// Pyxel-compatible bltm API.
-void bltm(
+void _fallbackDrawBlt(
   double x,
   double y,
-  int tm,
+  int img,
   double u,
   double v,
   double w,
   double h, {
   int? colkey,
 }) {
+  final sourceBank = _fallbackImageBanks[img] ?? _fallbackEnsureImageBank(img);
+  if (_fallbackImageBankSize <= 0) {
+    return;
+  }
+
+  final drawW = w.abs().round().toInt();
+  final drawH = h.abs().round().toInt();
+  if (drawW <= 0 || drawH <= 0) {
+    return;
+  }
+  final flipX = w < 0;
+  final flipY = h < 0;
+  final srcBaseX = u.round();
+  final srcBaseY = v.round();
+  final dstBaseX = x.round();
+  final dstBaseY = y.round();
+
+  for (var dy = 0; dy < drawH; dy++) {
+    for (var dx = 0; dx < drawW; dx++) {
+      final sx = srcBaseX + (flipX ? (drawW - 1 - dx) : dx);
+      final sy = srcBaseY + (flipY ? (drawH - 1 - dy) : dy);
+      final sourceIndex = _fallbackImageBankPixelIndex(sx, sy);
+      if (sourceIndex < 0) {
+        continue;
+      }
+
+      final color = sourceBank[sourceIndex];
+      if (colkey != null && color == colkey) {
+        continue;
+      }
+      _fallbackSetPixel(dstBaseX + dx, dstBaseY + dy, color);
+    }
+  }
+}
+
+/// Pyxel-compatible bltm API.
+void bltm(
+  double x,
+  double y,
+  Object tm,
+  double u,
+  double v,
+  double w,
+  double h, {
+  int? colkey,
+  double? rotate,
+  double? scale,
+}) {
   _ensureInitialized('bltm');
+
+  final tilemapId = switch (tm) {
+    int value => value,
+    Tilemap value => value._resourceTilemapId(),
+    _ => null,
+  };
+  if (tilemapId == null) {
+    throw UnsupportedError(
+      'bltm tm currently supports int id or resource Tilemap.',
+    );
+  }
 
   final bindings = _getBindingsOrNull();
   final ok =
       bindings?.flutterxel_core_bltm(
         x,
         y,
-        tm,
+        tilemapId,
         u,
         v,
         w,
@@ -1449,7 +1583,7 @@ void bltm(
   }
 
   if (bindings == null) {
-    _fallbackDrawBltm(x, y, tm, u, v, w, h, colkey: colkey);
+    _fallbackDrawBltm(x, y, tilemapId, u, v, w, h, colkey: colkey);
   }
 }
 
@@ -1470,8 +1604,14 @@ void blt(
 
   final imageId = switch (img) {
     int value => value,
-    _ => throw UnsupportedError('blt img currently supports only int id.'),
+    Image value => value._resourceImageId(),
+    _ => null,
   };
+  if (imageId == null) {
+    throw UnsupportedError(
+      'blt img currently supports int id or resource Image.',
+    );
+  }
 
   final bindings = _getBindingsOrNull();
   final ok =
@@ -1491,6 +1631,10 @@ void blt(
 
   if (!ok) {
     throw StateError('flutterxel_core_blt failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackDrawBlt(x, y, imageId, u, v, w, h, colkey: colkey);
   }
 }
 
@@ -2100,6 +2244,665 @@ List<int> frameBufferSnapshot() {
 
   return ptr.asTypedList(len).toList(growable: false);
 }
+
+class Seq<T> extends ListBase<T> {
+  Seq.proxy(this._source);
+
+  final List<T> Function() _source;
+
+  List<T> get _list => _source();
+
+  @override
+  int get length => _list.length;
+
+  @override
+  set length(int newLength) {
+    _list.length = newLength;
+  }
+
+  @override
+  T operator [](int index) => _list[index];
+
+  @override
+  void operator []=(int index, T value) {
+    _list[index] = value;
+  }
+
+  void append(T value) => add(value);
+
+  void extend(List<T> values) => addAll(values);
+
+  T pop([int? index]) {
+    if (index == null) {
+      return removeLast();
+    }
+    return removeAt(index);
+  }
+}
+
+class Font {
+  Font(this.filename, {double? font_size}) : fontSize = font_size;
+
+  final String filename;
+  final double? fontSize;
+
+  int text_width(String s) => textWidth(s);
+
+  int textWidth(String s) {
+    var maxChars = 0;
+    for (final line in s.split('\n')) {
+      if (line.length > maxChars) {
+        maxChars = line.length;
+      }
+    }
+    return maxChars * FONT_WIDTH;
+  }
+}
+
+int _runtimeWidth() => width;
+int _runtimeHeight() => height;
+
+void _screenClip(num? x, num? y, num? w, num? h) {
+  clip(x?.round(), y?.round(), w?.round(), h?.round());
+}
+
+void _screenCamera(num? x, num? y) {
+  camera((x ?? 0).round(), (y ?? 0).round());
+}
+
+void _screenPal(int? col1, int? col2) {
+  pal(col1, col2);
+}
+
+void _screenDither(double alpha) {
+  dither(alpha);
+}
+
+void _screenCls(int col) {
+  cls(col);
+}
+
+int _screenPget(num x, num y) {
+  return pget(x.round(), y.round());
+}
+
+void _screenPset(num x, num y, int col) {
+  pset(x.round(), y.round(), col);
+}
+
+void _screenLine(num x1, num y1, num x2, num y2, int col) {
+  line(x1.round(), y1.round(), x2.round(), y2.round(), col);
+}
+
+void _screenRect(num x, num y, num w, num h, int col) {
+  rect(x.round(), y.round(), w.round(), h.round(), col);
+}
+
+void _screenRectb(num x, num y, num w, num h, int col) {
+  rectb(x.round(), y.round(), w.round(), h.round(), col);
+}
+
+void _screenCirc(num x, num y, num r, int col) {
+  circ(x.round(), y.round(), r.round(), col);
+}
+
+void _screenCircb(num x, num y, num r, int col) {
+  circb(x.round(), y.round(), r.round(), col);
+}
+
+void _screenElli(num x, num y, num w, num h, int col) {
+  elli(x.round(), y.round(), w.round(), h.round(), col);
+}
+
+void _screenEllib(num x, num y, num w, num h, int col) {
+  ellib(x.round(), y.round(), w.round(), h.round(), col);
+}
+
+void _screenTri(num x1, num y1, num x2, num y2, num x3, num y3, int col) {
+  tri(
+    x1.round(),
+    y1.round(),
+    x2.round(),
+    y2.round(),
+    x3.round(),
+    y3.round(),
+    col,
+  );
+}
+
+void _screenTrib(num x1, num y1, num x2, num y2, num x3, num y3, int col) {
+  trib(
+    x1.round(),
+    y1.round(),
+    x2.round(),
+    y2.round(),
+    x3.round(),
+    y3.round(),
+    col,
+  );
+}
+
+void _screenFill(num x, num y, int col) {
+  fill(x.round(), y.round(), col);
+}
+
+void _screenBlt(
+  num x,
+  num y,
+  Object img,
+  num u,
+  num v,
+  num w,
+  num h, {
+  int? colkey,
+  double? rotate,
+  double? scale,
+}) {
+  blt(
+    x.toDouble(),
+    y.toDouble(),
+    img,
+    u.toDouble(),
+    v.toDouble(),
+    w.toDouble(),
+    h.toDouble(),
+    colkey: colkey,
+    rotate: rotate,
+    scale: scale,
+  );
+}
+
+void _screenBltm(
+  num x,
+  num y,
+  Object tm,
+  num u,
+  num v,
+  num w,
+  num h, {
+  int? colkey,
+  double? rotate,
+  double? scale,
+}) {
+  bltm(
+    x.toDouble(),
+    y.toDouble(),
+    tm,
+    u.toDouble(),
+    v.toDouble(),
+    w.toDouble(),
+    h.toDouble(),
+    colkey: colkey,
+    rotate: rotate,
+    scale: scale,
+  );
+}
+
+void _screenText(num x, num y, String s, int col) {
+  text(x.round(), y.round(), s, col);
+}
+
+class Image {
+  Image(int width, int height)
+    : _imageId = null,
+      _isScreen = false,
+      _width = width,
+      _height = height,
+      _pixels = List<int>.filled(width * height, 0, growable: false);
+
+  Image._resource(int imageId)
+    : _imageId = imageId,
+      _isScreen = false,
+      _width = IMAGE_SIZE,
+      _height = IMAGE_SIZE,
+      _pixels = null;
+
+  Image._screen()
+    : _imageId = null,
+      _isScreen = true,
+      _width = 0,
+      _height = 0,
+      _pixels = null;
+
+  final int _width;
+  final int _height;
+  final int? _imageId;
+  final bool _isScreen;
+  final List<int>? _pixels;
+
+  int get width => _isScreen ? _runtimeWidth() : _width;
+  int get height => _isScreen ? _runtimeHeight() : _height;
+
+  static Image from_image(String filename, {bool? include_colors}) {
+    return fromImage(filename, includeColors: include_colors);
+  }
+
+  static Image fromImage(String filename, {bool? includeColors}) {
+    final image = Image(IMAGE_SIZE, IMAGE_SIZE);
+    image.load(0, 0, filename, include_colors: includeColors);
+    return image;
+  }
+
+  int? _resourceImageId() => _imageId;
+
+  ffi.Pointer<ffi.Void> data_ptr() => ffi.nullptr.cast<ffi.Void>();
+
+  int _resolveX(num x) => x.round();
+  int _resolveY(num y) => y.round();
+
+  void _setLocalPixel(int x, int y, int col) {
+    if (_imageId != null) {
+      _fallbackSetImagePixel(_imageId, x, y, col);
+      return;
+    }
+    final pixels = _pixels;
+    if (pixels == null) {
+      return;
+    }
+    if (x < 0 || y < 0 || x >= _width || y >= _height) {
+      return;
+    }
+    pixels[y * _width + x] = col;
+  }
+
+  int _getLocalPixel(int x, int y) {
+    if (_imageId != null) {
+      return _fallbackGetImagePixel(_imageId, x, y);
+    }
+    final pixels = _pixels;
+    if (pixels == null) {
+      return 0;
+    }
+    if (x < 0 || y < 0 || x >= _width || y >= _height) {
+      return 0;
+    }
+    return pixels[y * _width + x];
+  }
+
+  void set(int x, int y, List<String> data) {
+    for (var row = 0; row < data.length; row++) {
+      final line = data[row];
+      for (var col = 0; col < line.length; col++) {
+        final ch = line[col];
+        final parsed = int.tryParse(ch, radix: 16);
+        if (parsed != null) {
+          _setLocalPixel(x + col, y + row, parsed);
+        }
+      }
+    }
+  }
+
+  void load(int x, int y, String filename, {bool? include_colors}) {
+    final file = File(filename);
+    if (!file.existsSync()) {
+      return;
+    }
+    final lines = file.readAsLinesSync();
+    set(x, y, lines);
+  }
+
+  void save(String filename, int scale) {
+    final output = StringBuffer();
+    final h = height;
+    final w = width;
+    final maxRows = math.min(h, 32);
+    final maxCols = math.min(w, 64);
+    for (var y = 0; y < maxRows; y++) {
+      for (var x = 0; x < maxCols; x++) {
+        output.write(_getLocalPixel(x, y).toRadixString(16));
+      }
+      output.writeln();
+    }
+    File(filename).writeAsStringSync(output.toString());
+  }
+
+  void clip([num? x, num? y, num? w, num? h]) {
+    if (_isScreen) {
+      _screenClip(x, y, w, h);
+    }
+  }
+
+  void camera([num? x, num? y]) {
+    if (_isScreen) {
+      _screenCamera(x, y);
+    }
+  }
+
+  void pal([int? col1, int? col2]) {
+    if (_isScreen) {
+      _screenPal(col1, col2);
+    }
+  }
+
+  void dither(double alpha) {
+    if (_isScreen) {
+      _screenDither(alpha);
+    }
+  }
+
+  void cls(int col) {
+    if (_isScreen) {
+      _screenCls(col);
+      return;
+    }
+    if (_imageId != null) {
+      final bank = _fallbackEnsureImageBank(_imageId);
+      for (var i = 0; i < bank.length; i++) {
+        bank[i] = col;
+      }
+      return;
+    }
+    final pixels = _pixels;
+    if (pixels == null) {
+      return;
+    }
+    for (var i = 0; i < pixels.length; i++) {
+      pixels[i] = col;
+    }
+  }
+
+  int pget(num x, num y) {
+    if (_isScreen) {
+      return _screenPget(x, y);
+    }
+    return _getLocalPixel(_resolveX(x), _resolveY(y));
+  }
+
+  void pset(num x, num y, int col) {
+    if (_isScreen) {
+      _screenPset(x, y, col);
+      return;
+    }
+    _setLocalPixel(_resolveX(x), _resolveY(y), col);
+  }
+
+  void line(num x1, num y1, num x2, num y2, int col) {
+    if (_isScreen) {
+      _screenLine(x1, y1, x2, y2, col);
+    }
+  }
+
+  void rect(num x, num y, num w, num h, int col) {
+    if (_isScreen) {
+      _screenRect(x, y, w, h, col);
+    }
+  }
+
+  void rectb(num x, num y, num w, num h, int col) {
+    if (_isScreen) {
+      _screenRectb(x, y, w, h, col);
+    }
+  }
+
+  void circ(num x, num y, num r, int col) {
+    if (_isScreen) {
+      _screenCirc(x, y, r, col);
+    }
+  }
+
+  void circb(num x, num y, num r, int col) {
+    if (_isScreen) {
+      _screenCircb(x, y, r, col);
+    }
+  }
+
+  void elli(num x, num y, num w, num h, int col) {
+    if (_isScreen) {
+      _screenElli(x, y, w, h, col);
+    }
+  }
+
+  void ellib(num x, num y, num w, num h, int col) {
+    if (_isScreen) {
+      _screenEllib(x, y, w, h, col);
+    }
+  }
+
+  void tri(num x1, num y1, num x2, num y2, num x3, num y3, int col) {
+    if (_isScreen) {
+      _screenTri(x1, y1, x2, y2, x3, y3, col);
+    }
+  }
+
+  void trib(num x1, num y1, num x2, num y2, num x3, num y3, int col) {
+    if (_isScreen) {
+      _screenTrib(x1, y1, x2, y2, x3, y3, col);
+    }
+  }
+
+  void fill(num x, num y, int col) {
+    if (_isScreen) {
+      _screenFill(x, y, col);
+    }
+  }
+
+  void blt(
+    num x,
+    num y,
+    Object img,
+    num u,
+    num v,
+    num w,
+    num h, {
+    int? colkey,
+    double? rotate,
+    double? scale,
+  }) {
+    if (_isScreen) {
+      _screenBlt(
+        x,
+        y,
+        img,
+        u,
+        v,
+        w,
+        h,
+        colkey: colkey,
+        rotate: rotate,
+        scale: scale,
+      );
+    }
+  }
+
+  void bltm(
+    num x,
+    num y,
+    Object tm,
+    num u,
+    num v,
+    num w,
+    num h, {
+    int? colkey,
+    double? rotate,
+    double? scale,
+  }) {
+    if (_isScreen) {
+      _screenBltm(
+        x,
+        y,
+        tm,
+        u,
+        v,
+        w,
+        h,
+        colkey: colkey,
+        rotate: rotate,
+        scale: scale,
+      );
+    }
+  }
+
+  void text(num x, num y, String s, int col, [Font? font]) {
+    if (_isScreen) {
+      _screenText(x, y, s, col);
+    }
+  }
+}
+
+class Tilemap {
+  Tilemap(this.width, this.height, this.imgsrc)
+    : _tilemapId = null,
+      _detachedData = List<int>.filled(width * height * 2, 0, growable: false);
+
+  Tilemap._resource(int tilemapId)
+    : width = TILEMAP_SIZE,
+      height = TILEMAP_SIZE,
+      imgsrc = 0,
+      _tilemapId = tilemapId,
+      _detachedData = null;
+
+  final int width;
+  final int height;
+  Object imgsrc;
+  final int? _tilemapId;
+  final List<int>? _detachedData;
+
+  int? _resourceTilemapId() => _tilemapId;
+
+  static Tilemap from_tmx(String filename, int layer) {
+    return fromTmx(filename, layer);
+  }
+
+  static Tilemap fromTmx(String filename, int layer) {
+    return Tilemap(TILEMAP_SIZE, TILEMAP_SIZE, 0);
+  }
+
+  ffi.Pointer<ffi.Void> data_ptr() => ffi.nullptr.cast<ffi.Void>();
+
+  void set(int x, int y, List<String> data) {
+    for (var row = 0; row < data.length; row++) {
+      final line = data[row];
+      final cells = line.split(' ');
+      for (var col = 0; col < cells.length; col++) {
+        final parts = cells[col].split(',');
+        if (parts.length < 2) {
+          continue;
+        }
+        final tx = int.tryParse(parts[0]) ?? 0;
+        final ty = int.tryParse(parts[1]) ?? 0;
+        pset(x + col, y + row, (tx, ty));
+      }
+    }
+  }
+
+  void load(int x, int y, String filename, int layer) {
+    final file = File(filename);
+    if (!file.existsSync()) {
+      return;
+    }
+    set(x, y, file.readAsLinesSync());
+  }
+
+  void clip([num? x, num? y, num? w, num? h]) {}
+
+  void camera([num? x, num? y]) {}
+
+  void cls((int, int) tile) {
+    if (_tilemapId != null) {
+      final tilemap = _fallbackEnsureTilemap(_tilemapId);
+      for (var y = 0; y < tilemap.height; y++) {
+        for (var x = 0; x < tilemap.width; x++) {
+          _fallbackSetTile(_tilemapId, x, y, tile.$1, tile.$2);
+        }
+      }
+      return;
+    }
+    final data = _detachedData;
+    if (data == null) {
+      return;
+    }
+    for (var i = 0; i < data.length ~/ 2; i++) {
+      data[i * 2] = tile.$1;
+      data[i * 2 + 1] = tile.$2;
+    }
+  }
+
+  (int, int) pget(num x, num y) {
+    final xi = x.round();
+    final yi = y.round();
+    if (_tilemapId != null) {
+      return _fallbackGetTile(_tilemapId, xi, yi);
+    }
+    final data = _detachedData;
+    if (data == null || xi < 0 || yi < 0 || xi >= width || yi >= height) {
+      return (0, 0);
+    }
+    final pairIndex = (yi * width + xi) * 2;
+    if (pairIndex + 1 >= data.length) {
+      return (0, 0);
+    }
+    return (data[pairIndex], data[pairIndex + 1]);
+  }
+
+  void pset(num x, num y, (int, int) tile) {
+    final xi = x.round();
+    final yi = y.round();
+    if (_tilemapId != null) {
+      _fallbackSetTile(_tilemapId, xi, yi, tile.$1, tile.$2);
+      return;
+    }
+    final data = _detachedData;
+    if (data == null || xi < 0 || yi < 0 || xi >= width || yi >= height) {
+      return;
+    }
+    final pairIndex = (yi * width + xi) * 2;
+    if (pairIndex + 1 >= data.length) {
+      return;
+    }
+    data[pairIndex] = tile.$1;
+    data[pairIndex + 1] = tile.$2;
+  }
+
+  void line(num x1, num y1, num x2, num y2, (int, int) tile) {}
+  void rect(num x, num y, num w, num h, (int, int) tile) {}
+  void rectb(num x, num y, num w, num h, (int, int) tile) {}
+  void circ(num x, num y, num r, (int, int) tile) {}
+  void circb(num x, num y, num r, (int, int) tile) {}
+  void elli(num x, num y, num w, num h, (int, int) tile) {}
+  void ellib(num x, num y, num w, num h, (int, int) tile) {}
+  void tri(num x1, num y1, num x2, num y2, num x3, num y3, (int, int) tile) {}
+  void trib(num x1, num y1, num x2, num y2, num x3, num y3, (int, int) tile) {}
+  void fill(num x, num y, (int, int) tile) {}
+
+  (double, double) collide(
+    num x,
+    num y,
+    num w,
+    num h,
+    num dx,
+    num dy,
+    List<(int, int)> walls,
+  ) {
+    return (dx.toDouble(), dy.toDouble());
+  }
+
+  void blt(
+    num x,
+    num y,
+    Object tm,
+    num u,
+    num v,
+    num w,
+    num h, {
+    (int, int)? tilekey,
+    double? rotate,
+    double? scale,
+  }) {}
+}
+
+final List<Image> _imageResources = List<Image>.unmodifiable(
+  List<Image>.generate(NUM_IMAGES, Image._resource, growable: false),
+);
+final List<Tilemap> _tilemapResources = List<Tilemap>.unmodifiable(
+  List<Tilemap>.generate(NUM_TILEMAPS, Tilemap._resource, growable: false),
+);
+
+final Seq<int> colors = Seq<int>.proxy(() => _fallbackPaletteMap);
+final Seq<Image> images = Seq<Image>.proxy(() => _imageResources);
+final Seq<Tilemap> tilemaps = Seq<Tilemap>.proxy(() => _tilemapResources);
+final Image screen = Image._screen();
+final Image cursor = Image(8, 8);
+final Image font = Image(FONT_WIDTH, FONT_HEIGHT);
 
 class Channel {
   Channel._(this._channelIndex);
