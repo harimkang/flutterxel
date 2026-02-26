@@ -3203,16 +3203,16 @@ class Tilemap {
 
   void set(int x, int y, List<String> data) {
     for (var row = 0; row < data.length; row++) {
-      final line = data[row];
-      final cells = line.split(' ');
-      for (var col = 0; col < cells.length; col++) {
-        final parts = cells[col].split(',');
-        if (parts.length < 2) {
+      final line = data[row].replaceAll(RegExp(r'\s+'), '').toLowerCase();
+      final numTiles = line.length ~/ 4;
+      for (var col = 0; col < numTiles; col++) {
+        final index = col * 4;
+        final chunk = line.substring(index, index + 4);
+        final tile = int.tryParse(chunk, radix: 16);
+        if (tile == null) {
           continue;
         }
-        final tx = int.tryParse(parts[0]) ?? 0;
-        final ty = int.tryParse(parts[1]) ?? 0;
-        pset(x + col, y + row, (tx, ty));
+        pset(x + col, y + row, ((tile >> 8) & 0xff, tile & 0xff));
       }
     }
   }

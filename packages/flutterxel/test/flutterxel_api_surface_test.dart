@@ -344,6 +344,20 @@ void main() {
     expect(tm.pget(0, 0), (1, 1));
   });
 
+  test('tilemap set parses pyxel-style 4-hex tile rows', () {
+    flutterxel.init(8, 8);
+    final tm = flutterxel.tilemaps[0];
+
+    tm.cls((0, 0));
+    tm.set(0, 0, ['0102 0A0B']);
+    expect(tm.pget(0, 0), (1, 2));
+    expect(tm.pget(1, 0), (10, 11));
+
+    tm.set(1, 1, [' 0C0D ', '\t0E0F']);
+    expect(tm.pget(1, 1), (12, 13));
+    expect(tm.pget(1, 2), (14, 15));
+  });
+
   test('detached image clip/camera and blt work on local buffers', () {
     flutterxel.init(8, 8);
 
