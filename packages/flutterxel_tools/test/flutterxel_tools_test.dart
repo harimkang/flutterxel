@@ -17,4 +17,10 @@ void main() {
       'run is scaffolded but not implemented yet.',
     );
   });
+
+  test('supports build-native command for rust core artifact workflow', () {
+    final parser = FlutterxelTools.buildParser();
+    final results = parser.parse(const ['build-native']);
+    expect(FlutterxelTools.dispatch(results), contains('build-native'));
+  });
 }

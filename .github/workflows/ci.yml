@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Bootstrap workspace
+        run: dart run melos bootstrap
+      - name: Analyze
+        run: dart run melos run analyze
+      - name: Test
+        run: dart run melos run test
+
+  rust-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust fmt check
+        run: cargo fmt --check
+        working-directory: native/flutterxel_core
+      - name: Rust tests
+        run: cargo test
+        working-directory: native/flutterxel_core
+
+  abi-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Bootstrap workspace
+        run: dart run melos bootstrap
+      - name: Regenerate ffigen bindings
+        run: dart run ffigen --config ffigen.yaml
+        working-directory: packages/flutterxel
+      - name: Check ABI contract symbols
+        run: ./packages/flutterxel/tool/check_abi_contract.sh

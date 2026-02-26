@@ -131,6 +131,40 @@ class FlutterxelBindings {
         )
       >();
 
+  int flutterxel_core_frame_count() {
+    return _flutterxel_core_frame_count();
+  }
+
+  late final _flutterxel_core_frame_countPtr =
+      _lookup<ffi.NativeFunction<ffi.Uint64 Function()>>(
+        'flutterxel_core_frame_count',
+      );
+  late final _flutterxel_core_frame_count = _flutterxel_core_frame_countPtr
+      .asFunction<int Function()>();
+
+  ffi.Pointer<ffi.Int32> flutterxel_core_framebuffer_ptr() {
+    return _flutterxel_core_framebuffer_ptr();
+  }
+
+  late final _flutterxel_core_framebuffer_ptrPtr =
+      _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Int32> Function()>>(
+        'flutterxel_core_framebuffer_ptr',
+      );
+  late final _flutterxel_core_framebuffer_ptr =
+      _flutterxel_core_framebuffer_ptrPtr
+          .asFunction<ffi.Pointer<ffi.Int32> Function()>();
+
+  int flutterxel_core_framebuffer_len() {
+    return _flutterxel_core_framebuffer_len();
+  }
+
+  late final _flutterxel_core_framebuffer_lenPtr =
+      _lookup<ffi.NativeFunction<ffi.Size Function()>>(
+        'flutterxel_core_framebuffer_len',
+      );
+  late final _flutterxel_core_framebuffer_len =
+      _flutterxel_core_framebuffer_lenPtr.asFunction<int Function()>();
+
   bool flutterxel_core_btn(int key) {
     return _flutterxel_core_btn(key);
   }
@@ -141,6 +175,17 @@ class FlutterxelBindings {
       );
   late final _flutterxel_core_btn = _flutterxel_core_btnPtr
       .asFunction<bool Function(int)>();
+
+  bool flutterxel_core_set_btn_state(int key, bool pressed) {
+    return _flutterxel_core_set_btn_state(key, pressed);
+  }
+
+  late final _flutterxel_core_set_btn_statePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Bool)>>(
+        'flutterxel_core_set_btn_state',
+      );
+  late final _flutterxel_core_set_btn_state = _flutterxel_core_set_btn_statePtr
+      .asFunction<bool Function(int, bool)>();
 
   bool flutterxel_core_cls(int col) {
     return _flutterxel_core_cls(col);
@@ -255,6 +300,17 @@ class FlutterxelBindings {
           int,
         )
       >();
+
+  bool flutterxel_core_is_channel_playing(int ch) {
+    return _flutterxel_core_is_channel_playing(ch);
+  }
+
+  late final _flutterxel_core_is_channel_playingPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_is_channel_playing',
+      );
+  late final _flutterxel_core_is_channel_playing =
+      _flutterxel_core_is_channel_playingPtr.asFunction<bool Function(int)>();
 
   bool flutterxel_core_load(
     ffi.Pointer<ffi.Char> filename,

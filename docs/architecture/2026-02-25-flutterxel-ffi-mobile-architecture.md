@@ -29,6 +29,11 @@ Build a Pyxel-compatible runtime for Flutter with a Rust core over FFI, targetin
 3. Rust core:
    - Owns simulation logic, rendering buffers, audio mixing, resource format logic
 
+Current implemented bridge includes:
+
+- Core API skeleton: `init/run/btn/cls/blt/play/load/save`
+- Runtime helper ABI: framebuffer pointer/length, frame counter, input-state bridge
+
 ## Rendering and Input
 
 - Rendering:
@@ -55,4 +60,3 @@ Build a Pyxel-compatible runtime for Flutter with a Rust core over FFI, targetin
 2. ABI contract checks between Dart FFI and Rust exports
 3. Flutter integration tests for runtime behavior
 4. Smoke tests on Android/iOS examples per release
-

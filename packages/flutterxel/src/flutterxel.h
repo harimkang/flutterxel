@@ -48,7 +48,13 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
     FlutterxelCoreFrameCallback draw,
     void* draw_user_data);
 
+FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void);
+FFI_PLUGIN_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
+FFI_PLUGIN_EXPORT size_t flutterxel_core_framebuffer_len(void);
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_btn(int32_t key);
+FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key,
+                                                      bool pressed);
 FFI_PLUGIN_EXPORT bool flutterxel_core_cls(int32_t col);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
@@ -73,6 +79,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
     double sec,
     int8_t loop,
     int8_t resume);
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(
     const char* filename,

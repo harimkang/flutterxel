@@ -16,6 +16,10 @@ set_target_properties(flutterxel PROPERTIES
 
 target_compile_definitions(flutterxel PUBLIC DART_SHARED_LIB)
 
+if (NOT WIN32)
+  target_link_libraries(flutterxel PRIVATE m)
+endif()
+
 if (ANDROID)
   # Support Android 15 16k page size
   target_link_options(flutterxel PRIVATE "-Wl,-z,max-page-size=16384")

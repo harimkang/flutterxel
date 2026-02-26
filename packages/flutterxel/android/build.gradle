@@ -60,4 +60,12 @@ android {
     defaultConfig {
         minSdk = 24
     }
+
+    sourceSets {
+        main {
+            // Prebuilt Rust core artifacts are expected under:
+            // packages/flutterxel/native/android/jniLibs/<abi>/libflutterxel_core.so
+            jniLibs.srcDirs += ["../native/android/jniLibs"]
+        }
+    }
 }

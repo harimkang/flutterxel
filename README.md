@@ -35,6 +35,14 @@ dart run melos run analyze
 dart run melos run test
 ```
 
+## CI
+
+GitHub Actions pipeline (`.github/workflows/ci.yml`) validates:
+
+- workspace bootstrap/analyze/test
+- Rust core formatting/tests
+- ABI symbol contract between C header and generated Dart bindings
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

@@ -16,7 +16,18 @@ This package is scaffolded and ready for progressive implementation:
 
 - FFI plugin packaging is configured.
 - Runtime architecture and implementation plans are documented in the repository `docs/` directory.
-- A Rust core ABI scaffold is present at `../../native/flutterxel_core`.
+- A Rust core runtime implementation is present at `../../native/flutterxel_core`.
+- Runtime API skeleton includes `init/run/btn/cls/blt/play/load/save`.
+- Native artifact layout for prebuilt Rust binaries is documented at `native/README.md`.
+
+## Native Artifact Bundling
+
+For release builds without requiring end-user Rust toolchains:
+
+- Android prebuilt `.so` files: `native/android/jniLibs/<abi>/libflutterxel_core.so`
+- iOS prebuilt xcframework: `native/ios/FlutterxelCore.xcframework`
+
+Runtime loading prefers `flutterxel_core` and falls back to `flutterxel` scaffold library.
 
 ## Monorepo
 
@@ -29,4 +40,3 @@ The repository is organized as:
 ## License
 
 MIT.
-

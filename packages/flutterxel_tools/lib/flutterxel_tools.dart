@@ -1,6 +1,14 @@
 import 'package:args/args.dart';
 
-enum FlutterxelToolCommand { run, watch, play, edit, package, app2html }
+enum FlutterxelToolCommand {
+  run,
+  watch,
+  play,
+  edit,
+  package,
+  app2html,
+  buildNative,
+}
 
 class FlutterxelTools {
   FlutterxelTools._();
@@ -14,6 +22,7 @@ class FlutterxelTools {
     parser.addCommand('edit');
     parser.addCommand('package');
     parser.addCommand('app2html');
+    parser.addCommand('build-native');
     return parser;
   }
 
@@ -32,6 +41,8 @@ class FlutterxelTools {
       'edit' => 'edit is scaffolded but not implemented yet.',
       'package' => 'package is scaffolded but not implemented yet.',
       'app2html' => 'app2html is scaffolded but not implemented yet.',
+      'build-native' =>
+        'build-native scaffold: run packages/flutterxel_tools/tool/build_rust_core_artifacts.sh',
       _ => usage(),
     };
   }

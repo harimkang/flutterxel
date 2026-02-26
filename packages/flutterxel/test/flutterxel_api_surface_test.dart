@@ -46,6 +46,7 @@ void main() {
       flutterxel.play(0, 1, sec: 0.5, loop: true, resume: false);
       flutterxel.play(0, <int>[1, 2, 3], sec: null, loop: null, resume: null);
       flutterxel.play(0, 'c3e3g3c4r', sec: 1.5, loop: false, resume: true);
+      expect(flutterxel.isChannelPlaying(0), isA<bool>());
 
       flutterxel.cls(0);
       flutterxel.blt(0, 0, 0, 0, 0, 8, 8, colkey: 2, rotate: 0.0, scale: 1.0);
@@ -71,5 +72,15 @@ void main() {
 
     expect(updateCalled, isTrue);
     expect(drawCalled, isTrue);
+  });
+
+  test('exposes runtime bridge helpers for input and framebuffer', () {
+    flutterxel.init(8, 8);
+
+    flutterxel.setBtnState(32, true);
+    expect(flutterxel.btn(32), isA<bool>());
+
+    final frame = flutterxel.frameBufferSnapshot();
+    expect(frame, isA<List<int>>());
   });
 }

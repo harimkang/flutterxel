@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+HEADER="$ROOT_DIR/packages/flutterxel/src/flutterxel.h"
+BINDINGS="$ROOT_DIR/packages/flutterxel/lib/flutterxel_bindings_generated.dart"
+
+SYMBOLS=(
+  flutterxel_core_init
+  flutterxel_core_run
+  flutterxel_core_btn
+  flutterxel_core_set_btn_state
+  flutterxel_core_cls
+  flutterxel_core_blt
+  flutterxel_core_play
+  flutterxel_core_is_channel_playing
+  flutterxel_core_load
+  flutterxel_core_save
+  flutterxel_core_frame_count
+  flutterxel_core_framebuffer_ptr
+  flutterxel_core_framebuffer_len
+)
+
+for symbol in "${SYMBOLS[@]}"; do
+  if ! rg -q "$symbol" "$HEADER"; then
+    echo "Missing symbol in header: $symbol" >&2
+    exit 1
+  fi
+  if ! rg -q "$symbol" "$BINDINGS"; then
+    echo "Missing symbol in Dart bindings: $symbol" >&2
+    exit 1
+  fi
+
+done
+
+echo "ABI contract check passed (${#SYMBOLS[@]} symbols)."

@@ -5,7 +5,6 @@ import 'package:ffi/ffi.dart';
 
 import 'flutterxel_bindings_generated.dart';
 
-const String _libName = 'flutterxel';
 const int _optionalI32None = -2147483648; // INT32_MIN
 const int _optionalBoolNone = -1;
 const int _optionalBoolFalse = 0;
@@ -20,16 +19,38 @@ FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
 ffi.DynamicLibrary _openLibrary() {
-  if (Platform.isMacOS || Platform.isIOS) {
-    return ffi.DynamicLibrary.open('$_libName.framework/$_libName');
+  final candidates = switch (Platform.operatingSystem) {
+    'ios' => const [
+      'flutterxel_core.framework/flutterxel_core',
+      'flutterxel.framework/flutterxel',
+    ],
+    'macos' => const [
+      'flutterxel_core.framework/flutterxel_core',
+      'flutterxel.framework/flutterxel',
+      'libflutterxel_core.dylib',
+      'libflutterxel.dylib',
+    ],
+    'android' => const ['libflutterxel_core.so', 'libflutterxel.so'],
+    'linux' => const ['libflutterxel_core.so', 'libflutterxel.so'],
+    'windows' => const ['flutterxel_core.dll', 'flutterxel.dll'],
+    _ => throw UnsupportedError(
+      'Unsupported platform: ${Platform.operatingSystem}',
+    ),
+  };
+
+  Object? lastError;
+  for (final candidate in candidates) {
+    try {
+      return ffi.DynamicLibrary.open(candidate);
+    } catch (error) {
+      lastError = error;
+    }
   }
-  if (Platform.isAndroid || Platform.isLinux) {
-    return ffi.DynamicLibrary.open('lib$_libName.so');
-  }
-  if (Platform.isWindows) {
-    return ffi.DynamicLibrary.open('$_libName.dll');
-  }
-  throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
+
+  throw ArgumentError(
+    'Unable to load native library. Tried: ${candidates.join(", ")}'
+    '${lastError == null ? "" : ". Last error: $lastError"}',
+  );
 }
 
 FlutterxelBindings? _getBindingsOrNull() {
@@ -137,7 +158,7 @@ void run(void Function() update, void Function() draw) {
     throw StateError('flutterxel_core_run failed.');
   }
 
-  frameCount += 1;
+  frameCount = bindings?.flutterxel_core_frame_count() ?? (frameCount + 1);
 }
 
 /// Pyxel-compatible btn API.
@@ -147,6 +168,16 @@ bool btn(int key) {
   }
   final bindings = _getBindingsOrNull();
   return bindings?.flutterxel_core_btn(key) ?? false;
+}
+
+/// Runtime input bridge for forwarding external key/touch mappings.
+void setBtnState(int key, bool pressed) {
+  _ensureInitialized('setBtnState');
+  final bindings = _getBindingsOrNull();
+  final ok = bindings?.flutterxel_core_set_btn_state(key, pressed) ?? true;
+  if (!ok) {
+    throw StateError('flutterxel_core_set_btn_state failed.');
+  }
 }
 
 /// Pyxel-compatible cls API.
@@ -262,6 +293,15 @@ void play(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
   }
 }
 
+/// Returns whether a channel is currently marked as playing in the core.
+bool isChannelPlaying(int ch) {
+  if (!_isInitialized) {
+    return false;
+  }
+  final bindings = _getBindingsOrNull();
+  return bindings?.flutterxel_core_is_channel_playing(ch) ?? false;
+}
+
 /// Pyxel-compatible load API.
 void load(
   String filename, {
@@ -324,6 +364,23 @@ void save(
   } finally {
     calloc.free(filenamePtr);
   }
+}
+
+/// Returns a copy of the current paletted framebuffer.
+List<int> frameBufferSnapshot() {
+  _ensureInitialized('frameBufferSnapshot');
+  final bindings = _getBindingsOrNull();
+  final len = bindings?.flutterxel_core_framebuffer_len() ?? 0;
+  if (len <= 0) {
+    return const [];
+  }
+
+  final ptr = bindings?.flutterxel_core_framebuffer_ptr() ?? ffi.nullptr;
+  if (ptr == ffi.nullptr) {
+    return const [];
+  }
+
+  return ptr.asTypedList(len).toList(growable: false);
 }
 
 class Flutterxel {

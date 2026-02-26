@@ -1,13 +1,19 @@
 #include "flutterxel.h"
 
 #include <math.h>
-#include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define ABI_VERSION_MAJOR 0
-#define ABI_VERSION_MINOR 2
+#define ABI_VERSION_MINOR 3
 #define ABI_VERSION_PATCH 0
+#define OPTIONAL_I32_NONE INT32_MIN
+#define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
+#define KEY_STATE_CAPACITY 2048
+#define CHANNEL_CAPACITY 64
+#define DEFAULT_IMAGE_BANK_SIZE 16
 
 typedef struct FlutterxelState {
   bool initialized;
@@ -15,12 +21,38 @@ typedef struct FlutterxelState {
   int32_t height;
   uint64_t frame_count;
   int32_t clear_color;
+  int32_t* frame_buffer;
+  size_t frame_buffer_len;
+  uint8_t key_state[KEY_STATE_CAPACITY];
+  uint8_t channel_state[CHANNEL_CAPACITY];
+  int32_t image_bank_size;
+  int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
 } FlutterxelState;
 
 static FlutterxelState g_state = {0};
 
 static bool is_valid_optional_bool(int8_t value) {
   return value == -1 || value == 0 || value == 1;
+}
+
+static void seed_default_image_bank(void) {
+  g_state.image_bank_size = DEFAULT_IMAGE_BANK_SIZE;
+  for (int y = 0; y < DEFAULT_IMAGE_BANK_SIZE; y++) {
+    for (int x = 0; x < DEFAULT_IMAGE_BANK_SIZE; x++) {
+      g_state.image_bank0[y * DEFAULT_IMAGE_BANK_SIZE + x] = (x + y) % 16;
+    }
+  }
+}
+
+static bool validate_resource_flags(
+    int8_t exclude_images,
+    int8_t exclude_tilemaps,
+    int8_t exclude_sounds,
+    int8_t exclude_musics) {
+  return is_valid_optional_bool(exclude_images) &&
+         is_valid_optional_bool(exclude_tilemaps) &&
+         is_valid_optional_bool(exclude_sounds) &&
+         is_valid_optional_bool(exclude_musics);
 }
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
@@ -55,11 +87,26 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
     return false;
   }
 
+  if (g_state.frame_buffer != NULL) {
+    free(g_state.frame_buffer);
+    g_state.frame_buffer = NULL;
+  }
+
+  g_state.frame_buffer_len = (size_t)width * (size_t)height;
+  g_state.frame_buffer = (int32_t*)calloc(g_state.frame_buffer_len, sizeof(int32_t));
+  if (g_state.frame_buffer == NULL) {
+    g_state.frame_buffer_len = 0;
+    return false;
+  }
+
   g_state.initialized = true;
   g_state.width = width;
   g_state.height = height;
   g_state.frame_count = 0;
   g_state.clear_color = 0;
+  memset(g_state.key_state, 0, sizeof(g_state.key_state));
+  memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
+  seed_default_image_bank();
   return true;
 }
 
@@ -84,19 +131,57 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_run(
   return true;
 }
 
+FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void) {
+  if (!g_state.initialized) {
+    return 0;
+  }
+  return g_state.frame_count;
+}
+
+FFI_PLUGIN_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return NULL;
+  }
+  return g_state.frame_buffer;
+}
+
+FFI_PLUGIN_EXPORT size_t flutterxel_core_framebuffer_len(void) {
+  if (!g_state.initialized) {
+    return 0;
+  }
+  return g_state.frame_buffer_len;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_btn(int32_t key) {
-  (void)key;
   if (!g_state.initialized) {
     return false;
   }
-  return false;
+  if (key < 0 || key >= KEY_STATE_CAPACITY) {
+    return false;
+  }
+  return g_state.key_state[key] != 0;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key, bool pressed) {
+  if (!g_state.initialized) {
+    return false;
+  }
+  if (key < 0 || key >= KEY_STATE_CAPACITY) {
+    return false;
+  }
+  g_state.key_state[key] = pressed ? 1 : 0;
+  return true;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_cls(int32_t col) {
-  if (!g_state.initialized) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
     return false;
   }
+
   g_state.clear_color = col;
+  for (size_t i = 0; i < g_state.frame_buffer_len; i++) {
+    g_state.frame_buffer[i] = col;
+  }
   return true;
 }
 
@@ -111,19 +196,51 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     int32_t colkey,
     double rotate,
     double scale) {
-  (void)x;
-  (void)y;
   (void)img;
-  (void)u;
-  (void)v;
-  (void)w;
-  (void)h;
-  (void)colkey;
   (void)rotate;
   (void)scale;
 
-  if (!g_state.initialized) {
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
     return false;
+  }
+
+  int32_t width = (int32_t)llround(fabs(w));
+  int32_t height = (int32_t)llround(fabs(h));
+  if (width <= 0 || height <= 0) {
+    return true;
+  }
+
+  int32_t base_dx = (int32_t)llround(x);
+  int32_t base_dy = (int32_t)llround(y);
+  int32_t base_sx = (int32_t)llround(u);
+  int32_t base_sy = (int32_t)llround(v);
+  bool flip_x = w < 0;
+  bool flip_y = h < 0;
+
+  for (int32_t dy = 0; dy < height; dy++) {
+    for (int32_t dx = 0; dx < width; dx++) {
+      int32_t src_x = base_sx + (flip_x ? (width - 1 - dx) : dx);
+      int32_t src_y = base_sy + (flip_y ? (height - 1 - dy) : dy);
+
+      if (src_x < 0 || src_x >= g_state.image_bank_size || src_y < 0 ||
+          src_y >= g_state.image_bank_size) {
+        continue;
+      }
+
+      int32_t src_color = g_state.image_bank0[src_y * g_state.image_bank_size + src_x];
+      if (colkey != OPTIONAL_I32_NONE && src_color == colkey) {
+        continue;
+      }
+
+      int32_t dst_x = base_dx + dx;
+      int32_t dst_y = base_dy + dy;
+      if (dst_x < 0 || dst_x >= g_state.width || dst_y < 0 || dst_y >= g_state.height) {
+        continue;
+      }
+
+      size_t dst_index = (size_t)dst_y * (size_t)g_state.width + (size_t)dst_x;
+      g_state.frame_buffer[dst_index] = src_color;
+    }
   }
 
   return true;
@@ -139,37 +256,46 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_play(
     double sec,
     int8_t loop,
     int8_t resume) {
-  (void)ch;
   (void)snd_value;
   (void)sec;
 
   if (!g_state.initialized) {
     return false;
   }
-
   if (!is_valid_optional_bool(loop) || !is_valid_optional_bool(resume)) {
+    return false;
+  }
+  if (ch < 0 || ch >= CHANNEL_CAPACITY) {
     return false;
   }
 
   if (snd_kind == FLUTTERXEL_CORE_PLAY_SND_INT) {
+    g_state.channel_state[ch] = 1;
     return true;
   }
-
   if (snd_kind == FLUTTERXEL_CORE_PLAY_SND_INT_LIST) {
     if (snd_sequence_len > 0 && snd_sequence_ptr == NULL) {
       return false;
     }
+    g_state.channel_state[ch] = 1;
     return true;
   }
-
   if (snd_kind == FLUTTERXEL_CORE_PLAY_SND_STRING) {
     if (snd_string == NULL || strlen(snd_string) == 0) {
       return false;
     }
+    g_state.channel_state[ch] = 1;
     return true;
   }
 
   return false;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch) {
+  if (!g_state.initialized || ch < 0 || ch >= CHANNEL_CAPACITY) {
+    return false;
+  }
+  return g_state.channel_state[ch] != 0;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_load(
@@ -178,20 +304,27 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_load(
     int8_t exclude_tilemaps,
     int8_t exclude_sounds,
     int8_t exclude_musics) {
-  (void)exclude_images;
-  (void)exclude_tilemaps;
-  (void)exclude_sounds;
-  (void)exclude_musics;
-
-  if (!g_state.initialized) {
+  if (!g_state.initialized || filename == NULL || strlen(filename) == 0) {
+    return false;
+  }
+  if (!validate_resource_flags(exclude_images, exclude_tilemaps, exclude_sounds,
+                               exclude_musics)) {
     return false;
   }
 
-  if (filename == NULL || strlen(filename) == 0) {
+  FILE* fp = fopen(filename, "rb");
+  if (fp == NULL) {
     return false;
   }
 
-  return true;
+  char magic[32] = {0};
+  size_t read_count = fread(magic, 1, strlen(RESOURCE_MAGIC), fp);
+  fclose(fp);
+
+  if (read_count != strlen(RESOURCE_MAGIC)) {
+    return false;
+  }
+  return memcmp(magic, RESOURCE_MAGIC, strlen(RESOURCE_MAGIC)) == 0;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_save(
@@ -200,18 +333,26 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_save(
     int8_t exclude_tilemaps,
     int8_t exclude_sounds,
     int8_t exclude_musics) {
-  (void)exclude_images;
-  (void)exclude_tilemaps;
-  (void)exclude_sounds;
-  (void)exclude_musics;
-
-  if (!g_state.initialized) {
+  if (!g_state.initialized || filename == NULL || strlen(filename) == 0) {
+    return false;
+  }
+  if (!validate_resource_flags(exclude_images, exclude_tilemaps, exclude_sounds,
+                               exclude_musics)) {
     return false;
   }
 
-  if (filename == NULL || strlen(filename) == 0) {
+  FILE* fp = fopen(filename, "wb");
+  if (fp == NULL) {
     return false;
   }
 
+  fprintf(fp,
+          "%s\nwidth=%d\nheight=%d\nframe_count=%llu\nclear_color=%d\n",
+          RESOURCE_MAGIC,
+          g_state.width,
+          g_state.height,
+          (unsigned long long)g_state.frame_count,
+          g_state.clear_color);
+  fclose(fp);
   return true;
 }

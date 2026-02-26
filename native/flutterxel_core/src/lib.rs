@@ -1,12 +1,14 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
+use std::fs;
 use std::os::raw::{c_char, c_void};
 use std::sync::{Mutex, OnceLock};
 
 const ABI_VERSION_MAJOR: u32 = 0;
-const ABI_VERSION_MINOR: u32 = 2;
+const ABI_VERSION_MINOR: u32 = 3;
 const ABI_VERSION_PATCH: u32 = 0;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
+const RESOURCE_MAGIC: &str = "FLUTTERXEL_RES_V1";
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -41,7 +43,7 @@ struct BltCall {
     scale: Option<f64>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct RuntimeState {
     initialized: bool,
     width: i32,
@@ -55,10 +57,41 @@ struct RuntimeState {
     capture_sec: Option<i32>,
     clear_color: i32,
     pressed_keys: HashSet<i32>,
+    frame_buffer: Vec<i32>,
+    image_banks: HashMap<i32, Vec<i32>>,
+    image_bank_size: i32,
+    channel_playback: HashMap<i32, PlayCall>,
     last_blt: Option<BltCall>,
     last_play: Option<PlayCall>,
     last_loaded: Option<String>,
     last_saved: Option<String>,
+}
+
+impl Default for RuntimeState {
+    fn default() -> Self {
+        Self {
+            initialized: false,
+            width: 0,
+            height: 0,
+            frame_count: 0,
+            title: None,
+            fps: None,
+            quit_key: None,
+            display_scale: None,
+            capture_scale: None,
+            capture_sec: None,
+            clear_color: 0,
+            pressed_keys: HashSet::new(),
+            frame_buffer: Vec::new(),
+            image_banks: HashMap::new(),
+            image_bank_size: 16,
+            channel_playback: HashMap::new(),
+            last_blt: None,
+            last_play: None,
+            last_loaded: None,
+            last_saved: None,
+        }
+    }
 }
 
 type FrameCallback = Option<extern "C" fn(*mut c_void)>;
@@ -103,6 +136,91 @@ fn decode_optional_string(ptr: *const c_char) -> Option<Option<String>> {
         Ok(value) => Some(Some(value.to_string())),
         Err(_) => None,
     }
+}
+
+fn ensure_default_image_bank(state: &mut RuntimeState) {
+    if state.image_banks.contains_key(&0) {
+        return;
+    }
+
+    let size = state.image_bank_size.max(1) as usize;
+    let mut bank = vec![0; size * size];
+    for y in 0..size {
+        for x in 0..size {
+            bank[y * size + x] = ((x + y) % 16) as i32;
+        }
+    }
+
+    state.image_banks.insert(0, bank);
+}
+
+fn validate_optional_resource_flags(
+    exclude_images: i8,
+    exclude_tilemaps: i8,
+    exclude_sounds: i8,
+    exclude_musics: i8,
+) -> bool {
+    decode_optional_bool(exclude_images).is_some()
+        && decode_optional_bool(exclude_tilemaps).is_some()
+        && decode_optional_bool(exclude_sounds).is_some()
+        && decode_optional_bool(exclude_musics).is_some()
+}
+
+fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
+    let Some(source) = state.image_banks.get(&call.img) else {
+        return false;
+    };
+
+    let source_size = state.image_bank_size;
+    if source_size <= 0 {
+        return false;
+    }
+
+    let source_size_usize = source_size as usize;
+    if source.len() < source_size_usize * source_size_usize {
+        return false;
+    }
+
+    let width = call.w.abs().round() as i32;
+    let height = call.h.abs().round() as i32;
+    if width <= 0 || height <= 0 {
+        return true;
+    }
+
+    let flip_x = call.w < 0.0;
+    let flip_y = call.h < 0.0;
+    let base_dx = call.x.round() as i32;
+    let base_dy = call.y.round() as i32;
+    let base_sx = call.u.round() as i32;
+    let base_sy = call.v.round() as i32;
+
+    for dy in 0..height {
+        for dx in 0..width {
+            let src_x = base_sx + if flip_x { width - 1 - dx } else { dx };
+            let src_y = base_sy + if flip_y { height - 1 - dy } else { dy };
+
+            if src_x < 0 || src_x >= source_size || src_y < 0 || src_y >= source_size {
+                continue;
+            }
+
+            let src_index = src_y as usize * source_size_usize + src_x as usize;
+            let color = source[src_index];
+            if call.colkey == Some(color) {
+                continue;
+            }
+
+            let dst_x = base_dx + dx;
+            let dst_y = base_dy + dy;
+            if dst_x < 0 || dst_x >= state.width || dst_y < 0 || dst_y >= state.height {
+                continue;
+            }
+
+            let dst_index = dst_y as usize * state.width as usize + dst_x as usize;
+            state.frame_buffer[dst_index] = color;
+        }
+    }
+
+    true
 }
 
 #[no_mangle]
@@ -152,10 +270,14 @@ pub extern "C" fn flutterxel_core_init(
     state.capture_sec = decode_optional_i32(capture_sec);
     state.clear_color = 0;
     state.pressed_keys.clear();
+    state.frame_buffer = vec![0; width as usize * height as usize];
+    state.image_banks.clear();
+    state.channel_playback.clear();
     state.last_blt = None;
     state.last_play = None;
     state.last_loaded = None;
     state.last_saved = None;
+    ensure_default_image_bank(&mut state);
     true
 }
 
@@ -185,6 +307,33 @@ pub extern "C" fn flutterxel_core_run(
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_frame_count() -> u64 {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0;
+    }
+    state.frame_count
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_framebuffer_ptr() -> *const i32 {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized || state.frame_buffer.is_empty() {
+        return std::ptr::null();
+    }
+    state.frame_buffer.as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_framebuffer_len() -> usize {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return 0;
+    }
+    state.frame_buffer.len()
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_btn(key: i32) -> bool {
     let state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -194,12 +343,28 @@ pub extern "C" fn flutterxel_core_btn(key: i32) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_set_btn_state(key: i32, pressed: bool) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    if pressed {
+        state.pressed_keys.insert(key);
+    } else {
+        state.pressed_keys.remove(&key);
+    }
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_cls(col: i32) -> bool {
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
         return false;
     }
     state.clear_color = col;
+    state.frame_buffer.fill(col);
     true
 }
 
@@ -221,7 +386,7 @@ pub extern "C" fn flutterxel_core_blt(
         return false;
     }
 
-    state.last_blt = Some(BltCall {
+    let call = BltCall {
         x,
         y,
         img,
@@ -232,8 +397,13 @@ pub extern "C" fn flutterxel_core_blt(
         colkey: decode_optional_i32(colkey),
         rotate: decode_optional_f64(rotate),
         scale: decode_optional_f64(scale),
-    });
-    true
+    };
+
+    let ok = draw_blt(&mut state, &call);
+    if ok {
+        state.last_blt = Some(call);
+    }
+    ok
 }
 
 #[no_mangle]
@@ -281,29 +451,50 @@ pub extern "C" fn flutterxel_core_play(
         _ => return false,
     };
 
-    let mut state = runtime_state().lock().expect("runtime state poisoned");
-    if !state.initialized {
-        return false;
-    }
-    state.last_play = Some(PlayCall {
+    let call = PlayCall {
         ch,
         source,
         sec: decode_optional_f64(sec),
         loop_opt,
         resume_opt,
-    });
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    state.channel_playback.insert(ch, call.clone());
+    state.last_play = Some(call);
     true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_is_channel_playing(ch: i32) -> bool {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    state.channel_playback.contains_key(&ch)
 }
 
 #[no_mangle]
 pub extern "C" fn flutterxel_core_load(
     filename: *const c_char,
-    _exclude_images: i8,
-    _exclude_tilemaps: i8,
-    _exclude_sounds: i8,
-    _exclude_musics: i8,
+    exclude_images: i8,
+    exclude_tilemaps: i8,
+    exclude_sounds: i8,
+    exclude_musics: i8,
 ) -> bool {
     if filename.is_null() {
+        return false;
+    }
+    if !validate_optional_resource_flags(
+        exclude_images,
+        exclude_tilemaps,
+        exclude_sounds,
+        exclude_musics,
+    ) {
         return false;
     }
 
@@ -311,6 +502,13 @@ pub extern "C" fn flutterxel_core_load(
     let Ok(path) = c_str.to_str() else {
         return false;
     };
+
+    let Ok(contents) = fs::read_to_string(path) else {
+        return false;
+    };
+    if !contents.starts_with(RESOURCE_MAGIC) {
+        return false;
+    }
 
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -323,12 +521,20 @@ pub extern "C" fn flutterxel_core_load(
 #[no_mangle]
 pub extern "C" fn flutterxel_core_save(
     filename: *const c_char,
-    _exclude_images: i8,
-    _exclude_tilemaps: i8,
-    _exclude_sounds: i8,
-    _exclude_musics: i8,
+    exclude_images: i8,
+    exclude_tilemaps: i8,
+    exclude_sounds: i8,
+    exclude_musics: i8,
 ) -> bool {
     if filename.is_null() {
+        return false;
+    }
+    if !validate_optional_resource_flags(
+        exclude_images,
+        exclude_tilemaps,
+        exclude_sounds,
+        exclude_musics,
+    ) {
         return false;
     }
 
@@ -341,6 +547,168 @@ pub extern "C" fn flutterxel_core_save(
     if !state.initialized {
         return false;
     }
+
+    let payload = format!(
+        "{magic}\nwidth={width}\nheight={height}\nframe_count={frame_count}\nclear_color={clear_color}\n",
+        magic = RESOURCE_MAGIC,
+        width = state.width,
+        height = state.height,
+        frame_count = state.frame_count,
+        clear_color = state.clear_color,
+    );
+
+    if fs::write(path, payload).is_err() {
+        return false;
+    }
+
     state.last_saved = Some(path.to_string());
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+    use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("test lock poisoned")
+    }
+
+    fn init_runtime(width: i32, height: i32) {
+        let title = CString::new("test").expect("valid cstring");
+        let ok = flutterxel_core_init(
+            width,
+            height,
+            title.as_ptr(),
+            OPTIONAL_I32_NONE,
+            OPTIONAL_I32_NONE,
+            OPTIONAL_I32_NONE,
+            OPTIONAL_I32_NONE,
+            OPTIONAL_I32_NONE,
+        );
+        assert!(ok);
+    }
+
+    fn tmp_resource_path(label: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("valid system time")
+            .as_nanos();
+        path.push(format!("flutterxel_core_{label}_{stamp}.pyxres"));
+        path
+    }
+
+    #[test]
+    fn cls_fills_entire_framebuffer_with_color_index() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        assert!(flutterxel_core_cls(7));
+
+        let frame_buffer = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            state.frame_buffer.clone()
+        };
+        assert_eq!(frame_buffer.len(), 16);
+        assert!(frame_buffer.iter().all(|pixel| *pixel == 7));
+    }
+
+    #[test]
+    fn blt_copies_from_image_bank_and_respects_colkey() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_banks.insert(0, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            state.image_bank_size = 3;
+        }
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            1.0,
+            1.0,
+            0,
+            0.0,
+            0.0,
+            2.0,
+            2.0,
+            2,
+            f64::NAN,
+            f64::NAN
+        ));
+
+        let frame_buffer = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            state.frame_buffer.clone()
+        };
+        // Drawn block at (1,1) with source [1,2;4,5], with colkey=2 skipped.
+        let expected = [
+            0, 0, 0, 0, //
+            0, 1, 0, 0, //
+            0, 4, 5, 0, //
+            0, 0, 0, 0,
+        ];
+        assert_eq!(frame_buffer, expected);
+    }
+
+    #[test]
+    fn btn_state_can_be_updated_from_bridge_api() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        assert!(!flutterxel_core_btn(32));
+
+        assert!(flutterxel_core_set_btn_state(32, true));
+        assert!(flutterxel_core_btn(32));
+
+        assert!(flutterxel_core_set_btn_state(32, false));
+        assert!(!flutterxel_core_btn(32));
+    }
+
+    #[test]
+    fn save_then_load_accepts_minimal_resource_payload() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        assert!(flutterxel_core_cls(9));
+
+        let path = tmp_resource_path("save_load");
+        let path_string = path.to_string_lossy().to_string();
+        let c_path = CString::new(path_string.clone()).expect("valid cstring");
+
+        assert!(flutterxel_core_save(c_path.as_ptr(), -1, -1, -1, -1));
+        assert!(flutterxel_core_load(c_path.as_ptr(), -1, -1, -1, -1));
+
+        let (last_saved, last_loaded) = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            (state.last_saved.clone(), state.last_loaded.clone())
+        };
+        assert_eq!(last_saved.as_deref(), Some(path_string.as_str()));
+        assert_eq!(last_loaded.as_deref(), Some(path_string.as_str()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn play_updates_channel_state() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_play(
+            1,
+            0,
+            3,
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            f64::NAN,
+            1,
+            -1
+        ));
+
+        assert!(flutterxel_core_is_channel_playing(1));
+    }
 }

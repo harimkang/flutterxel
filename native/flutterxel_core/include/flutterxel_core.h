@@ -51,8 +51,16 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_run(
     FlutterxelCoreFrameCallback draw,
     void* draw_user_data);
 
+FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_frame_count(void);
+FLUTTERXEL_CORE_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
+FLUTTERXEL_CORE_EXPORT size_t flutterxel_core_framebuffer_len(void);
+
 // pyxel.btn(key)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btn(int32_t key);
+
+// runtime input bridge
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_btn_state(int32_t key,
+                                                           bool pressed);
 
 // pyxel.cls(col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_cls(int32_t col);
@@ -81,6 +89,8 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_play(
     double sec,
     int8_t loop,
     int8_t resume);
+
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_is_channel_playing(int32_t ch);
 
 // pyxel.load(filename, *, exclude_images=None, exclude_tilemaps=None,
 //            exclude_sounds=None, exclude_musics=None)

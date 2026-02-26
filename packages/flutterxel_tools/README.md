@@ -15,7 +15,12 @@ The CLI command surface is scaffolded with placeholder handlers.
 ```bash
 dart run flutterxel_tools:flutterxel_tools --help
 dart run flutterxel_tools:flutterxel_tools run
+dart run flutterxel_tools:flutterxel_tools build-native
 ```
+
+`build-native` currently points maintainers to:
+
+- `packages/flutterxel_tools/tool/build_rust_core_artifacts.sh`
 
 ## Monorepo Context
 
@@ -24,4 +29,3 @@ dart run flutterxel_tools:flutterxel_tools run
 ## License
 
 MIT.
-
