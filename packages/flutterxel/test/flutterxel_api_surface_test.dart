@@ -7,7 +7,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/text/blt/play/playm/stop/load/save API surface',
+    'exposes init/run/flip/quit/camera/clip/pal/btn/btnp/btnr/btnv/cls/pset/pget/line/rect/rectb/circ/circb/tri/trib/text/bltm/blt/play/playm/stop/load/save API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -31,6 +31,7 @@ void main() {
       expect(flutterxel.tri, isA<Function>());
       expect(flutterxel.trib, isA<Function>());
       expect(flutterxel.text, isA<Function>());
+      expect(flutterxel.bltm, isA<Function>());
       expect(flutterxel.blt, isA<Function>());
       expect(flutterxel.play, isA<Function>());
       expect(flutterxel.playm, isA<Function>());
@@ -206,6 +207,14 @@ void main() {
 
     flutterxel.text(6, 1, ' ', 12);
     expect(flutterxel.pget(6, 1), 0);
+  });
+
+  test('bltm draws tilemap region using default tile resources', () {
+    flutterxel.init(16, 16);
+    flutterxel.cls(0);
+
+    flutterxel.bltm(0, 0, 0, 0, 0, 1, 1);
+    expect(flutterxel.pget(1, 0), 1);
   });
 
   test('quit stops loop and resets initialized runtime state', () {

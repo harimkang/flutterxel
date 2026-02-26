@@ -30,6 +30,7 @@ SYMBOLS=(
   flutterxel_core_tri
   flutterxel_core_trib
   flutterxel_core_text
+  flutterxel_core_bltm
   flutterxel_core_blt
   flutterxel_core_play
   flutterxel_core_playm

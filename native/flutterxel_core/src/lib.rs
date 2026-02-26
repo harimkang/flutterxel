@@ -14,6 +14,7 @@ const OPTIONAL_I32_NONE: i32 = i32::MIN;
 const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
+const TILE_SIZE: i32 = 8;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -205,6 +206,22 @@ fn ensure_default_image_bank(state: &mut RuntimeState) {
     }
 
     state.image_banks.insert(0, bank);
+}
+
+fn ensure_default_tilemap(state: &mut RuntimeState) {
+    if state.tilemaps.contains_key(&0) {
+        return;
+    }
+
+    state.tilemaps.insert(
+        0,
+        TilemapResource {
+            width: 1,
+            height: 1,
+            imgsrc: 0,
+            data: vec![(0, 0)],
+        },
+    );
 }
 
 fn parse_i32_value(value: &toml::Value) -> Option<i32> {
@@ -975,6 +992,87 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     true
 }
 
+fn draw_bltm(
+    state: &mut RuntimeState,
+    x: f64,
+    y: f64,
+    tm: i32,
+    u: f64,
+    v: f64,
+    w: f64,
+    h: f64,
+    colkey: Option<i32>,
+) -> bool {
+    let Some(tilemap) = state.tilemaps.get(&tm).cloned() else {
+        return false;
+    };
+    let Some(source_bank) = state.image_banks.get(&tilemap.imgsrc).cloned() else {
+        return false;
+    };
+    let source_size = state.image_bank_size;
+    if source_size <= 0 {
+        return false;
+    }
+
+    let tilemap_width = i32::try_from(tilemap.width).ok().unwrap_or(0);
+    let tilemap_height = i32::try_from(tilemap.height).ok().unwrap_or(0);
+    if tilemap_width <= 0 || tilemap_height <= 0 {
+        return true;
+    }
+
+    let tiles_w = w.abs().round() as i32;
+    let tiles_h = h.abs().round() as i32;
+    if tiles_w <= 0 || tiles_h <= 0 {
+        return true;
+    }
+
+    let flip_x = w < 0.0;
+    let flip_y = h < 0.0;
+    let base_dx = x.round() as i32;
+    let base_dy = y.round() as i32;
+    let base_tx = u.round() as i32;
+    let base_ty = v.round() as i32;
+    let source_size_usize = source_size as usize;
+
+    for dy in 0..tiles_h {
+        for dx in 0..tiles_w {
+            let src_tx = base_tx + if flip_x { tiles_w - 1 - dx } else { dx };
+            let src_ty = base_ty + if flip_y { tiles_h - 1 - dy } else { dy };
+            if src_tx < 0 || src_tx >= tilemap_width || src_ty < 0 || src_ty >= tilemap_height {
+                continue;
+            }
+
+            let tile_index = src_ty as usize * tilemap_width as usize + src_tx as usize;
+            if tile_index >= tilemap.data.len() {
+                continue;
+            }
+            let (tile_x, tile_y) = tilemap.data[tile_index];
+
+            for py in 0..TILE_SIZE {
+                for px in 0..TILE_SIZE {
+                    let src_x = tile_x * TILE_SIZE + px;
+                    let src_y = tile_y * TILE_SIZE + py;
+                    if src_x < 0 || src_x >= source_size || src_y < 0 || src_y >= source_size {
+                        continue;
+                    }
+
+                    let src_index = src_y as usize * source_size_usize + src_x as usize;
+                    let color = source_bank[src_index];
+                    if colkey == Some(color) {
+                        continue;
+                    }
+
+                    let dst_x = base_dx + dx * TILE_SIZE + px;
+                    let dst_y = base_dy + dy * TILE_SIZE + py;
+                    set_frame_pixel(state, dst_x, dst_y, color);
+                }
+            }
+        }
+    }
+
+    true
+}
+
 fn apply_palette(state: &RuntimeState, col: i32) -> i32 {
     if let Ok(index) = usize::try_from(col) {
         if index < state.palette_map.len() {
@@ -1258,6 +1356,7 @@ pub extern "C" fn flutterxel_core_init(
     state.last_loaded = None;
     state.last_saved = None;
     ensure_default_image_bank(&mut state);
+    ensure_default_tilemap(&mut state);
     true
 }
 
@@ -1662,6 +1761,35 @@ pub extern "C" fn flutterxel_core_text(x: i32, y: i32, text: *const c_char, col:
     }
     draw_text(&mut state, x, y, text, col);
     true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_bltm(
+    x: f64,
+    y: f64,
+    tm: i32,
+    u: f64,
+    v: f64,
+    w: f64,
+    h: f64,
+    colkey: i32,
+) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    draw_bltm(
+        &mut state,
+        x,
+        y,
+        tm,
+        u,
+        v,
+        w,
+        h,
+        decode_optional_i32(colkey),
+    )
 }
 
 #[no_mangle]
@@ -2213,6 +2341,45 @@ mod tests {
         let text_space = CString::new(" ").expect("valid cstring");
         assert!(flutterxel_core_text(6, 1, text_space.as_ptr(), 12));
         assert_eq!(flutterxel_core_pget(6, 1), 0);
+    }
+
+    #[test]
+    fn bltm_draws_tilemap_region_using_image_bank_tiles() {
+        let _guard = test_lock();
+        init_runtime(16, 16);
+        assert!(flutterxel_core_cls(0));
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_bank_size = 16;
+            let mut bank = vec![0; 16 * 16];
+            for y in 0..16 {
+                for x in 0..16 {
+                    bank[y * 16 + x] = ((x + y) % 16) as i32;
+                }
+            }
+            state.image_banks.insert(0, bank);
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 1,
+                    height: 1,
+                    imgsrc: 0,
+                    data: vec![(0, 0)],
+                },
+            );
+        }
+
+        assert!(flutterxel_core_bltm(
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE
+        ));
+        assert_eq!(flutterxel_core_pget(1, 0), 1);
     }
 
     #[test]

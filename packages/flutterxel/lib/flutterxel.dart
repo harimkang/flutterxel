@@ -36,6 +36,21 @@ const int MOUSE_BUTTON_LEFT = MOUSE_KEY_START_INDEX + 4;
 const int MOUSE_BUTTON_MIDDLE = MOUSE_KEY_START_INDEX + 5;
 const int MOUSE_BUTTON_RIGHT = MOUSE_KEY_START_INDEX + 6;
 const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
+const int _fallbackTileSize = 8;
+
+class _FallbackTilemap {
+  const _FallbackTilemap({
+    required this.width,
+    required this.height,
+    required this.imgsrc,
+    required this.data,
+  });
+
+  final int width;
+  final int height;
+  final int imgsrc;
+  final List<int> data;
+}
 
 final Map<LogicalKeyboardKey, int> _defaultKeyboardMapping =
     <LogicalKeyboardKey, int>{
@@ -69,6 +84,9 @@ int _fallbackClipY = 0;
 int _fallbackClipW = 0;
 int _fallbackClipH = 0;
 List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+int _fallbackImageBankSize = 16;
+final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
+final Map<int, _FallbackTilemap> _fallbackTilemaps = <int, _FallbackTilemap>{};
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -181,6 +199,28 @@ int _fallbackGetPixel(int x, int y) {
   return _fallbackFrameBuffer[index];
 }
 
+void _seedFallbackResources() {
+  _fallbackImageBankSize = 16;
+  final bankSize = _fallbackImageBankSize;
+  final bank = List<int>.filled(bankSize * bankSize, 0, growable: false);
+  for (var y = 0; y < bankSize; y++) {
+    for (var x = 0; x < bankSize; x++) {
+      bank[y * bankSize + x] = (x + y) % 16;
+    }
+  }
+  _fallbackImageBanks
+    ..clear()
+    ..[0] = bank;
+  _fallbackTilemaps
+    ..clear()
+    ..[0] = const _FallbackTilemap(
+      width: 1,
+      height: 1,
+      imgsrc: 0,
+      data: <int>[0, 0],
+    );
+}
+
 /// Pyxel-compatible 1st-scope initialization API.
 void init(
   int widthValue,
@@ -233,6 +273,7 @@ void init(
     _fallbackClipW = width;
     _fallbackClipH = height;
     _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+    _seedFallbackResources();
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -269,6 +310,9 @@ void quit() {
   _fallbackClipW = 0;
   _fallbackClipH = 0;
   _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+  _fallbackImageBankSize = 16;
+  _fallbackImageBanks.clear();
+  _fallbackTilemaps.clear();
   _isInitialized = false;
 }
 
@@ -776,6 +820,118 @@ void text(int x, int y, String s, int col) {
       }
       cursorX += 4;
     }
+  }
+}
+
+void _fallbackDrawBltm(
+  double x,
+  double y,
+  int tm,
+  double u,
+  double v,
+  double w,
+  double h, {
+  int? colkey,
+}) {
+  final tilemap = _fallbackTilemaps[tm];
+  if (tilemap == null) {
+    return;
+  }
+  final sourceBank = _fallbackImageBanks[tilemap.imgsrc];
+  if (sourceBank == null || _fallbackImageBankSize <= 0) {
+    return;
+  }
+
+  final tilesW = w.abs().round().toInt();
+  final tilesH = h.abs().round().toInt();
+  if (tilesW <= 0 || tilesH <= 0) {
+    return;
+  }
+  final flipX = w < 0;
+  final flipY = h < 0;
+  final baseDx = x.round();
+  final baseDy = y.round();
+  final baseTx = u.round();
+  final baseTy = v.round();
+
+  for (var dy = 0; dy < tilesH; dy++) {
+    for (var dx = 0; dx < tilesW; dx++) {
+      final srcTx = baseTx + (flipX ? (tilesW - 1 - dx) : dx);
+      final srcTy = baseTy + (flipY ? (tilesH - 1 - dy) : dy);
+      if (srcTx < 0 ||
+          srcTx >= tilemap.width ||
+          srcTy < 0 ||
+          srcTy >= tilemap.height) {
+        continue;
+      }
+
+      final tileIndex = srcTy * tilemap.width + srcTx;
+      final pairIndex = tileIndex * 2;
+      if (pairIndex + 1 >= tilemap.data.length) {
+        continue;
+      }
+      final tileX = tilemap.data[pairIndex];
+      final tileY = tilemap.data[pairIndex + 1];
+
+      for (var py = 0; py < _fallbackTileSize; py++) {
+        for (var px = 0; px < _fallbackTileSize; px++) {
+          final srcX = tileX * _fallbackTileSize + px;
+          final srcY = tileY * _fallbackTileSize + py;
+          if (srcX < 0 ||
+              srcX >= _fallbackImageBankSize ||
+              srcY < 0 ||
+              srcY >= _fallbackImageBankSize) {
+            continue;
+          }
+
+          final color = sourceBank[srcY * _fallbackImageBankSize + srcX];
+          if (colkey != null && color == colkey) {
+            continue;
+          }
+
+          _fallbackSetPixel(
+            baseDx + dx * _fallbackTileSize + px,
+            baseDy + dy * _fallbackTileSize + py,
+            color,
+          );
+        }
+      }
+    }
+  }
+}
+
+/// Pyxel-compatible bltm API.
+void bltm(
+  double x,
+  double y,
+  int tm,
+  double u,
+  double v,
+  double w,
+  double h, {
+  int? colkey,
+}) {
+  _ensureInitialized('bltm');
+
+  final bindings = _getBindingsOrNull();
+  final ok =
+      bindings?.flutterxel_core_bltm(
+        x,
+        y,
+        tm,
+        u,
+        v,
+        w,
+        h,
+        _encodeOptionalI32(colkey),
+      ) ??
+      true;
+  if (!ok) {
+    throw StateError('flutterxel_core_bltm failed.');
+  }
+
+  if (bindings == null) {
+    _fallbackDrawBltm(x, y, tm, u, v, w, h, colkey: colkey);
   }
 }
 

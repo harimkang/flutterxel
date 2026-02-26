@@ -145,6 +145,15 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_text(int32_t x,
                                                  int32_t y,
                                                  const char* text,
                                                  int32_t col);
+// pyxel.bltm(x, y, tm, u, v, w, h, colkey=None)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_bltm(double x,
+                                                 double y,
+                                                 int32_t tm,
+                                                 double u,
+                                                 double v,
+                                                 double w,
+                                                 double h,
+                                                 int32_t colkey);
 
 // pyxel.blt(x, y, img, u, v, w, h, colkey=None, *, rotate=None, scale=None)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_blt(

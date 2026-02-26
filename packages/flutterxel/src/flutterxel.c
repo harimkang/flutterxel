@@ -14,6 +14,7 @@
 #define PRESSED_KEY_CAPACITY 1024
 #define CHANNEL_CAPACITY 64
 #define DEFAULT_IMAGE_BANK_SIZE 16
+#define TILE_SIZE 8
 
 typedef struct FlutterxelState {
   bool initialized;
@@ -813,6 +814,62 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_text(
       }
     }
     cursor_x += 4;
+  }
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_bltm(
+    double x,
+    double y,
+    int32_t tm,
+    double u,
+    double v,
+    double w,
+    double h,
+    int32_t colkey) {
+  (void)tm;
+  if (!g_state.initialized || g_state.frame_buffer == NULL) {
+    return false;
+  }
+
+  int32_t tiles_w = (int32_t)llround(fabs(w));
+  int32_t tiles_h = (int32_t)llround(fabs(h));
+  if (tiles_w <= 0 || tiles_h <= 0) {
+    return true;
+  }
+
+  int32_t base_dx = (int32_t)llround(x);
+  int32_t base_dy = (int32_t)llround(y);
+  int32_t base_tx = (int32_t)llround(u);
+  int32_t base_ty = (int32_t)llround(v);
+  bool flip_x = w < 0;
+  bool flip_y = h < 0;
+
+  for (int32_t dy = 0; dy < tiles_h; dy++) {
+    for (int32_t dx = 0; dx < tiles_w; dx++) {
+      int32_t src_tile_x = base_tx + (flip_x ? (tiles_w - 1 - dx) : dx);
+      int32_t src_tile_y = base_ty + (flip_y ? (tiles_h - 1 - dy) : dy);
+
+      for (int32_t py = 0; py < TILE_SIZE; py++) {
+        for (int32_t px = 0; px < TILE_SIZE; px++) {
+          int32_t src_x = src_tile_x * TILE_SIZE + px;
+          int32_t src_y = src_tile_y * TILE_SIZE + py;
+          if (src_x < 0 || src_x >= g_state.image_bank_size || src_y < 0 ||
+              src_y >= g_state.image_bank_size) {
+            continue;
+          }
+
+          int32_t src_color = g_state.image_bank0[src_y * g_state.image_bank_size + src_x];
+          if (colkey != OPTIONAL_I32_NONE && src_color == colkey) {
+            continue;
+          }
+
+          int32_t dst_x = base_dx + dx * TILE_SIZE + px;
+          int32_t dst_y = base_dy + dy * TILE_SIZE + py;
+          set_frame_pixel(dst_x, dst_y, src_color);
+        }
+      }
+    }
   }
   return true;
 }

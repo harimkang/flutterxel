@@ -116,6 +116,14 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_text(int32_t x,
                                              int32_t y,
                                              const char* text,
                                              int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_bltm(double x,
+                                             double y,
+                                             int32_t tm,
+                                             double u,
+                                             double v,
+                                             double w,
+                                             double h,
+                                             int32_t colkey);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double x,
