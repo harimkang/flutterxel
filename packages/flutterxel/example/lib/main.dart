@@ -10,8 +10,16 @@ void main() {
 
   flutterxel.run(
     () {
+      if (flutterxel.btn(flutterxel.KEY_LEFT)) {
+        _x -= 2.0;
+      }
+      if (flutterxel.btn(flutterxel.KEY_RIGHT)) {
+        _x += 2.0;
+      }
+
       _x += _vx;
       if (_x <= 0 || _x >= flutterxel.width - _spriteSize) {
+        _x = _x.clamp(0, flutterxel.width - _spriteSize);
         _vx = -_vx;
       }
     },

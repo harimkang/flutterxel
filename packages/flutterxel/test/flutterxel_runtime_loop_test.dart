@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 
@@ -55,5 +56,43 @@ void main() {
     expect(find.byType(CustomPaint), findsWidgets);
 
     flutterxel.stopRunLoop();
+  });
+
+  testWidgets('FlutterxelView maps keyboard and pointer input to btn state', (
+    tester,
+  ) async {
+    flutterxel.init(16, 16, fps: 30);
+    flutterxel.setBtnState(flutterxel.MOUSE_BUTTON_LEFT, true);
+    expect(flutterxel.btn(flutterxel.MOUSE_BUTTON_LEFT), isTrue);
+    flutterxel.setBtnState(flutterxel.MOUSE_BUTTON_LEFT, false);
+    expect(flutterxel.btn(flutterxel.MOUSE_BUTTON_LEFT), isFalse);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(child: flutterxel.FlutterxelView(pixelScale: 2)),
+        ),
+      ),
+    );
+
+    final viewFinder = find.byType(flutterxel.FlutterxelView);
+    expect(viewFinder, findsOneWidget);
+
+    final gesture = await tester.startGesture(tester.getCenter(viewFinder));
+    await tester.pump();
+    expect(flutterxel.btn(flutterxel.MOUSE_BUTTON_LEFT), isTrue);
+
+    await gesture.up();
+    await tester.pump();
+    expect(flutterxel.btn(flutterxel.MOUSE_BUTTON_LEFT), isFalse);
+
+    await tester.tap(viewFinder);
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+    expect(flutterxel.btn(flutterxel.KEY_LEFT), isTrue);
+
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+    expect(flutterxel.btn(flutterxel.KEY_LEFT), isFalse);
   });
 }

@@ -11,7 +11,7 @@
 #define ABI_VERSION_PATCH 0
 #define OPTIONAL_I32_NONE INT32_MIN
 #define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
-#define KEY_STATE_CAPACITY 2048
+#define PRESSED_KEY_CAPACITY 1024
 #define CHANNEL_CAPACITY 64
 #define DEFAULT_IMAGE_BANK_SIZE 16
 
@@ -23,7 +23,8 @@ typedef struct FlutterxelState {
   int32_t clear_color;
   int32_t* frame_buffer;
   size_t frame_buffer_len;
-  uint8_t key_state[KEY_STATE_CAPACITY];
+  int32_t pressed_keys[PRESSED_KEY_CAPACITY];
+  size_t pressed_key_count;
   uint8_t channel_state[CHANNEL_CAPACITY];
   int32_t image_bank_size;
   int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
@@ -53,6 +54,15 @@ static bool validate_resource_flags(
          is_valid_optional_bool(exclude_tilemaps) &&
          is_valid_optional_bool(exclude_sounds) &&
          is_valid_optional_bool(exclude_musics);
+}
+
+static int find_pressed_key_index(int32_t key) {
+  for (size_t i = 0; i < g_state.pressed_key_count; i++) {
+    if (g_state.pressed_keys[i] == key) {
+      return (int)i;
+    }
+  }
+  return -1;
 }
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
@@ -104,7 +114,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.height = height;
   g_state.frame_count = 0;
   g_state.clear_color = 0;
-  memset(g_state.key_state, 0, sizeof(g_state.key_state));
+  g_state.pressed_key_count = 0;
+  memset(g_state.pressed_keys, 0, sizeof(g_state.pressed_keys));
   memset(g_state.channel_state, 0, sizeof(g_state.channel_state));
   seed_default_image_bank();
   return true;
@@ -156,20 +167,37 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_btn(int32_t key) {
   if (!g_state.initialized) {
     return false;
   }
-  if (key < 0 || key >= KEY_STATE_CAPACITY) {
-    return false;
-  }
-  return g_state.key_state[key] != 0;
+  return find_pressed_key_index(key) >= 0;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_btn_state(int32_t key, bool pressed) {
   if (!g_state.initialized) {
     return false;
   }
-  if (key < 0 || key >= KEY_STATE_CAPACITY) {
-    return false;
+
+  int existing_index = find_pressed_key_index(key);
+  if (pressed) {
+    if (existing_index >= 0) {
+      return true;
+    }
+    if (g_state.pressed_key_count >= PRESSED_KEY_CAPACITY) {
+      return false;
+    }
+    g_state.pressed_keys[g_state.pressed_key_count++] = key;
+    return true;
   }
-  g_state.key_state[key] = pressed ? 1 : 0;
+
+  if (existing_index < 0) {
+    return true;
+  }
+
+  size_t index = (size_t)existing_index;
+  size_t last_index = g_state.pressed_key_count - 1;
+  if (index != last_index) {
+    g_state.pressed_keys[index] = g_state.pressed_keys[last_index];
+  }
+  g_state.pressed_keys[last_index] = 0;
+  g_state.pressed_key_count -= 1;
   return true;
 }
 

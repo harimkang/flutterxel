@@ -1,8 +1,11 @@
+// ignore_for_file: constant_identifier_names
+
 import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'flutterxel_bindings_generated.dart';
@@ -12,6 +15,33 @@ const int _optionalBoolNone = -1;
 const int _optionalBoolFalse = 0;
 const int _optionalBoolTrue = 1;
 
+// Pyxel-compatible key codes (subset used for mobile-first input mapping).
+const int KEY_RETURN = 0x0D;
+const int KEY_ESCAPE = 0x1B;
+const int KEY_SPACE = 0x20;
+const int KEY_RIGHT = 0x4000004F;
+const int KEY_LEFT = 0x40000050;
+const int KEY_DOWN = 0x40000051;
+const int KEY_UP = 0x40000052;
+
+const int MOUSE_KEY_START_INDEX = 0x50000100;
+const int MOUSE_POS_X = MOUSE_KEY_START_INDEX;
+const int MOUSE_POS_Y = MOUSE_KEY_START_INDEX + 1;
+const int MOUSE_BUTTON_LEFT = MOUSE_KEY_START_INDEX + 4;
+const int MOUSE_BUTTON_MIDDLE = MOUSE_KEY_START_INDEX + 5;
+const int MOUSE_BUTTON_RIGHT = MOUSE_KEY_START_INDEX + 6;
+
+final Map<LogicalKeyboardKey, int> _defaultKeyboardMapping =
+    <LogicalKeyboardKey, int>{
+      LogicalKeyboardKey.arrowLeft: KEY_LEFT,
+      LogicalKeyboardKey.arrowRight: KEY_RIGHT,
+      LogicalKeyboardKey.arrowUp: KEY_UP,
+      LogicalKeyboardKey.arrowDown: KEY_DOWN,
+      LogicalKeyboardKey.space: KEY_SPACE,
+      LogicalKeyboardKey.enter: KEY_RETURN,
+      LogicalKeyboardKey.escape: KEY_ESCAPE,
+    };
+
 int width = 0;
 int height = 0;
 int frameCount = 0;
@@ -20,6 +50,7 @@ bool _isInitialized = false;
 int _runtimeFps = 30;
 Timer? _runLoopTimer;
 final ValueNotifier<int> _frameNotifier = ValueNotifier<int>(0);
+final Set<int> _fallbackPressedKeys = <int>{};
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -131,6 +162,7 @@ void init(
     frameCount = 0;
     _runtimeFps = (fps ?? 30).clamp(1, 240).toInt();
     _frameNotifier.value = frameCount;
+    _fallbackPressedKeys.clear();
     _isInitialized = true;
     stopRunLoop();
   } finally {
@@ -193,16 +225,34 @@ bool btn(int key) {
     return false;
   }
   final bindings = _getBindingsOrNull();
-  return bindings?.flutterxel_core_btn(key) ?? false;
+  if (bindings == null) {
+    return _fallbackPressedKeys.contains(key);
+  }
+  return bindings.flutterxel_core_btn(key);
 }
 
 /// Runtime input bridge for forwarding external key/touch mappings.
 void setBtnState(int key, bool pressed) {
-  _ensureInitialized('setBtnState');
+  if (!_isInitialized) {
+    return;
+  }
   final bindings = _getBindingsOrNull();
-  final ok = bindings?.flutterxel_core_set_btn_state(key, pressed) ?? true;
+  if (bindings == null) {
+    if (pressed) {
+      _fallbackPressedKeys.add(key);
+    } else {
+      _fallbackPressedKeys.remove(key);
+    }
+    return;
+  }
+  final ok = bindings.flutterxel_core_set_btn_state(key, pressed);
   if (!ok) {
     throw StateError('flutterxel_core_set_btn_state failed.');
+  }
+  if (pressed) {
+    _fallbackPressedKeys.add(key);
+  } else {
+    _fallbackPressedKeys.remove(key);
   }
 }
 
@@ -441,41 +491,123 @@ const List<Color> _defaultPalette = <Color>[
   Color(0xFFEDC7B0),
 ];
 
-class FlutterxelView extends StatelessWidget {
+class FlutterxelView extends StatefulWidget {
   const FlutterxelView({
     super.key,
     this.pixelScale = 4,
     this.palette = _defaultPalette,
     this.backgroundColor = const Color(0xFF000000),
+    this.captureInput = true,
+    this.autofocus = true,
+    this.keyboardMapping,
+    this.focusNode,
   });
 
   final double pixelScale;
   final List<Color> palette;
   final Color backgroundColor;
+  final bool captureInput;
+  final bool autofocus;
+  final Map<LogicalKeyboardKey, int>? keyboardMapping;
+  final FocusNode? focusNode;
+
+  @override
+  State<FlutterxelView> createState() => _FlutterxelViewState();
+}
+
+class _FlutterxelViewState extends State<FlutterxelView> {
+  late final FocusNode _focusNode;
+  late final bool _ownsFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ?? FocusNode(debugLabel: 'FlutterxelView');
+  }
+
+  @override
+  void dispose() {
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode _, KeyEvent event) {
+    if (!widget.captureInput || !_isInitialized) {
+      return KeyEventResult.ignored;
+    }
+
+    final mapping = widget.keyboardMapping ?? _defaultKeyboardMapping;
+    final mappedKey = mapping[event.logicalKey];
+    if (mappedKey == null) {
+      return KeyEventResult.ignored;
+    }
+
+    final pressed = event is! KeyUpEvent;
+    setBtnState(mappedKey, pressed);
+    return KeyEventResult.handled;
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (!widget.captureInput || !_isInitialized) {
+      return;
+    }
+    _focusNode.requestFocus();
+    setBtnState(MOUSE_BUTTON_LEFT, true);
+  }
+
+  void _handlePointerUp(PointerEvent event) {
+    if (!widget.captureInput || !_isInitialized) {
+      return;
+    }
+    setBtnState(MOUSE_BUTTON_LEFT, false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final viewWidth = width > 0 ? width : 1;
     final viewHeight = height > 0 ? height : 1;
 
-    return AnimatedBuilder(
+    final view = AnimatedBuilder(
       animation: _frameNotifier,
       builder: (context, _) {
         final frame = frameBufferSnapshot();
         return RepaintBoundary(
           child: CustomPaint(
-            size: Size(viewWidth * pixelScale, viewHeight * pixelScale),
+            size: Size(
+              viewWidth * widget.pixelScale,
+              viewHeight * widget.pixelScale,
+            ),
             painter: _FlutterxelViewPainter(
               frame: frame,
               frameWidth: viewWidth,
               frameHeight: viewHeight,
-              pixelScale: pixelScale,
-              palette: palette,
-              backgroundColor: backgroundColor,
+              pixelScale: widget.pixelScale,
+              palette: widget.palette,
+              backgroundColor: widget.backgroundColor,
             ),
           ),
         );
       },
+    );
+
+    if (!widget.captureInput) {
+      return view;
+    }
+
+    return Focus(
+      autofocus: widget.autofocus,
+      focusNode: _focusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _handlePointerDown,
+        onPointerUp: _handlePointerUp,
+        onPointerCancel: _handlePointerUp,
+        child: view,
+      ),
     );
   }
 }

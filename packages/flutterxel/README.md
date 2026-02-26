@@ -51,6 +51,12 @@ Render with:
 const flutterxel.FlutterxelView(pixelScale: 3)
 ```
 
+`FlutterxelView` captures input by default:
+
+- pointer/touch -> `MOUSE_BUTTON_LEFT`
+- arrow keys -> `KEY_LEFT/KEY_RIGHT/KEY_UP/KEY_DOWN`
+- `space/enter/escape` -> `KEY_SPACE/KEY_RETURN/KEY_ESCAPE`
+
 ## Monorepo
 
 The repository is organized as:
