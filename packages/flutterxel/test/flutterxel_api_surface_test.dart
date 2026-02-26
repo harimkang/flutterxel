@@ -310,6 +310,10 @@ void main() {
     sound.speed = 2;
     expect(sound.total_sec(), 1.0);
     sound.mml('T120 CDE');
+    expect(sound.total_sec(), closeTo(1.49996, 1e-4));
+    sound.mml('[C]2');
+    expect(sound.total_sec(), closeTo(0.99997, 1e-4));
+    sound.mml('[C]');
     expect(sound.total_sec(), isNull);
     sound.mml();
     expect(sound.total_sec(), 1.0);
@@ -318,6 +322,7 @@ void main() {
     expect(() => sound.set_tones('x'), throwsFormatException);
     expect(() => sound.set_volumes('9'), throwsFormatException);
     expect(() => sound.set_effects('z'), throwsFormatException);
+    expect(() => sound.mml('T0 C'), throwsFormatException);
   });
 
   test('tilemap primitives, blt and collide update tile data', () {

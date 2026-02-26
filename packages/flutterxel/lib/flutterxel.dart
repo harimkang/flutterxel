@@ -4120,6 +4120,372 @@ List<int> _parseSoundEffects(String effects) {
   return parsed;
 }
 
+const int _mmlAudioClockRate = 1789773;
+const int _mmlTicksPerQuarterNote = 48;
+const int _mmlDefaultTempo = 120;
+const int _mmlDefaultOctave = 4;
+const int _mmlDefaultLength = 4;
+
+sealed class _MmlEvent {
+  const _MmlEvent();
+}
+
+class _MmlTempoEvent extends _MmlEvent {
+  const _MmlTempoEvent(this.bpm);
+  final int bpm;
+}
+
+class _MmlDurationEvent extends _MmlEvent {
+  const _MmlDurationEvent(this.ticks);
+  final int ticks;
+}
+
+class _MmlRepeatStartEvent extends _MmlEvent {
+  const _MmlRepeatStartEvent();
+}
+
+class _MmlRepeatEndEvent extends _MmlEvent {
+  const _MmlRepeatEndEvent(this.playCount);
+  final int playCount;
+}
+
+class _MmlCharStream {
+  _MmlCharStream(this.source);
+
+  final String source;
+  int pos = 0;
+
+  bool get isEof => pos >= source.length;
+
+  String error(String message) => 'MML:$pos: $message';
+
+  String? peek() => isEof ? null : source[pos];
+
+  String? next() {
+    if (isEof) {
+      return null;
+    }
+    final value = source[pos];
+    pos += 1;
+    return value;
+  }
+
+  void skipWhitespace() {
+    while (!isEof) {
+      final c = source[pos];
+      if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+        pos += 1;
+      } else {
+        break;
+      }
+    }
+  }
+
+  bool consumeChar(String c) {
+    skipWhitespace();
+    if (!isEof && source[pos] == c) {
+      pos += 1;
+      return true;
+    }
+    return false;
+  }
+
+  bool consumeStringIgnoreCase(String text) {
+    skipWhitespace();
+    if (pos + text.length > source.length) {
+      return false;
+    }
+    for (var i = 0; i < text.length; i++) {
+      final actual = source[pos + i].toLowerCase();
+      final expected = text[i].toLowerCase();
+      if (actual != expected) {
+        return false;
+      }
+    }
+    pos += text.length;
+    return true;
+  }
+
+  int parseRequiredInt(String name, {int? min, int? max}) {
+    skipWhitespace();
+    final start = pos;
+    var sign = 1;
+    if (!isEof && source[pos] == '-') {
+      sign = -1;
+      pos += 1;
+    }
+    final digitsStart = pos;
+    while (!isEof) {
+      final unit = source.codeUnitAt(pos);
+      if (unit >= 0x30 && unit <= 0x39) {
+        pos += 1;
+      } else {
+        break;
+      }
+    }
+    if (digitsStart == pos) {
+      pos = start;
+      final found = isEof ? '<eof>' : source[pos];
+      throw FormatException(
+        error("Expected value for '$name' but found '$found'"),
+      );
+    }
+    final value = sign * int.parse(source.substring(digitsStart, pos));
+    if (min != null && value < min) {
+      throw FormatException(error("'$name' is below minimum $min"));
+    }
+    if (max != null && value > max) {
+      throw FormatException(error("'$name' exceeds maximum $max"));
+    }
+    return value;
+  }
+
+  int? parseOptionalUnsignedInt() {
+    skipWhitespace();
+    final start = pos;
+    while (!isEof) {
+      final unit = source.codeUnitAt(pos);
+      if (unit >= 0x30 && unit <= 0x39) {
+        pos += 1;
+      } else {
+        break;
+      }
+    }
+    if (start == pos) {
+      return null;
+    }
+    return int.parse(source.substring(start, pos));
+  }
+}
+
+int _bpmToMmlClocksPerTick(int bpm) {
+  return ((_mmlAudioClockRate * 60) / (bpm * _mmlTicksPerQuarterNote)).round();
+}
+
+int _parseMmlLengthAsTicks(_MmlCharStream stream, int currentNoteTicks) {
+  const wholeNoteTicks = _mmlTicksPerQuarterNote * 4;
+  var noteTicks = currentNoteTicks;
+  final length = stream.parseOptionalUnsignedInt();
+  if (length != null) {
+    if (length <= 0 || wholeNoteTicks % length != 0) {
+      throw FormatException(stream.error("Invalid note length '$length'"));
+    }
+    noteTicks = wholeNoteTicks ~/ length;
+  }
+  var dotTicks = noteTicks;
+  while (stream.consumeChar('.')) {
+    if (dotTicks.isOdd) {
+      throw FormatException(
+        stream.error('Cannot apply dot to odd note length'),
+      );
+    }
+    dotTicks ~/= 2;
+    noteTicks += dotTicks;
+  }
+  return noteTicks;
+}
+
+List<_MmlEvent> _parseMmlEvents(String code) {
+  final stream = _MmlCharStream(code);
+  final events = <_MmlEvent>[];
+  var octave = _mmlDefaultOctave;
+  var noteTicks = (_mmlTicksPerQuarterNote * 4) ~/ _mmlDefaultLength;
+
+  while (true) {
+    stream.skipWhitespace();
+    if (stream.isEof) {
+      break;
+    }
+
+    if (stream.consumeChar('[')) {
+      events.add(const _MmlRepeatStartEvent());
+      continue;
+    }
+    if (stream.consumeChar(']')) {
+      final playCount = stream.parseOptionalUnsignedInt() ?? 0;
+      events.add(_MmlRepeatEndEvent(playCount));
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('T')) {
+      final bpm = stream.parseRequiredInt('bpm', min: 1);
+      events.add(_MmlTempoEvent(bpm));
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('Q')) {
+      stream.parseRequiredInt('gate_percent', min: 0, max: 100);
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('V')) {
+      stream.parseRequiredInt('vol', min: 0, max: 127);
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('K')) {
+      stream.parseRequiredInt('key_offset');
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('Y')) {
+      stream.parseRequiredInt('offset_cents');
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('@ENV')) {
+      stream.parseRequiredInt('slot', min: 0);
+      if (stream.consumeChar('{')) {
+        var depth = 1;
+        while (!stream.isEof && depth > 0) {
+          final c = stream.next();
+          if (c == '{') {
+            depth += 1;
+          } else if (c == '}') {
+            depth -= 1;
+          }
+        }
+        if (depth != 0) {
+          throw FormatException(stream.error("Expected '}'"));
+        }
+      }
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('@VIB')) {
+      stream.parseRequiredInt('slot', min: 0);
+      if (stream.consumeChar('{')) {
+        var depth = 1;
+        while (!stream.isEof && depth > 0) {
+          final c = stream.next();
+          if (c == '{') {
+            depth += 1;
+          } else if (c == '}') {
+            depth -= 1;
+          }
+        }
+        if (depth != 0) {
+          throw FormatException(stream.error("Expected '}'"));
+        }
+      }
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('@GLI')) {
+      stream.parseRequiredInt('slot', min: 0);
+      if (stream.consumeChar('{')) {
+        var depth = 1;
+        while (!stream.isEof && depth > 0) {
+          final c = stream.next();
+          if (c == '{') {
+            depth += 1;
+          } else if (c == '}') {
+            depth -= 1;
+          }
+        }
+        if (depth != 0) {
+          throw FormatException(stream.error("Expected '}'"));
+        }
+      }
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('@')) {
+      stream.parseRequiredInt('tone', min: 0);
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('O')) {
+      octave = stream.parseRequiredInt('oct', min: -1, max: 9);
+      continue;
+    }
+    if (stream.consumeChar('>')) {
+      if (octave >= 9) {
+        throw FormatException(stream.error('Octave exceeds maximum $octave'));
+      }
+      octave += 1;
+      continue;
+    }
+    if (stream.consumeChar('<')) {
+      if (octave <= -1) {
+        throw FormatException(stream.error('Octave is below minimum $octave'));
+      }
+      octave -= 1;
+      continue;
+    }
+    if (stream.consumeStringIgnoreCase('L')) {
+      noteTicks = _parseMmlLengthAsTicks(stream, noteTicks);
+      continue;
+    }
+
+    stream.skipWhitespace();
+    final head = stream.peek()?.toLowerCase();
+    if (head == null) {
+      break;
+    }
+
+    const noteLetters = <String>{'c', 'd', 'e', 'f', 'g', 'a', 'b'};
+    if (noteLetters.contains(head)) {
+      stream.next();
+      final accidental = stream.peek();
+      if (accidental == '#' || accidental == '+' || accidental == '-') {
+        stream.next();
+      }
+      var durationTicks = _parseMmlLengthAsTicks(stream, noteTicks);
+      while (stream.consumeChar('&')) {
+        stream.skipWhitespace();
+        final next = stream.peek();
+        if (next != null) {
+          final unit = next.codeUnitAt(0);
+          final isDigit = unit >= 0x30 && unit <= 0x39;
+          if (isDigit) {
+            durationTicks += _parseMmlLengthAsTicks(stream, noteTicks);
+            continue;
+          }
+        }
+        break;
+      }
+      events.add(_MmlDurationEvent(durationTicks));
+      continue;
+    }
+
+    if (head == 'r') {
+      stream.next();
+      var durationTicks = _parseMmlLengthAsTicks(stream, noteTicks);
+      while (stream.consumeChar('&')) {
+        durationTicks += _parseMmlLengthAsTicks(stream, noteTicks);
+      }
+      events.add(_MmlDurationEvent(durationTicks));
+      continue;
+    }
+
+    throw FormatException(stream.error("Unexpected character '$head'"));
+  }
+  return events;
+}
+
+double? _calcMmlDurationSec(String code) {
+  final events = _parseMmlEvents(code);
+  var clocksPerTick = _bpmToMmlClocksPerTick(_mmlDefaultTempo);
+  var totalClocks = 0;
+  final repeatPoints = <(int, int)>[];
+  var index = 0;
+  while (index < events.length) {
+    final event = events[index];
+    index += 1;
+    switch (event) {
+      case _MmlTempoEvent(:final bpm):
+        clocksPerTick = _bpmToMmlClocksPerTick(bpm);
+      case _MmlDurationEvent(:final ticks):
+        totalClocks += clocksPerTick * ticks;
+      case _MmlRepeatStartEvent():
+        repeatPoints.add((index, 0));
+      case _MmlRepeatEndEvent(:final playCount):
+        if (playCount == 0) {
+          return null;
+        }
+        if (repeatPoints.isNotEmpty) {
+          final point = repeatPoints.removeLast();
+          if (point.$2 + 1 < playCount) {
+            repeatPoints.add((point.$1, point.$2 + 1));
+            index = point.$1;
+          }
+        }
+    }
+  }
+  return totalClocks / _mmlAudioClockRate;
+}
+
 class Tone {
   Tone() {
     wavetable = Seq<int>.proxy(() => _wavetableData);
@@ -4153,6 +4519,7 @@ class Sound {
   late final Seq<int> effects;
   int speed = 30;
   String? _mmlCode;
+  double? _mmlDurationSec;
 
   void set(
     String notes,
@@ -4211,8 +4578,10 @@ class Sound {
   void mml([String? code, bool? old_syntax]) {
     if (code == null) {
       _mmlCode = null;
+      _mmlDurationSec = null;
       return;
     }
+    _mmlDurationSec = _calcMmlDurationSec(code);
     _mmlCode = code;
   }
 
@@ -4222,7 +4591,7 @@ class Sound {
 
   double? total_sec() {
     if (_mmlCode != null) {
-      return null;
+      return _mmlDurationSec;
     }
     if (speed <= 0 || _notesData.isEmpty) {
       return null;
