@@ -346,6 +346,32 @@ int _fallbackGetImagePixel(int imageId, int x, int y) {
 _FallbackTilemap _fallbackEnsureTilemap(int tilemapId) {
   final existing = _fallbackTilemaps[tilemapId];
   if (existing != null) {
+    if (existing.width < TILEMAP_SIZE || existing.height < TILEMAP_SIZE) {
+      final newWidth = TILEMAP_SIZE;
+      final newHeight = TILEMAP_SIZE;
+      final newData = List<int>.filled(
+        newWidth * newHeight * 2,
+        0,
+        growable: false,
+      );
+      final copyWidth = math.min(existing.width, newWidth);
+      final copyHeight = math.min(existing.height, newHeight);
+      for (var y = 0; y < copyHeight; y++) {
+        for (var x = 0; x < copyWidth; x++) {
+          final oldPairIndex = (y * existing.width + x) * 2;
+          final newPairIndex = (y * newWidth + x) * 2;
+          if (oldPairIndex + 1 >= existing.data.length) {
+            continue;
+          }
+          newData[newPairIndex] = existing.data[oldPairIndex];
+          newData[newPairIndex + 1] = existing.data[oldPairIndex + 1];
+        }
+      }
+      existing
+        ..width = newWidth
+        ..height = newHeight
+        ..data = newData;
+    }
     return existing;
   }
   final created = _FallbackTilemap(
@@ -2853,16 +2879,225 @@ class Tilemap {
     data[pairIndex + 1] = tile.$2;
   }
 
-  void line(num x1, num y1, num x2, num y2, (int, int) tile) {}
-  void rect(num x, num y, num w, num h, (int, int) tile) {}
-  void rectb(num x, num y, num w, num h, (int, int) tile) {}
-  void circ(num x, num y, num r, (int, int) tile) {}
-  void circb(num x, num y, num r, (int, int) tile) {}
-  void elli(num x, num y, num w, num h, (int, int) tile) {}
-  void ellib(num x, num y, num w, num h, (int, int) tile) {}
-  void tri(num x1, num y1, num x2, num y2, num x3, num y3, (int, int) tile) {}
-  void trib(num x1, num y1, num x2, num y2, num x3, num y3, (int, int) tile) {}
-  void fill(num x, num y, (int, int) tile) {}
+  void line(num x1, num y1, num x2, num y2, (int, int) tile) {
+    var cx = x1.round();
+    var cy = y1.round();
+    final tx = x2.round();
+    final ty = y2.round();
+    final dx = (tx - cx).abs();
+    final sx = cx < tx ? 1 : -1;
+    final dy = -(ty - cy).abs();
+    final sy = cy < ty ? 1 : -1;
+    var err = dx + dy;
+    while (true) {
+      pset(cx, cy, tile);
+      if (cx == tx && cy == ty) {
+        break;
+      }
+      final e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        cx += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        cy += sy;
+      }
+    }
+  }
+
+  void rect(num x, num y, num w, num h, (int, int) tile) {
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    for (var py = y0; py < y0 + hh; py++) {
+      for (var px = x0; px < x0 + ww; px++) {
+        pset(px, py, tile);
+      }
+    }
+  }
+
+  void rectb(num x, num y, num w, num h, (int, int) tile) {
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    final right = x0 + ww - 1;
+    final bottom = y0 + hh - 1;
+    for (var px = x0; px <= right; px++) {
+      pset(px, y0, tile);
+      pset(px, bottom, tile);
+    }
+    for (var py = y0 + 1; py < bottom; py++) {
+      pset(x0, py, tile);
+      pset(right, py, tile);
+    }
+  }
+
+  void circ(num x, num y, num r, (int, int) tile) {
+    final cx = x.round();
+    final cy = y.round();
+    final rr = r.round();
+    if (rr < 0) {
+      return;
+    }
+    final rSq = rr * rr;
+    for (var dy = -rr; dy <= rr; dy++) {
+      final remain = rSq - dy * dy;
+      final maxDx = math.sqrt(remain).floor();
+      for (var dx = -maxDx; dx <= maxDx; dx++) {
+        pset(cx + dx, cy + dy, tile);
+      }
+    }
+  }
+
+  void circb(num x, num y, num r, (int, int) tile) {
+    final cx = x.round();
+    final cy = y.round();
+    final rr = r.round();
+    if (rr < 0) {
+      return;
+    }
+    var px = rr;
+    var py = 0;
+    var err = 1 - px;
+    while (px >= py) {
+      pset(cx + px, cy + py, tile);
+      pset(cx - px, cy + py, tile);
+      pset(cx + px, cy - py, tile);
+      pset(cx - px, cy - py, tile);
+      pset(cx + py, cy + px, tile);
+      pset(cx - py, cy + px, tile);
+      pset(cx + py, cy - px, tile);
+      pset(cx - py, cy - px, tile);
+      py += 1;
+      if (err < 0) {
+        err += 2 * py + 1;
+      } else {
+        px -= 1;
+        err += 2 * (py - px + 1);
+      }
+    }
+  }
+
+  void elli(num x, num y, num w, num h, (int, int) tile) {
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    for (var py = 0; py < hh; py++) {
+      for (var px = 0; px < ww; px++) {
+        if (_fallbackEllipseContains(px, py, ww, hh)) {
+          pset(x0 + px, y0 + py, tile);
+        }
+      }
+    }
+  }
+
+  void ellib(num x, num y, num w, num h, (int, int) tile) {
+    final x0 = x.round();
+    final y0 = y.round();
+    final ww = w.round();
+    final hh = h.round();
+    if (ww <= 0 || hh <= 0) {
+      return;
+    }
+    for (var py = 0; py < hh; py++) {
+      for (var px = 0; px < ww; px++) {
+        if (!_fallbackEllipseContains(px, py, ww, hh)) {
+          continue;
+        }
+        final isEdge =
+            !_fallbackEllipseContains(px - 1, py, ww, hh) ||
+            !_fallbackEllipseContains(px + 1, py, ww, hh) ||
+            !_fallbackEllipseContains(px, py - 1, ww, hh) ||
+            !_fallbackEllipseContains(px, py + 1, ww, hh);
+        if (isEdge) {
+          pset(x0 + px, y0 + py, tile);
+        }
+      }
+    }
+  }
+
+  void tri(num x1, num y1, num x2, num y2, num x3, num y3, (int, int) tile) {
+    final ax = x1.round();
+    final ay = y1.round();
+    final bx = x2.round();
+    final by = y2.round();
+    final cx = x3.round();
+    final cy = y3.round();
+    final minX = [ax, bx, cx].reduce(math.min);
+    final maxX = [ax, bx, cx].reduce(math.max);
+    final minY = [ay, by, cy].reduce(math.min);
+    final maxY = [ay, by, cy].reduce(math.max);
+
+    int edge(int sx, int sy, int ex, int ey, int px, int py) {
+      return (px - sx) * (ey - sy) - (py - sy) * (ex - sx);
+    }
+
+    for (var py = minY; py <= maxY; py++) {
+      for (var px = minX; px <= maxX; px++) {
+        final w1 = edge(ax, ay, bx, by, px, py);
+        final w2 = edge(bx, by, cx, cy, px, py);
+        final w3 = edge(cx, cy, ax, ay, px, py);
+        final allNonNegative = w1 >= 0 && w2 >= 0 && w3 >= 0;
+        final allNonPositive = w1 <= 0 && w2 <= 0 && w3 <= 0;
+        if (allNonNegative || allNonPositive) {
+          pset(px, py, tile);
+        }
+      }
+    }
+  }
+
+  void trib(num x1, num y1, num x2, num y2, num x3, num y3, (int, int) tile) {
+    line(x1, y1, x2, y2, tile);
+    line(x2, y2, x3, y3, tile);
+    line(x3, y3, x1, y1, tile);
+  }
+
+  void fill(num x, num y, (int, int) tile) {
+    final sx = x.round();
+    final sy = y.round();
+    if (sx < 0 || sy < 0 || sx >= width || sy >= height) {
+      return;
+    }
+    final target = pget(sx, sy);
+    if (target == tile) {
+      return;
+    }
+
+    final stack = <int>[sx, sy];
+    while (stack.isNotEmpty) {
+      final cy = stack.removeLast();
+      final cx = stack.removeLast();
+      if (cx < 0 || cy < 0 || cx >= width || cy >= height) {
+        continue;
+      }
+      if (pget(cx, cy) != target) {
+        continue;
+      }
+      pset(cx, cy, tile);
+      stack
+        ..add(cx - 1)
+        ..add(cy)
+        ..add(cx + 1)
+        ..add(cy)
+        ..add(cx)
+        ..add(cy - 1)
+        ..add(cx)
+        ..add(cy + 1);
+    }
+  }
 
   (double, double) collide(
     num x,
@@ -2873,7 +3108,111 @@ class Tilemap {
     num dy,
     List<(int, int)> walls,
   ) {
-    return (dx.toDouble(), dy.toDouble());
+    if (walls.isEmpty) {
+      return (dx.toDouble(), dy.toDouble());
+    }
+    final wallSet = walls.toSet();
+    final originX = x.toDouble();
+    final originY = y.toDouble();
+    final widthPx = w.toDouble();
+    final heightPx = h.toDouble();
+    final tileSize = _fallbackTileSize.toDouble();
+
+    bool isWall(int tx, int ty) {
+      if (tx < 0 || ty < 0 || tx >= width || ty >= height) {
+        return false;
+      }
+      return wallSet.contains(pget(tx, ty));
+    }
+
+    double resolveX(double cx, double cy, double deltaX) {
+      if (deltaX == 0.0) {
+        return deltaX;
+      }
+      final ty0 = (cy / tileSize).floor();
+      final ty1 = ((cy + heightPx - 1.0) / tileSize).floor();
+
+      if (deltaX > 0.0) {
+        final currentRight = cx + widthPx - 1.0;
+        final nextRight = cx + deltaX + widthPx - 1.0;
+        final startTx = (currentRight / tileSize).floor() + 1;
+        final endTx = (nextRight / tileSize).floor();
+        if (startTx <= endTx) {
+          for (var tx = startTx; tx <= endTx; tx++) {
+            for (var ty = ty0; ty <= ty1; ty++) {
+              if (isWall(tx, ty)) {
+                return tx * tileSize - widthPx - cx;
+              }
+            }
+          }
+        }
+      } else {
+        final currentLeft = cx;
+        final nextLeft = cx + deltaX;
+        final startTx = (currentLeft / tileSize).floor() - 1;
+        final endTx = (nextLeft / tileSize).floor();
+        if (startTx >= endTx) {
+          for (var tx = startTx; tx >= endTx; tx--) {
+            for (var ty = ty0; ty <= ty1; ty++) {
+              if (isWall(tx, ty)) {
+                return (tx + 1) * tileSize - cx;
+              }
+            }
+          }
+        }
+      }
+      return deltaX;
+    }
+
+    double resolveY(double cx, double cy, double deltaY) {
+      if (deltaY == 0.0) {
+        return deltaY;
+      }
+      final tx0 = (cx / tileSize).floor();
+      final tx1 = ((cx + widthPx - 1.0) / tileSize).floor();
+
+      if (deltaY > 0.0) {
+        final currentBottom = cy + heightPx - 1.0;
+        final nextBottom = cy + deltaY + heightPx - 1.0;
+        final startTy = (currentBottom / tileSize).floor() + 1;
+        final endTy = (nextBottom / tileSize).floor();
+        if (startTy <= endTy) {
+          for (var ty = startTy; ty <= endTy; ty++) {
+            for (var tx = tx0; tx <= tx1; tx++) {
+              if (isWall(tx, ty)) {
+                return ty * tileSize - heightPx - cy;
+              }
+            }
+          }
+        }
+      } else {
+        final currentTop = cy;
+        final nextTop = cy + deltaY;
+        final startTy = (currentTop / tileSize).floor() - 1;
+        final endTy = (nextTop / tileSize).floor();
+        if (startTy >= endTy) {
+          for (var ty = startTy; ty >= endTy; ty--) {
+            for (var tx = tx0; tx <= tx1; tx++) {
+              if (isWall(tx, ty)) {
+                return (ty + 1) * tileSize - cy;
+              }
+            }
+          }
+        }
+      }
+      return deltaY;
+    }
+
+    var ndx = dx.toDouble();
+    var ndy = dy.toDouble();
+    if (ndx.abs() >= ndy.abs()) {
+      ndx = resolveX(originX, originY, ndx);
+      ndy = resolveY(originX + ndx, originY, ndy);
+    } else {
+      ndy = resolveY(originX, originY, ndy);
+      ndx = resolveX(originX, originY + ndy, ndx);
+    }
+    return (ndx, ndy);
   }
 
   void blt(
@@ -2887,7 +3226,39 @@ class Tilemap {
     (int, int)? tilekey,
     double? rotate,
     double? scale,
-  }) {}
+  }) {
+    final srcTileAt = switch (tm) {
+      int tmId => (int tx, int ty) => _fallbackGetTile(tmId, tx, ty),
+      Tilemap source => (int tx, int ty) => source.pget(tx, ty),
+      _ => throw UnsupportedError(
+        'tilemap.blt tm supports int id or Tilemap source.',
+      ),
+    };
+
+    final widthTiles = w.abs().round();
+    final heightTiles = h.abs().round();
+    if (widthTiles <= 0 || heightTiles <= 0) {
+      return;
+    }
+    final dstX = x.round();
+    final dstY = y.round();
+    final srcX = u.round();
+    final srcY = v.round();
+    final flipX = w < 0;
+    final flipY = h < 0;
+
+    for (var dy = 0; dy < heightTiles; dy++) {
+      for (var dx = 0; dx < widthTiles; dx++) {
+        final sx = srcX + (flipX ? (widthTiles - 1 - dx) : dx);
+        final sy = srcY + (flipY ? (heightTiles - 1 - dy) : dy);
+        final tile = srcTileAt(sx, sy);
+        if (tilekey != null && tile == tilekey) {
+          continue;
+        }
+        pset(dstX + dx, dstY + dy, tile);
+      }
+    }
+  }
 }
 
 final List<Image> _imageResources = List<Image>.unmodifiable(

@@ -282,6 +282,44 @@ void main() {
     expect(flutterxel.isChannelPlaying(0), isTrue);
   });
 
+  test('tilemap primitives, blt and collide update tile data', () {
+    flutterxel.init(8, 8);
+
+    final tm0 = flutterxel.tilemaps[0];
+    final tm1 = flutterxel.tilemaps[1];
+
+    tm0.cls((0, 0));
+    tm0.line(0, 0, 3, 0, (1, 1));
+    expect(tm0.pget(0, 0), (1, 1));
+    expect(tm0.pget(3, 0), (1, 1));
+
+    tm0.rect(1, 1, 2, 2, (2, 2));
+    expect(tm0.pget(1, 1), (2, 2));
+    expect(tm0.pget(2, 2), (2, 2));
+
+    tm0.rectb(0, 3, 3, 3, (3, 3));
+    expect(tm0.pget(0, 3), (3, 3));
+    expect(tm0.pget(2, 5), (3, 3));
+    expect(tm0.pget(1, 4), (0, 0));
+
+    tm0.cls((0, 0));
+    tm0.rectb(0, 0, 4, 4, (9, 9));
+    tm0.fill(1, 1, (4, 4));
+    expect(tm0.pget(1, 1), (4, 4));
+    expect(tm0.pget(0, 0), (9, 9));
+
+    tm1.cls((0, 0));
+    tm1.pset(0, 0, (7, 7));
+    tm0.blt(0, 0, tm1, 0, 0, 1, 1);
+    expect(tm0.pget(0, 0), (7, 7));
+
+    tm0.cls((0, 0));
+    tm0.pset(2, 2, (5, 5));
+    expect(tm0.collide(0, 0, 8, 8, 16, 16, <(int, int)>[(5, 5)]), (16.0, 8.0));
+    tm0.pset(1, 0, (6, 6));
+    expect(tm0.collide(0, 0, 8, 8, 8, 0, <(int, int)>[(6, 6)]), (0.0, 0.0));
+  });
+
   test('flip advances frame and clears transient wheel values', () {
     flutterxel.init(8, 8);
 
