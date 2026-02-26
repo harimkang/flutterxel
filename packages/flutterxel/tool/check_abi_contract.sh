@@ -68,6 +68,8 @@ SYMBOLS=(
   flutterxel_core_atan2
   flutterxel_core_load
   flutterxel_core_save
+  flutterxel_core_load_pal
+  flutterxel_core_save_pal
   flutterxel_core_frame_count
   flutterxel_core_framebuffer_ptr
   flutterxel_core_framebuffer_len

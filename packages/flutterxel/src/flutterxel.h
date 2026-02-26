@@ -213,6 +213,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_save(
     int8_t exclude_tilemaps,
     int8_t exclude_sounds,
     int8_t exclude_musics);
+FFI_PLUGIN_EXPORT bool flutterxel_core_load_pal(const char* filename);
+FFI_PLUGIN_EXPORT bool flutterxel_core_save_pal(const char* filename);
 
 #ifdef __cplusplus
 }  // extern "C"

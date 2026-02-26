@@ -1066,6 +1066,28 @@ class FlutterxelBindings {
       >('flutterxel_core_save');
   late final _flutterxel_core_save = _flutterxel_core_savePtr
       .asFunction<bool Function(ffi.Pointer<ffi.Char>, int, int, int, int)>();
+
+  bool flutterxel_core_load_pal(ffi.Pointer<ffi.Char> filename) {
+    return _flutterxel_core_load_pal(filename);
+  }
+
+  late final _flutterxel_core_load_palPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Pointer<ffi.Char>)>>(
+        'flutterxel_core_load_pal',
+      );
+  late final _flutterxel_core_load_pal = _flutterxel_core_load_palPtr
+      .asFunction<bool Function(ffi.Pointer<ffi.Char>)>();
+
+  bool flutterxel_core_save_pal(ffi.Pointer<ffi.Char> filename) {
+    return _flutterxel_core_save_pal(filename);
+  }
+
+  late final _flutterxel_core_save_palPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Pointer<ffi.Char>)>>(
+        'flutterxel_core_save_pal',
+      );
+  late final _flutterxel_core_save_pal = _flutterxel_core_save_palPtr
+      .asFunction<bool Function(ffi.Pointer<ffi.Char>)>();
 }
 
 /// Optional parameter encoding in ABI:

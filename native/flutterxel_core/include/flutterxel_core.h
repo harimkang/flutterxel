@@ -285,6 +285,10 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_save(
     int8_t exclude_tilemaps,
     int8_t exclude_sounds,
     int8_t exclude_musics);
+// pyxel.load_pal(filename)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_load_pal(const char* filename);
+// pyxel.save_pal(filename)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_save_pal(const char* filename);
 
 #ifdef __cplusplus
 }  // extern "C"

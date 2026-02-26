@@ -1,5 +1,6 @@
 #include "flutterxel.h"
 
+#include <ctype.h>
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
@@ -90,6 +91,62 @@ static bool validate_resource_flags(
          is_valid_optional_bool(exclude_tilemaps) &&
          is_valid_optional_bool(exclude_sounds) &&
          is_valid_optional_bool(exclude_musics);
+}
+
+static bool parse_palette_value(const char* line, int32_t* out_value) {
+  if (line == NULL || out_value == NULL) {
+    return false;
+  }
+
+  while (isspace((unsigned char)*line)) {
+    line += 1;
+  }
+  if (*line == '\0') {
+    return false;
+  }
+
+  char buffer[64];
+  strncpy(buffer, line, sizeof(buffer) - 1);
+  buffer[sizeof(buffer) - 1] = '\0';
+
+  size_t len = strlen(buffer);
+  while (len > 0 && isspace((unsigned char)buffer[len - 1])) {
+    buffer[len - 1] = '\0';
+    len -= 1;
+  }
+  if (len == 0) {
+    return false;
+  }
+
+  bool hex_like = true;
+  for (size_t i = 0; i < len; i++) {
+    if (!isxdigit((unsigned char)buffer[i])) {
+      hex_like = false;
+      break;
+    }
+  }
+
+  char* end = NULL;
+  long value = 0;
+  if ((len == 6 || len == 8) && hex_like) {
+    value = strtol(buffer, &end, 16);
+  } else {
+    value = strtol(buffer, &end, 10);
+    if ((end == NULL || *end != '\0') && hex_like) {
+      end = NULL;
+      value = strtol(buffer, &end, 16);
+    }
+  }
+
+  if (end == NULL || end == buffer || *end != '\0') {
+    return false;
+  }
+  if (value > INT32_MAX || value < INT32_MIN) {
+    return false;
+  }
+
+  *out_value = (int32_t)value;
+  return true;
 }
 
 static uint64_t seed_to_rng_state(int32_t seed) {
@@ -1595,6 +1652,50 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_save(
           g_state.height,
           (unsigned long long)g_state.frame_count,
           g_state.clear_color);
+  fclose(fp);
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_load_pal(const char* filename) {
+  if (!g_state.initialized || filename == NULL || strlen(filename) == 0) {
+    return false;
+  }
+
+  FILE* fp = fopen(filename, "r");
+  if (fp == NULL) {
+    return false;
+  }
+
+  char line[128];
+  for (int i = 0; i < 16; i++) {
+    if (fgets(line, sizeof(line), fp) == NULL) {
+      break;
+    }
+    int32_t value = 0;
+    if (parse_palette_value(line, &value)) {
+      g_state.palette_map[i] = value;
+    }
+  }
+  fclose(fp);
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_save_pal(const char* filename) {
+  if (!g_state.initialized || filename == NULL || strlen(filename) == 0) {
+    return false;
+  }
+
+  FILE* fp = fopen(filename, "w");
+  if (fp == NULL) {
+    return false;
+  }
+
+  for (int i = 0; i < 16; i++) {
+    if (fprintf(fp, "%d\n", g_state.palette_map[i]) < 0) {
+      fclose(fp);
+      return false;
+    }
+  }
   fclose(fp);
   return true;
 }

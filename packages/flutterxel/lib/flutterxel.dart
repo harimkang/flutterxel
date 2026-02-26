@@ -191,6 +191,24 @@ double _fallbackNoiseLerp(double a, double b, double t) {
   return a + (b - a) * t;
 }
 
+int? _parsePaletteLine(String line) {
+  final trimmed = line.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
+    return int.tryParse(trimmed.substring(2), radix: 16);
+  }
+
+  final hexLike = RegExp(r'^[0-9A-Fa-f]+$').hasMatch(trimmed);
+  if (hexLike && (trimmed.length == 6 || trimmed.length == 8)) {
+    return int.tryParse(trimmed, radix: 16);
+  }
+
+  return int.tryParse(trimmed) ??
+      (hexLike ? int.tryParse(trimmed, radix: 16) : null);
+}
+
 double _fallbackNoiseHash(int seed, int x, int y, int z) {
   var n =
       (x * 374761393) +
@@ -1825,6 +1843,107 @@ void save(
   } finally {
     calloc.free(filenamePtr);
   }
+}
+
+/// Pyxel-compatible load_pal API.
+void loadPal(String filename) {
+  _ensureInitialized('load_pal');
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    final filenamePtr = filename.toNativeUtf8().cast<ffi.Char>();
+    try {
+      final ok = bindings.flutterxel_core_load_pal(filenamePtr);
+      if (!ok) {
+        throw StateError('flutterxel_core_load_pal failed.');
+      }
+    } finally {
+      calloc.free(filenamePtr);
+    }
+    return;
+  }
+
+  final file = File(filename);
+  if (!file.existsSync()) {
+    throw StateError('flutterxel_core_load_pal failed.');
+  }
+  final lines = file.readAsLinesSync();
+  final limit = math.min(_fallbackPaletteMap.length, lines.length);
+  for (var i = 0; i < limit; i++) {
+    final parsed = _parsePaletteLine(lines[i]);
+    if (parsed != null) {
+      _fallbackPaletteMap[i] = parsed;
+    }
+  }
+}
+
+/// Pyxel-compatible save_pal API.
+void savePal(String filename) {
+  _ensureInitialized('save_pal');
+
+  final bindings = _getBindingsOrNull();
+  if (bindings != null) {
+    final filenamePtr = filename.toNativeUtf8().cast<ffi.Char>();
+    try {
+      final ok = bindings.flutterxel_core_save_pal(filenamePtr);
+      if (!ok) {
+        throw StateError('flutterxel_core_save_pal failed.');
+      }
+    } finally {
+      calloc.free(filenamePtr);
+    }
+    return;
+  }
+
+  final output = StringBuffer();
+  for (final value in _fallbackPaletteMap) {
+    output.writeln(value);
+  }
+  File(filename).writeAsStringSync(output.toString());
+}
+
+String _joinPath(String left, String right) {
+  final separator = Platform.pathSeparator;
+  if (left.endsWith(separator)) {
+    return '$left$right';
+  }
+  return '$left$separator$right';
+}
+
+/// Pyxel-compatible user_data_dir API.
+String userDataDir(String vendorName, String appName) {
+  final vendor = vendorName.trim();
+  final app = appName.trim();
+  if (vendor.isEmpty) {
+    throw ArgumentError.value(vendorName, 'vendorName', 'must not be empty.');
+  }
+  if (app.isEmpty) {
+    throw ArgumentError.value(appName, 'appName', 'must not be empty.');
+  }
+
+  final home = Platform.environment['HOME'];
+  final base = switch (Platform.operatingSystem) {
+    'windows' => Platform.environment['APPDATA'] ?? Directory.systemTemp.path,
+    'macos' =>
+      home != null && home.isNotEmpty
+          ? _joinPath(_joinPath(home, 'Library'), 'Application Support')
+          : Directory.systemTemp.path,
+    'linux' || 'android' =>
+      (Platform.environment['XDG_DATA_HOME']?.isNotEmpty ?? false)
+          ? Platform.environment['XDG_DATA_HOME']!
+          : (home != null && home.isNotEmpty
+                ? _joinPath(_joinPath(home, '.local'), 'share')
+                : Directory.systemTemp.path),
+    'ios' =>
+      home != null && home.isNotEmpty
+          ? _joinPath(home, 'Documents')
+          : Directory.systemTemp.path,
+    _ => Directory.systemTemp.path,
+  };
+
+  final dirPath = _joinPath(_joinPath(base, vendor), app);
+  Directory(dirPath).createSync(recursive: true);
+  return dirPath;
 }
 
 /// Returns a copy of the current paletted framebuffer.

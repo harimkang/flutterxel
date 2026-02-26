@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -7,7 +9,7 @@ void main() {
   });
 
   test(
-    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
+    'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {
       expect(flutterxel.init, isA<Function>());
       expect(flutterxel.run, isA<Function>());
@@ -53,6 +55,9 @@ void main() {
       expect(flutterxel.playPos, isA<Function>());
       expect(flutterxel.load, isA<Function>());
       expect(flutterxel.save, isA<Function>());
+      expect(flutterxel.loadPal, isA<Function>());
+      expect(flutterxel.savePal, isA<Function>());
+      expect(flutterxel.userDataDir, isA<Function>());
       expect(flutterxel.rseed, isA<Function>());
       expect(flutterxel.rndi, isA<Function>());
       expect(flutterxel.rndf, isA<Function>());
@@ -433,6 +438,37 @@ void main() {
     expect(() => flutterxel.icon(<String>['0123'], 1), throwsStateError);
     expect(() => flutterxel.dither(0.5), throwsStateError);
   });
+
+  test(
+    'loadPal/savePal roundtrip palette map and userDataDir returns path',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync('flutterxel_pal_');
+      final filePath = '${tempDir.path}${Platform.pathSeparator}palette.pyxpal';
+      try {
+        flutterxel.pal(0, 6);
+        flutterxel.savePal(filePath);
+
+        flutterxel.pal(0, 1);
+        flutterxel.loadPal(filePath);
+        flutterxel.cls(0);
+        flutterxel.pset(0, 0, 0);
+        expect(flutterxel.pget(0, 0), 6);
+
+        final userDir = flutterxel.userDataDir(
+          'FlutterxelVendor',
+          'FlutterxelGame',
+        );
+        expect(userDir, contains('FlutterxelVendor'));
+        expect(userDir, contains('FlutterxelGame'));
+        expect(Directory(userDir).existsSync(), isTrue);
+      } finally {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      }
+    },
+  );
 
   test('show advances frame and title accepts runtime title update', () {
     flutterxel.init(8, 8);

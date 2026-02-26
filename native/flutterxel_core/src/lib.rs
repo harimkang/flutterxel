@@ -289,6 +289,31 @@ fn decode_optional_string(ptr: *const c_char) -> Option<Option<String>> {
     }
 }
 
+fn parse_palette_line(line: &str) -> Option<i32> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Some(hex) = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+    {
+        return i32::from_str_radix(hex, 16).ok();
+    }
+
+    let is_hex_like = trimmed.chars().all(|ch| ch.is_ascii_hexdigit());
+    if is_hex_like && (trimmed.len() == 6 || trimmed.len() == 8) {
+        return i32::from_str_radix(trimmed, 16).ok();
+    }
+
+    trimmed.parse::<i32>().ok().or_else(|| {
+        is_hex_like
+            .then(|| i32::from_str_radix(trimmed, 16).ok())
+            .flatten()
+    })
+}
+
 fn ensure_default_image_bank(state: &mut RuntimeState) {
     if state.image_banks.contains_key(&0) {
         return;
@@ -2743,6 +2768,62 @@ pub extern "C" fn flutterxel_core_save(
     true
 }
 
+#[no_mangle]
+pub extern "C" fn flutterxel_core_load_pal(filename: *const c_char) -> bool {
+    if filename.is_null() {
+        return false;
+    }
+    let c_str = unsafe { CStr::from_ptr(filename) };
+    let Ok(path) = c_str.to_str() else {
+        return false;
+    };
+
+    let Ok(text) = fs::read_to_string(path) else {
+        return false;
+    };
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    for (index, line) in text.lines().take(state.palette_map.len()).enumerate() {
+        if let Some(value) = parse_palette_line(line) {
+            state.palette_map[index] = value;
+        }
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_save_pal(filename: *const c_char) -> bool {
+    if filename.is_null() {
+        return false;
+    }
+    let c_str = unsafe { CStr::from_ptr(filename) };
+    let Ok(path) = c_str.to_str() else {
+        return false;
+    };
+
+    let palette = {
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        if !state.initialized {
+            return false;
+        }
+        state.palette_map
+    };
+
+    let Ok(mut file) = File::create(path) else {
+        return false;
+    };
+    for value in palette {
+        if writeln!(file, "{value}").is_err() {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2782,6 +2863,16 @@ mod tests {
             .expect("valid system time")
             .as_nanos();
         path.push(format!("flutterxel_core_{label}_{stamp}.pyxres"));
+        path
+    }
+
+    fn tmp_palette_path(label: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("valid system time")
+            .as_nanos();
+        path.push(format!("flutterxel_core_{label}_{stamp}.pyxpal"));
         path
     }
 
@@ -3319,6 +3410,28 @@ mod tests {
         assert_eq!(state.width, 4);
         assert_eq!(state.height, 4);
         assert_eq!(state.frame_buffer.len(), 16);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_pal_then_load_pal_roundtrips_palette_map() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        assert!(flutterxel_core_pal(0, 6));
+        assert!(flutterxel_core_pal(1, 9));
+
+        let path = tmp_palette_path("palette_roundtrip");
+        let c_path = CString::new(path.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save_pal(c_path.as_ptr()));
+
+        assert!(flutterxel_core_pal(0, 1));
+        assert!(flutterxel_core_pal(1, 2));
+        assert!(flutterxel_core_load_pal(c_path.as_ptr()));
+
+        let state = runtime_state().lock().expect("runtime state poisoned");
+        assert_eq!(state.palette_map[0], 6);
+        assert_eq!(state.palette_map[1], 9);
 
         let _ = fs::remove_file(path);
     }
