@@ -103,6 +103,10 @@ int _fallbackRngState = _fallbackRngDefaultState;
 int _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
+final Finalizer<ffi.Pointer<ffi.Void>> _nativeBufferFinalizer =
+    Finalizer<ffi.Pointer<ffi.Void>>((pointer) {
+      calloc.free(pointer);
+    });
 
 ffi.DynamicLibrary _openLibrary() {
   final candidates = switch (Platform.operatingSystem) {
@@ -2604,7 +2608,9 @@ class Image {
       _clipW = width,
       _clipH = height,
       _cameraX = 0,
-      _cameraY = 0;
+      _cameraY = 0,
+      _dataPtrCache = null,
+      _dataPtrCacheLength = 0;
 
   Image._resource(int imageId)
     : _imageId = imageId,
@@ -2617,7 +2623,9 @@ class Image {
       _clipW = IMAGE_SIZE,
       _clipH = IMAGE_SIZE,
       _cameraX = 0,
-      _cameraY = 0;
+      _cameraY = 0,
+      _dataPtrCache = null,
+      _dataPtrCacheLength = 0;
 
   Image._screen()
     : _imageId = null,
@@ -2630,7 +2638,9 @@ class Image {
       _clipW = 0,
       _clipH = 0,
       _cameraX = 0,
-      _cameraY = 0;
+      _cameraY = 0,
+      _dataPtrCache = null,
+      _dataPtrCacheLength = 0;
 
   final int _width;
   final int _height;
@@ -2643,6 +2653,8 @@ class Image {
   int _clipH;
   int _cameraX;
   int _cameraY;
+  ffi.Pointer<ffi.Uint8>? _dataPtrCache;
+  int _dataPtrCacheLength;
 
   int get width => _isScreen ? _runtimeWidth() : _width;
   int get height => _isScreen ? _runtimeHeight() : _height;
@@ -2659,7 +2671,44 @@ class Image {
 
   int? _resourceImageId() => _imageId;
 
-  ffi.Pointer<ffi.Void> data_ptr() => ffi.nullptr.cast<ffi.Void>();
+  ffi.Pointer<ffi.Void> data_ptr() {
+    final data = switch ((_isScreen, _imageId, _pixels)) {
+      (true, _, _) => _fallbackFrameBuffer,
+      (false, int imageId, _) => _fallbackEnsureImageBank(imageId),
+      (false, _, List<int> pixels) => pixels,
+      _ => const <int>[],
+    };
+    final length = data.length;
+    if (length <= 0) {
+      return ffi.nullptr.cast<ffi.Void>();
+    }
+    _ensureDataPtrCapacity(length);
+    final pointer = _dataPtrCache;
+    if (pointer == null) {
+      return ffi.nullptr.cast<ffi.Void>();
+    }
+    final view = pointer.asTypedList(length);
+    for (var i = 0; i < length; i++) {
+      view[i] = data[i] & 0xFF;
+    }
+    return pointer.cast<ffi.Void>();
+  }
+
+  void _ensureDataPtrCapacity(int length) {
+    if (_dataPtrCache != null && _dataPtrCacheLength == length) {
+      return;
+    }
+    if (_dataPtrCache != null) {
+      _nativeBufferFinalizer.detach(this);
+      calloc.free(_dataPtrCache!);
+      _dataPtrCache = null;
+      _dataPtrCacheLength = 0;
+    }
+    final buffer = calloc<ffi.Uint8>(length);
+    _dataPtrCache = buffer;
+    _dataPtrCacheLength = length;
+    _nativeBufferFinalizer.attach(this, buffer.cast<ffi.Void>(), detach: this);
+  }
 
   int _resolveX(num x) => x.round();
   int _resolveY(num y) => y.round();
@@ -3286,7 +3335,9 @@ class Tilemap {
       _clipW = width,
       _clipH = height,
       _cameraX = 0,
-      _cameraY = 0;
+      _cameraY = 0,
+      _dataPtrCache = null,
+      _dataPtrCacheLength = 0;
 
   Tilemap._resource(int tilemapId)
     : width = TILEMAP_SIZE,
@@ -3299,7 +3350,9 @@ class Tilemap {
       _clipW = TILEMAP_SIZE,
       _clipH = TILEMAP_SIZE,
       _cameraX = 0,
-      _cameraY = 0;
+      _cameraY = 0,
+      _dataPtrCache = null,
+      _dataPtrCacheLength = 0;
 
   final int width;
   final int height;
@@ -3312,6 +3365,8 @@ class Tilemap {
   int _clipH;
   int _cameraX;
   int _cameraY;
+  ffi.Pointer<ffi.Uint8>? _dataPtrCache;
+  int _dataPtrCacheLength;
 
   int? _resourceTilemapId() => _tilemapId;
 
@@ -3340,7 +3395,43 @@ class Tilemap {
     return tilemap;
   }
 
-  ffi.Pointer<ffi.Void> data_ptr() => ffi.nullptr.cast<ffi.Void>();
+  ffi.Pointer<ffi.Void> data_ptr() {
+    final data = switch ((_tilemapId, _detachedData)) {
+      (int tilemapId, _) => _fallbackEnsureTilemap(tilemapId).data,
+      (_, List<int> detached) => detached,
+      _ => const <int>[],
+    };
+    final length = data.length;
+    if (length <= 0) {
+      return ffi.nullptr.cast<ffi.Void>();
+    }
+    _ensureDataPtrCapacity(length);
+    final pointer = _dataPtrCache;
+    if (pointer == null) {
+      return ffi.nullptr.cast<ffi.Void>();
+    }
+    final view = pointer.asTypedList(length);
+    for (var i = 0; i < length; i++) {
+      view[i] = data[i] & 0xFF;
+    }
+    return pointer.cast<ffi.Void>();
+  }
+
+  void _ensureDataPtrCapacity(int length) {
+    if (_dataPtrCache != null && _dataPtrCacheLength == length) {
+      return;
+    }
+    if (_dataPtrCache != null) {
+      _nativeBufferFinalizer.detach(this);
+      calloc.free(_dataPtrCache!);
+      _dataPtrCache = null;
+      _dataPtrCacheLength = 0;
+    }
+    final buffer = calloc<ffi.Uint8>(length);
+    _dataPtrCache = buffer;
+    _dataPtrCacheLength = length;
+    _nativeBufferFinalizer.attach(this, buffer.cast<ffi.Void>(), detach: this);
+  }
 
   void set(int x, int y, List<String> data) {
     for (var row = 0; row < data.length; row++) {

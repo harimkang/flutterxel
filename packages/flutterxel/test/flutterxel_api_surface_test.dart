@@ -1,3 +1,4 @@
+import 'dart:ffi' as ffi;
 import 'dart:io';
 
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
@@ -404,6 +405,28 @@ void main() {
         tempDir.deleteSync(recursive: true);
       }
     }
+  });
+
+  test('image and tilemap data_ptr expose raw byte layout snapshots', () {
+    flutterxel.init(8, 8);
+
+    final img = flutterxel.Image(2, 2);
+    img.pset(0, 0, 1);
+    img.pset(1, 0, 2);
+    img.pset(0, 1, 3);
+    img.pset(1, 1, 4);
+    final imgPtr = img.data_ptr().cast<ffi.Uint8>();
+    expect(imgPtr.address, isNonZero);
+    expect(imgPtr.asTypedList(4), <int>[1, 2, 3, 4]);
+
+    final tm = flutterxel.Tilemap(2, 2, 0);
+    tm.pset(0, 0, (1, 2));
+    tm.pset(1, 0, (3, 4));
+    tm.pset(0, 1, (5, 6));
+    tm.pset(1, 1, (7, 8));
+    final tmPtr = tm.data_ptr().cast<ffi.Uint8>();
+    expect(tmPtr.address, isNonZero);
+    expect(tmPtr.asTypedList(8), <int>[1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   test('detached image clip/camera and blt work on local buffers', () {
