@@ -358,6 +358,54 @@ void main() {
     expect(tm.pget(1, 2), (14, 15));
   });
 
+  test('tilemap from_tmx and load parse csv layers', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync('flutterxel_tmx_');
+    final tmxPath = '${tempDir.path}${Platform.pathSeparator}map.tmx';
+    try {
+      File(tmxPath).writeAsStringSync('''
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="2" height="2" tilewidth="8" tileheight="8">
+ <tileset firstgid="1" name="test" tilewidth="8" tileheight="8" tilecount="16" columns="4">
+  <image source="test.png" width="32" height="32"/>
+ </tileset>
+ <layer id="1" name="L1" width="2" height="2">
+  <data encoding="csv">
+1,2,
+5,0
+  </data>
+ </layer>
+ <layer id="2" name="L2" width="2" height="2">
+  <data encoding="csv">
+3,4,
+5,6
+  </data>
+ </layer>
+</map>
+''');
+
+      final loaded = flutterxel.Tilemap.from_tmx(tmxPath, 1);
+      expect(loaded.width, 2);
+      expect(loaded.height, 2);
+      expect(loaded.pget(0, 0), (2, 0));
+      expect(loaded.pget(1, 0), (3, 0));
+      expect(loaded.pget(0, 1), (0, 1));
+      expect(loaded.pget(1, 1), (1, 1));
+
+      final tm = flutterxel.tilemaps[0];
+      tm.cls((0, 0));
+      tm.load(0, 0, tmxPath, 0);
+      expect(tm.pget(0, 0), (0, 0));
+      expect(tm.pget(1, 0), (1, 0));
+      expect(tm.pget(0, 1), (0, 1));
+      expect(tm.pget(1, 1), (0, 0));
+    } finally {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    }
+  });
+
   test('detached image clip/camera and blt work on local buffers', () {
     flutterxel.init(8, 8);
 

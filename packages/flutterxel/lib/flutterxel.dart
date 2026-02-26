@@ -167,6 +167,130 @@ int _encodeOptionalBool(bool? value) {
   return value ? _optionalBoolTrue : _optionalBoolFalse;
 }
 
+class _ParsedTmxLayer {
+  const _ParsedTmxLayer({
+    required this.width,
+    required this.height,
+    required this.tilesetFirstGid,
+    required this.tilesetColumns,
+    required this.gids,
+  });
+
+  final int width;
+  final int height;
+  final int tilesetFirstGid;
+  final int tilesetColumns;
+  final List<int> gids;
+}
+
+Map<String, String> _parseXmlAttributes(String source) {
+  final attrs = <String, String>{};
+  final doubleQuote = RegExp(r'([A-Za-z_][A-Za-z0-9_:-]*)\s*=\s*"([^"]*)"');
+  final singleQuote = RegExp(r"([A-Za-z_][A-Za-z0-9_:-]*)\s*=\s*'([^']*)'");
+  for (final match in doubleQuote.allMatches(source)) {
+    attrs[match.group(1)!] = match.group(2)!;
+  }
+  for (final match in singleQuote.allMatches(source)) {
+    attrs[match.group(1)!] = match.group(2)!;
+  }
+  return attrs;
+}
+
+int _requiredIntAttr(Map<String, String> attrs, String name, String context) {
+  final raw = attrs[name];
+  if (raw == null) {
+    throw FormatException('$context is missing "$name" attribute.');
+  }
+  final parsed = int.tryParse(raw);
+  if (parsed == null) {
+    throw FormatException('$context has invalid "$name" value.');
+  }
+  return parsed;
+}
+
+_ParsedTmxLayer _parseTmxLayer(String tmxText, int layerIndex) {
+  final mapMatch = RegExp(r'<map\b([^>]*)>', dotAll: true).firstMatch(tmxText);
+  if (mapMatch == null) {
+    throw const FormatException('Failed to parse TMX file.');
+  }
+  final mapAttrs = _parseXmlAttributes(mapMatch.group(1)!);
+  final tileWidth = _requiredIntAttr(mapAttrs, 'tilewidth', 'TMX map');
+  final tileHeight = _requiredIntAttr(mapAttrs, 'tileheight', 'TMX map');
+  if (tileWidth != TILE_SIZE || tileHeight != TILE_SIZE) {
+    throw FormatException(
+      "TMX file's tile size is not ${TILE_SIZE}x$TILE_SIZE.",
+    );
+  }
+
+  final tilesetMatches = RegExp(
+    r'<tileset\b([^>]*)>',
+    dotAll: true,
+  ).allMatches(tmxText).toList(growable: false);
+  if (tilesetMatches.isEmpty) {
+    throw const FormatException('Tileset not found in TMX file.');
+  }
+  final tilesetAttrs = _parseXmlAttributes(tilesetMatches.first.group(1)!);
+  final tilesetFirstGid = _requiredIntAttr(
+    tilesetAttrs,
+    'firstgid',
+    'TMX tileset',
+  );
+  final tilesetColumns = _requiredIntAttr(
+    tilesetAttrs,
+    'columns',
+    'TMX tileset',
+  );
+  if (tilesetColumns <= 0) {
+    throw const FormatException('TMX tileset columns must be positive.');
+  }
+
+  final layerMatches = RegExp(
+    r'<layer\b([^>]*)>([\s\S]*?)</layer>',
+    dotAll: true,
+  ).allMatches(tmxText).toList(growable: false);
+  if (layerIndex < 0 || layerIndex >= layerMatches.length) {
+    throw FormatException('Layer $layerIndex not found in TMX file.');
+  }
+  final layerMatch = layerMatches[layerIndex];
+  final layerAttrs = _parseXmlAttributes(layerMatch.group(1)!);
+  final layerWidth = _requiredIntAttr(layerAttrs, 'width', 'TMX layer');
+  final layerHeight = _requiredIntAttr(layerAttrs, 'height', 'TMX layer');
+
+  final layerInner = layerMatch.group(2)!;
+  final dataMatch = RegExp(
+    r'<data\b([^>]*)>([\s\S]*?)</data>',
+    dotAll: true,
+  ).firstMatch(layerInner);
+  if (dataMatch == null) {
+    throw const FormatException('TMX layer data not found.');
+  }
+  final dataAttrs = _parseXmlAttributes(dataMatch.group(1)!);
+  final encoding = dataAttrs['encoding']?.toLowerCase();
+  if (encoding != 'csv') {
+    throw const FormatException("TMX file's encoding is not CSV.");
+  }
+
+  final csv = dataMatch.group(2)!.replaceAll(RegExp(r'\s+'), '');
+  final gids = <int>[];
+  if (csv.isNotEmpty) {
+    for (final token in csv.split(',')) {
+      final value = int.tryParse(token);
+      if (value == null) {
+        throw const FormatException('Failed to parse CSV tile data.');
+      }
+      gids.add(value);
+    }
+  }
+
+  return _ParsedTmxLayer(
+    width: layerWidth,
+    height: layerHeight,
+    tilesetFirstGid: tilesetFirstGid,
+    tilesetColumns: tilesetColumns,
+    gids: gids,
+  );
+}
+
 int _seedToFallbackRngState(int seed) {
   final unsignedSeed = seed & 0xFFFFFFFF;
   return (unsignedSeed ^ _fallbackRngDefaultState) & _fallbackRngMask64;
@@ -3196,7 +3320,24 @@ class Tilemap {
   }
 
   static Tilemap fromTmx(String filename, int layer) {
-    return Tilemap(TILEMAP_SIZE, TILEMAP_SIZE, 0);
+    final file = File(filename);
+    if (!file.existsSync()) {
+      throw FormatException("Failed to open file '$filename'");
+    }
+    final parsed = _parseTmxLayer(file.readAsStringSync(), layer);
+    final tilemap = Tilemap(parsed.width, parsed.height, 0);
+    for (var i = 0; i < parsed.gids.length; i++) {
+      final x = i % parsed.width;
+      final y = i ~/ parsed.width;
+      final gid = parsed.gids[i];
+      final tileId = gid > parsed.tilesetFirstGid
+          ? gid - parsed.tilesetFirstGid
+          : 0;
+      final tileX = tileId % parsed.tilesetColumns;
+      final tileY = tileId ~/ parsed.tilesetColumns;
+      tilemap._writeTileRaw(x, y, (tileX, tileY));
+    }
+    return tilemap;
   }
 
   ffi.Pointer<ffi.Void> data_ptr() => ffi.nullptr.cast<ffi.Void>();
@@ -3218,11 +3359,8 @@ class Tilemap {
   }
 
   void load(int x, int y, String filename, int layer) {
-    final file = File(filename);
-    if (!file.existsSync()) {
-      return;
-    }
-    set(x, y, file.readAsLinesSync());
+    final tilemap = Tilemap.fromTmx(filename, layer);
+    blt(x, y, tilemap, 0, 0, tilemap.width, tilemap.height);
   }
 
   void clip([num? x, num? y, num? w, num? h]) {
