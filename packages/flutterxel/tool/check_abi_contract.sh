@@ -84,12 +84,22 @@ SYMBOLS=(
   flutterxel_core_framebuffer_len
 )
 
+contains_symbol() {
+  local symbol="$1"
+  local file_path="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q --fixed-strings "$symbol" "$file_path"
+    return
+  fi
+  grep -Fq -- "$symbol" "$file_path"
+}
+
 for symbol in "${SYMBOLS[@]}"; do
-  if ! rg -q "$symbol" "$HEADER"; then
+  if ! contains_symbol "$symbol" "$HEADER"; then
     echo "Missing symbol in header: $symbol" >&2
     exit 1
   fi
-  if ! rg -q "$symbol" "$BINDINGS"; then
+  if ! contains_symbol "$symbol" "$BINDINGS"; then
     echo "Missing symbol in Dart bindings: $symbol" >&2
     exit 1
   fi
