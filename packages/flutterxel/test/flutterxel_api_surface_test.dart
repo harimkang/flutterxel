@@ -2,6 +2,10 @@ import 'package:flutterxel/flutterxel.dart' as flutterxel;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  tearDown(() {
+    flutterxel.stopRunLoop();
+  });
+
   test('exposes init/run/btn/cls/blt/play/load/save API surface', () {
     expect(flutterxel.init, isA<Function>());
     expect(flutterxel.run, isA<Function>());
@@ -72,6 +76,7 @@ void main() {
 
     expect(updateCalled, isTrue);
     expect(drawCalled, isTrue);
+    flutterxel.stopRunLoop();
   });
 
   test('exposes runtime bridge helpers for input and framebuffer', () {

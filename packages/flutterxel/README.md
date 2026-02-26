@@ -29,6 +29,28 @@ For release builds without requiring end-user Rust toolchains:
 
 Runtime loading prefers `flutterxel_core` and falls back to `flutterxel` scaffold library.
 
+## Runtime Loop and View
+
+```dart
+import 'package:flutterxel/flutterxel.dart' as flutterxel;
+
+void main() {
+  flutterxel.init(160, 120, fps: 60);
+  flutterxel.run(() {
+    // update
+  }, () {
+    flutterxel.cls(0);
+    flutterxel.blt(8, 8, 0, 0, 0, 16, 16, colkey: 2);
+  });
+}
+```
+
+Render with:
+
+```dart
+const flutterxel.FlutterxelView(pixelScale: 3)
+```
+
 ## Monorepo
 
 The repository is organized as:

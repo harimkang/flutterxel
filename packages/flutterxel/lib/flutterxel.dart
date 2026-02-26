@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/widgets.dart';
 
 import 'flutterxel_bindings_generated.dart';
 
@@ -15,6 +17,9 @@ int height = 0;
 int frameCount = 0;
 
 bool _isInitialized = false;
+int _runtimeFps = 30;
+Timer? _runLoopTimer;
+final ValueNotifier<int> _frameNotifier = ValueNotifier<int>(0);
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
 
@@ -124,7 +129,10 @@ void init(
     width = widthValue;
     height = heightValue;
     frameCount = 0;
+    _runtimeFps = (fps ?? 30).clamp(1, 240).toInt();
+    _frameNotifier.value = frameCount;
     _isInitialized = true;
+    stopRunLoop();
   } finally {
     if (titlePtr != ffi.nullptr) {
       calloc.free(titlePtr);
@@ -134,10 +142,20 @@ void init(
 
 /// Pyxel-compatible run API.
 ///
-/// Current skeleton executes one update/draw cycle per call.
+/// In Flutter, this starts a non-blocking periodic loop.
 void run(void Function() update, void Function() draw) {
   _ensureInitialized('run');
 
+  stopRunLoop();
+  _runFrame(update, draw);
+
+  final frameIntervalMs = (1000 / _runtimeFps).round().clamp(1, 1000);
+  _runLoopTimer = Timer.periodic(Duration(milliseconds: frameIntervalMs), (_) {
+    _runFrame(update, draw);
+  });
+}
+
+void _runFrame(void Function() update, void Function() draw) {
   update();
   draw();
 
@@ -159,6 +177,14 @@ void run(void Function() update, void Function() draw) {
   }
 
   frameCount = bindings?.flutterxel_core_frame_count() ?? (frameCount + 1);
+  _frameNotifier.value = frameCount;
+}
+
+bool get isRunning => _runLoopTimer?.isActive ?? false;
+
+void stopRunLoop() {
+  _runLoopTimer?.cancel();
+  _runLoopTimer = null;
 }
 
 /// Pyxel-compatible btn API.
@@ -394,4 +420,118 @@ class Flutterxel {
 
   static int versionPatch() =>
       _getBindingsOrNull()?.flutterxel_core_version_patch() ?? 0;
+}
+
+const List<Color> _defaultPalette = <Color>[
+  Color(0xFF000000),
+  Color(0xFF2B335F),
+  Color(0xFF7E2072),
+  Color(0xFF19959C),
+  Color(0xFF8B4852),
+  Color(0xFF395C98),
+  Color(0xFFA9C1FF),
+  Color(0xFFEEEEEE),
+  Color(0xFFD4186C),
+  Color(0xFFD38441),
+  Color(0xFFE9C35B),
+  Color(0xFF70C6A9),
+  Color(0xFF7696DE),
+  Color(0xFFA3A3A3),
+  Color(0xFFFF9798),
+  Color(0xFFEDC7B0),
+];
+
+class FlutterxelView extends StatelessWidget {
+  const FlutterxelView({
+    super.key,
+    this.pixelScale = 4,
+    this.palette = _defaultPalette,
+    this.backgroundColor = const Color(0xFF000000),
+  });
+
+  final double pixelScale;
+  final List<Color> palette;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewWidth = width > 0 ? width : 1;
+    final viewHeight = height > 0 ? height : 1;
+
+    return AnimatedBuilder(
+      animation: _frameNotifier,
+      builder: (context, _) {
+        final frame = frameBufferSnapshot();
+        return RepaintBoundary(
+          child: CustomPaint(
+            size: Size(viewWidth * pixelScale, viewHeight * pixelScale),
+            painter: _FlutterxelViewPainter(
+              frame: frame,
+              frameWidth: viewWidth,
+              frameHeight: viewHeight,
+              pixelScale: pixelScale,
+              palette: palette,
+              backgroundColor: backgroundColor,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FlutterxelViewPainter extends CustomPainter {
+  _FlutterxelViewPainter({
+    required this.frame,
+    required this.frameWidth,
+    required this.frameHeight,
+    required this.pixelScale,
+    required this.palette,
+    required this.backgroundColor,
+  });
+
+  final List<int> frame;
+  final int frameWidth;
+  final int frameHeight;
+  final double pixelScale;
+  final List<Color> palette;
+  final Color backgroundColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()..color = backgroundColor;
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    if (frame.isEmpty || palette.isEmpty) {
+      return;
+    }
+
+    final maxPixels = frameWidth * frameHeight;
+    final pixelsToDraw = frame.length < maxPixels ? frame.length : maxPixels;
+
+    final paints = <Paint>[];
+    for (final color in palette) {
+      paints.add(Paint()..color = color);
+    }
+
+    for (var index = 0; index < pixelsToDraw; index++) {
+      final colorIndex = frame[index].abs() % paints.length;
+      final x = (index % frameWidth) * pixelScale;
+      final y = (index ~/ frameWidth) * pixelScale;
+      canvas.drawRect(
+        Rect.fromLTWH(x, y, pixelScale, pixelScale),
+        paints[colorIndex],
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlutterxelViewPainter oldDelegate) {
+    return !identical(oldDelegate.frame, frame) ||
+        oldDelegate.frameWidth != frameWidth ||
+        oldDelegate.frameHeight != frameHeight ||
+        oldDelegate.pixelScale != pixelScale ||
+        oldDelegate.palette != palette ||
+        oldDelegate.backgroundColor != backgroundColor;
+  }
 }
