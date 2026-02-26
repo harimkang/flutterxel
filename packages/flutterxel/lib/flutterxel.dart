@@ -12,6 +12,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'flutterxel_bindings_generated.dart';
+import 'src/pyxel_constants.dart';
+
+export 'src/pyxel_constants.dart';
 
 const int _optionalI32None = -2147483648; // INT32_MIN
 const int _optionalBoolNone = -1;
@@ -19,26 +22,8 @@ const int _optionalBoolFalse = 0;
 const int _optionalBoolTrue = 1;
 const int _i64Min = -0x8000000000000000;
 const int _i64Max = 0x7FFFFFFFFFFFFFFF;
-
-// Pyxel-compatible key codes (subset used for mobile-first input mapping).
-const int KEY_RETURN = 0x0D;
-const int KEY_ESCAPE = 0x1B;
-const int KEY_SPACE = 0x20;
-const int KEY_RIGHT = 0x4000004F;
-const int KEY_LEFT = 0x40000050;
-const int KEY_DOWN = 0x40000051;
-const int KEY_UP = 0x40000052;
-
-const int MOUSE_KEY_START_INDEX = 0x50000100;
-const int MOUSE_POS_X = MOUSE_KEY_START_INDEX;
-const int MOUSE_POS_Y = MOUSE_KEY_START_INDEX + 1;
-const int MOUSE_WHEEL_X = MOUSE_KEY_START_INDEX + 2;
-const int MOUSE_WHEEL_Y = MOUSE_KEY_START_INDEX + 3;
-const int MOUSE_BUTTON_LEFT = MOUSE_KEY_START_INDEX + 4;
-const int MOUSE_BUTTON_MIDDLE = MOUSE_KEY_START_INDEX + 5;
-const int MOUSE_BUTTON_RIGHT = MOUSE_KEY_START_INDEX + 6;
 const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
-const int _fallbackTileSize = 8;
+const int _fallbackTileSize = TILE_SIZE;
 const int _fallbackRngDefaultState = 0xA3C59AC3D12B9E5D;
 const int _fallbackRngMask64 = 0xFFFFFFFFFFFFFFFF;
 const int _fallbackNoiseDefaultSeed = 0;
@@ -105,7 +90,10 @@ bool _fallbackPerfMonitorEnabled = false;
 bool _fallbackIntegerScaleEnabled = true;
 int _fallbackScreenMode = 0;
 bool _fallbackFullscreenEnabled = false;
-List<int> _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+List<int> _fallbackPaletteMap = List<int>.generate(
+  NUM_COLORS,
+  (index) => index,
+);
 int _fallbackImageBankSize = 16;
 final Map<int, List<int>> _fallbackImageBanks = <int, List<int>>{};
 final Map<int, _FallbackTilemap> _fallbackTilemaps = <int, _FallbackTilemap>{};
@@ -319,7 +307,7 @@ void _seedFallbackResources() {
   final bank = List<int>.filled(bankSize * bankSize, 0, growable: false);
   for (var y = 0; y < bankSize; y++) {
     for (var x = 0; x < bankSize; x++) {
-      bank[y * bankSize + x] = (x + y) % 16;
+      bank[y * bankSize + x] = (x + y) % NUM_COLORS;
     }
   }
   _fallbackImageBanks
@@ -402,7 +390,7 @@ void init(
     _fallbackIntegerScaleEnabled = true;
     _fallbackScreenMode = 0;
     _fallbackFullscreenEnabled = false;
-    _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+    _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
     _seedFallbackResources();
     _fallbackRngState = _fallbackRngDefaultState;
     _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
@@ -461,7 +449,7 @@ void _clearLocalRuntimeState() {
   _fallbackIntegerScaleEnabled = true;
   _fallbackScreenMode = 0;
   _fallbackFullscreenEnabled = false;
-  _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+  _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
   _fallbackImageBankSize = 16;
   _fallbackImageBanks.clear();
   _fallbackTilemaps.clear();
@@ -960,7 +948,7 @@ void pal([int? col1, int? col2]) {
   }
   if (bindings == null) {
     if (col1 == null && col2 == null) {
-      _fallbackPaletteMap = List<int>.generate(16, (index) => index);
+      _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
       return;
     }
     if (col1 != null && col1 >= 0 && col1 < _fallbackPaletteMap.length) {

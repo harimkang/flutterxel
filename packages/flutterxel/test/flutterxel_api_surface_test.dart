@@ -85,6 +85,42 @@ void main() {
     },
   );
 
+  test('exposes Pyxel-compatible core constants', () {
+    expect(flutterxel.VERSION, '2.7.1');
+    expect(flutterxel.BASE_DIR, '.pyxel');
+    expect(flutterxel.WINDOW_STATE_ENV, 'PYXEL_WINDOW_STATE');
+    expect(flutterxel.WATCH_STATE_FILE_ENV, 'PYXEL_WATCH_STATE_FILE');
+    expect(flutterxel.WATCH_RESET_EXIT_CODE, 82);
+    expect(flutterxel.APP_FILE_EXTENSION, '.pyxapp');
+    expect(flutterxel.RESOURCE_FILE_EXTENSION, '.pyxres');
+    expect(flutterxel.PALETTE_FILE_EXTENSION, '.pyxpal');
+    expect(flutterxel.NUM_COLORS, 16);
+    expect(flutterxel.NUM_IMAGES, 3);
+    expect(flutterxel.IMAGE_SIZE, 256);
+    expect(flutterxel.NUM_TILEMAPS, 8);
+    expect(flutterxel.TILEMAP_SIZE, 256);
+    expect(flutterxel.TILE_SIZE, 8);
+    expect(flutterxel.FONT_WIDTH, 4);
+    expect(flutterxel.FONT_HEIGHT, 6);
+    expect(flutterxel.NUM_CHANNELS, 4);
+    expect(flutterxel.NUM_TONES, 4);
+    expect(flutterxel.NUM_SOUNDS, 64);
+    expect(flutterxel.NUM_MUSICS, 8);
+    expect(flutterxel.DEFAULT_COLORS.length, flutterxel.NUM_COLORS);
+    expect(flutterxel.COLOR_BLACK, 0);
+    expect(flutterxel.COLOR_PEACH, 15);
+    expect(flutterxel.KEY_UNKNOWN, 0x00);
+    expect(flutterxel.KEY_BACKSPACE, 0x08);
+    expect(flutterxel.KEY_F1, 0x4000003A);
+    expect(flutterxel.MOUSE_BUTTON_X1, flutterxel.MOUSE_KEY_START_INDEX + 7);
+    expect(flutterxel.MOUSE_BUTTON_X2, flutterxel.MOUSE_KEY_START_INDEX + 8);
+    expect(flutterxel.GAMEPAD1_BUTTON_A, flutterxel.GAMEPAD1_AXIS_LEFTX + 6);
+    expect(flutterxel.TONE_TRIANGLE, 0);
+    expect(flutterxel.TONE_NOISE, 3);
+    expect(flutterxel.EFFECT_NONE, 0);
+    expect(flutterxel.EFFECT_QUARTER_FADEOUT, 5);
+  });
+
   test(
     'accepts Pyxel-compatible named options for init/load/save/play/playm/blt',
     () {
