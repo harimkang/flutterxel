@@ -12,14 +12,11 @@
 
 ## Add Dependency
 
-Use a Git dependency to consume the package from this monorepo:
+Use the published package from pub.dev:
 
 ```yaml
 dependencies:
-  flutterxel:
-    git:
-      url: https://github.com/harimkang/flutterxel.git
-      path: packages/flutterxel
+  flutterxel: ^0.0.2
 ```
 
 Then run:
@@ -27,6 +24,13 @@ Then run:
 ```bash
 flutter pub get
 ```
+
+Package pages:
+
+- https://pub.dev/packages/flutterxel
+- https://pub.dev/packages/flutterxel_tools
+
+If you need to test unreleased changes from this repository, you can switch to a Git dependency temporarily.
 
 ## If You Are Working Inside This Repository
 
