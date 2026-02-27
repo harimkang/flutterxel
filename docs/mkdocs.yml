@@ -45,4 +45,6 @@ nav:
   - Reference:
       - API (Auto-Generated): reference/api.md
       - Constants and Compatibility: reference/constants-and-compatibility.md
+  - Release Notes:
+      - v0.0.2: release-notes/v0.0.2.md
   - Docs Workflow: contributing.md
