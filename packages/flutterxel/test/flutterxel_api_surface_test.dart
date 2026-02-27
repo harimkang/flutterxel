@@ -932,15 +932,29 @@ void main() {
     expect(flutterxel.pget(3, 2), 2);
   });
 
-  test('text draws glyph pixels and skips spaces', () {
+  test('text draws builtin glyph shape instead of a filled block', () {
     flutterxel.init(20, 10);
     flutterxel.cls(0);
 
     flutterxel.text(1, 1, 'A', 11);
-    expect(flutterxel.pget(1, 1), 11);
+    // Built-in 4x6 'A' glyph starts with an empty top-left pixel.
+    expect(flutterxel.pget(1, 1), 0);
+    expect(flutterxel.pget(2, 1), 11);
+    expect(flutterxel.pget(3, 1), 0);
 
     flutterxel.text(6, 1, ' ', 12);
     expect(flutterxel.pget(6, 1), 0);
+  });
+
+  test('text skips non-ASCII glyphs without advancing cursor', () {
+    flutterxel.init(20, 10);
+    flutterxel.cls(0);
+
+    flutterxel.text(1, 1, '한A', 12);
+
+    // Non-ASCII glyph is skipped, so 'A' starts immediately at x=1.
+    expect(flutterxel.pget(1, 1), 0);
+    expect(flutterxel.pget(2, 1), 12);
   });
 
   test('bltm draws tilemap region using default tile resources', () {

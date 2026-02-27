@@ -29,6 +29,106 @@ const int _fallbackTileSize = TILE_SIZE;
 const int _fallbackRngDefaultState = 0xA3C59AC3D12B9E5D;
 const int _fallbackRngMask64 = 0xFFFFFFFFFFFFFFFF;
 const int _fallbackNoiseDefaultSeed = 0;
+const int _builtinFontMinCode = 32;
+const int _builtinFontMaxCode = 127;
+const List<int> _builtinFontData = <int>[
+  0x000000,
+  0x444040,
+  0xAA0000,
+  0xAEAEA0,
+  0x6C6C40,
+  0x824820,
+  0x4A4AC0,
+  0x440000,
+  0x244420,
+  0x844480,
+  0xA4E4A0,
+  0x04E400,
+  0x000480,
+  0x00E000,
+  0x000040,
+  0x224880,
+  0x6AAAC0,
+  0x4C4440,
+  0xC248E0,
+  0xC242C0,
+  0xAAE220,
+  0xE8C2C0,
+  0x68EAE0,
+  0xE24880,
+  0xEAEAE0,
+  0xEAE2C0,
+  0x040400,
+  0x040480,
+  0x248420,
+  0x0E0E00,
+  0x842480,
+  0xE24040,
+  0x4AA860,
+  0x4AEAA0,
+  0xCACAC0,
+  0x688860,
+  0xCAAAC0,
+  0xE8E8E0,
+  0xE8E880,
+  0x68EA60,
+  0xAAEAA0,
+  0xE444E0,
+  0x222A40,
+  0xAACAA0,
+  0x8888E0,
+  0xAEEAA0,
+  0xCAAAA0,
+  0x4AAA40,
+  0xCAC880,
+  0x4AAE60,
+  0xCAECA0,
+  0x6842C0,
+  0xE44440,
+  0xAAAA60,
+  0xAAAA40,
+  0xAAEEA0,
+  0xAA4AA0,
+  0xAA4440,
+  0xE248E0,
+  0x644460,
+  0x884220,
+  0xC444C0,
+  0x4A0000,
+  0x0000E0,
+  0x840000,
+  0x06AA60,
+  0x8CAAC0,
+  0x068860,
+  0x26AA60,
+  0x06AC60,
+  0x24E440,
+  0x06AE24,
+  0x8CAAA0,
+  0x404440,
+  0x2022A4,
+  0x8ACCA0,
+  0xC444E0,
+  0x0EEEA0,
+  0x0CAAA0,
+  0x04AA40,
+  0x0CAAC8,
+  0x06AA62,
+  0x068880,
+  0x06C6C0,
+  0x4E4460,
+  0x0AAA60,
+  0x0AAA40,
+  0x0AAEE0,
+  0x0A44A0,
+  0x0AA624,
+  0x0E24E0,
+  0x64C460,
+  0x444440,
+  0xC464C0,
+  0x6C0000,
+  0xEEEEE0,
+];
 
 class _FallbackTilemap {
   _FallbackTilemap({
@@ -1619,6 +1719,48 @@ void fill(int x, int y, int col) {
   }
 }
 
+bool _builtinFontPixelOn(int codePoint, int glyphX, int glyphY) {
+  if (codePoint < _builtinFontMinCode || codePoint > _builtinFontMaxCode) {
+    return false;
+  }
+  if (glyphX < 0 ||
+      glyphX >= FONT_WIDTH ||
+      glyphY < 0 ||
+      glyphY >= FONT_HEIGHT) {
+    return false;
+  }
+  final glyph = _builtinFontData[codePoint - _builtinFontMinCode];
+  final bitIndex =
+      FONT_WIDTH * FONT_HEIGHT - 1 - (glyphY * FONT_WIDTH + glyphX);
+  return (glyph & (1 << bitIndex)) != 0;
+}
+
+void _drawFallbackBuiltinText(int x, int y, String s, int col) {
+  var cursorX = x;
+  var cursorY = y;
+  final lineStartX = x;
+
+  for (final rune in s.runes) {
+    if (rune == 0x0A) {
+      cursorX = lineStartX;
+      cursorY += FONT_HEIGHT;
+      continue;
+    }
+    if (rune < _builtinFontMinCode || rune > _builtinFontMaxCode) {
+      continue;
+    }
+
+    for (var dy = 0; dy < FONT_HEIGHT; dy++) {
+      for (var dx = 0; dx < FONT_WIDTH; dx++) {
+        if (_builtinFontPixelOn(rune, dx, dy)) {
+          _fallbackSetPixel(cursorX + dx, cursorY + dy, col);
+        }
+      }
+    }
+    cursorX += FONT_WIDTH;
+  }
+}
+
 /// Pyxel-compatible text API.
 void text(int x, int y, String s, int col) {
   _ensureInitialized('text');
@@ -1635,25 +1777,7 @@ void text(int x, int y, String s, int col) {
   }
 
   if (bindings == null) {
-    var cursorX = x;
-    var cursorY = y;
-    final lineStartX = x;
-    for (final rune in s.runes) {
-      final ch = String.fromCharCode(rune);
-      if (ch == '\n') {
-        cursorX = lineStartX;
-        cursorY += 6;
-        continue;
-      }
-      if (ch != ' ') {
-        for (var dy = 0; dy < 6; dy++) {
-          for (var dx = 0; dx < 4; dx++) {
-            _fallbackSetPixel(cursorX + dx, cursorY + dy, col);
-          }
-        }
-      }
-      cursorX += 4;
-    }
+    _drawFallbackBuiltinText(x, y, s, col);
   }
 }
 

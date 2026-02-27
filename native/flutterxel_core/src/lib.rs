@@ -16,6 +16,23 @@ const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 const TILE_SIZE: i32 = 8;
+const MIN_FONT_CODE: u32 = 32;
+const MAX_FONT_CODE: u32 = 127;
+const FONT_WIDTH: usize = 4;
+const FONT_HEIGHT: usize = 6;
+const FONT_DATA: [u32; (MAX_FONT_CODE - MIN_FONT_CODE + 1) as usize] = [
+    0x000000, 0x444040, 0xaa0000, 0xaeaea0, 0x6c6c40, 0x824820, 0x4a4ac0, 0x440000, 0x244420,
+    0x844480, 0xa4e4a0, 0x04e400, 0x000480, 0x00e000, 0x000040, 0x224880, 0x6aaac0, 0x4c4440,
+    0xc248e0, 0xc242c0, 0xaae220, 0xe8c2c0, 0x68eae0, 0xe24880, 0xeaeae0, 0xeae2c0, 0x040400,
+    0x040480, 0x248420, 0x0e0e00, 0x842480, 0xe24040, 0x4aa860, 0x4aeaa0, 0xcacac0, 0x688860,
+    0xcaaac0, 0xe8e8e0, 0xe8e880, 0x68ea60, 0xaaeaa0, 0xe444e0, 0x222a40, 0xaacaa0, 0x8888e0,
+    0xaeeaa0, 0xcaaaa0, 0x4aaa40, 0xcac880, 0x4aae60, 0xcaeca0, 0x6842c0, 0xe44440, 0xaaaa60,
+    0xaaaa40, 0xaaeea0, 0xaa4aa0, 0xaa4440, 0xe248e0, 0x644460, 0x884220, 0xc444c0, 0x4a0000,
+    0x0000e0, 0x840000, 0x06aa60, 0x8caac0, 0x068860, 0x26aa60, 0x06ac60, 0x24e440, 0x06ae24,
+    0x8caaa0, 0x404440, 0x2022a4, 0x8acca0, 0xc444e0, 0x0eeea0, 0x0caaa0, 0x04aa40, 0x0caac8,
+    0x06aa62, 0x068880, 0x06c6c0, 0x4e4460, 0x0aaa60, 0x0aaa40, 0x0aaee0, 0x0a44a0, 0x0aa624,
+    0x0e24e0, 0x64c460, 0x444440, 0xc464c0, 0x6c0000, 0xeeeee0,
+];
 const RNG_DEFAULT_STATE: u64 = 0xA3C5_9AC3_D12B_9E5D;
 const NOISE_DEFAULT_SEED: u32 = 0;
 const MOUSE_KEY_START_INDEX: i32 = 0x5000_0100;
@@ -1545,24 +1562,41 @@ fn draw_trib(
 }
 
 fn draw_text(state: &mut RuntimeState, x: i32, y: i32, text: &str, col: i32) {
+    fn builtin_font_pixel_on(code: u32, x: usize, y: usize) -> bool {
+        if !(MIN_FONT_CODE..=MAX_FONT_CODE).contains(&code) {
+            return false;
+        }
+        if x >= FONT_WIDTH || y >= FONT_HEIGHT {
+            return false;
+        }
+        let glyph = FONT_DATA[(code - MIN_FONT_CODE) as usize];
+        let bit_index = FONT_WIDTH * FONT_HEIGHT - 1 - (y * FONT_WIDTH + x);
+        (glyph & (1_u32 << bit_index)) != 0
+    }
+
     let mut cursor_x = x;
     let mut cursor_y = y;
     let line_start_x = x;
     for ch in text.chars() {
         if ch == '\n' {
             cursor_x = line_start_x;
-            cursor_y += 6;
+            cursor_y += FONT_HEIGHT as i32;
             continue;
         }
 
-        if ch != ' ' {
-            for dy in 0..6 {
-                for dx in 0..4 {
-                    set_frame_pixel(state, cursor_x + dx, cursor_y + dy, col);
+        let code = ch as u32;
+        if !(MIN_FONT_CODE..=MAX_FONT_CODE).contains(&code) {
+            continue;
+        }
+
+        for dy in 0..FONT_HEIGHT {
+            for dx in 0..FONT_WIDTH {
+                if builtin_font_pixel_on(code, dx, dy) {
+                    set_frame_pixel(state, cursor_x + dx as i32, cursor_y + dy as i32, col);
                 }
             }
         }
-        cursor_x += 4;
+        cursor_x += FONT_WIDTH as i32;
     }
 }
 
@@ -3313,18 +3347,35 @@ mod tests {
     }
 
     #[test]
-    fn text_draws_pixels_for_non_space_and_skips_spaces() {
+    fn text_draws_builtin_glyph_shape_instead_of_filled_block() {
         let _guard = test_lock();
         init_runtime(20, 10);
         assert!(flutterxel_core_cls(0));
 
         let text_a = CString::new("A").expect("valid cstring");
         assert!(flutterxel_core_text(1, 1, text_a.as_ptr(), 11));
-        assert_eq!(flutterxel_core_pget(1, 1), 11);
+        // Built-in 4x6 'A' glyph starts with an empty top-left pixel.
+        assert_eq!(flutterxel_core_pget(1, 1), 0);
+        assert_eq!(flutterxel_core_pget(2, 1), 11);
+        assert_eq!(flutterxel_core_pget(3, 1), 0);
 
         let text_space = CString::new(" ").expect("valid cstring");
         assert!(flutterxel_core_text(6, 1, text_space.as_ptr(), 12));
         assert_eq!(flutterxel_core_pget(6, 1), 0);
+    }
+
+    #[test]
+    fn text_skips_non_ascii_without_advancing_cursor() {
+        let _guard = test_lock();
+        init_runtime(20, 10);
+        assert!(flutterxel_core_cls(0));
+
+        let text = CString::new("한A").expect("valid cstring");
+        assert!(flutterxel_core_text(1, 1, text.as_ptr(), 12));
+
+        // Non-ASCII glyph is skipped, so 'A' starts immediately at x=1.
+        assert_eq!(flutterxel_core_pget(1, 1), 0);
+        assert_eq!(flutterxel_core_pget(2, 1), 12);
     }
 
     #[test]
