@@ -1,0 +1,48 @@
+site_name: flutterxel Docs
+site_description: Official documentation for the flutterxel Flutter plugin and runtime.
+site_url: https://harimkang.github.io/flutterxel/
+repo_url: https://github.com/harimkang/flutterxel
+repo_name: harimkang/flutterxel
+edit_uri: edit/main/docs/site/
+
+docs_dir: site
+site_dir: .site
+strict: true
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+not_in_nav: |
+  api/flutterxel/**/*.md
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - First App: getting-started/first-app.md
+  - Guides:
+      - Game Loop and Rendering: guides/game-loop-and-rendering.md
+      - Input: guides/input.md
+      - Audio: guides/audio.md
+      - Resources and Persistence: guides/resources-and-persistence.md
+      - Examples: guides/examples.md
+  - Reference:
+      - API (Auto-Generated): reference/api.md
+      - Constants and Compatibility: reference/constants-and-compatibility.md
+  - Docs Workflow: contributing.md

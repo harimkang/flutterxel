@@ -1,5 +1,5 @@
 # Source mirrors and local references
-reference/
+/reference/
 
 # Dart / Flutter
 **/.dart_tool/
@@ -22,3 +22,7 @@ reference/
 .DS_Store
 
 AGENTS.md
+
+# Documentation build artifacts
+docs/.site/
+docs/site/api/
