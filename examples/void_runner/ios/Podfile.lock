@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - flutterxel (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - flutterxel (from `.symlinks/plugins/flutterxel/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  flutterxel:
+    :path: ".symlinks/plugins/flutterxel/ios"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutterxel: b31429faa59449eb5484d873a37303cc5b98334c
+
+PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
+
+COCOAPODS: 1.16.2
