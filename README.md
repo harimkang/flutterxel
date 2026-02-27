@@ -1,150 +1,177 @@
 # flutterxel
 
-`flutterxel` is a **Pyxel-compatible runtime and tooling monorepo** built with:
+`flutterxel` is a Pyxel-style retro game runtime for Flutter, powered by a Rust core over FFI.
 
-- **Rust core** (`native/flutterxel_core`)
-- **Flutter API/plugin layer** (`packages/flutterxel`)
-- **Tooling package** (`packages/flutterxel_tools`)
+It is built for developers who want fast pixel-game iteration with a familiar API (`init`, `run`, `cls`, `pset`, `text`, `btn`, `play`, and more) inside modern Flutter apps.
 
-This codebase is a Flutter + Rust porting effort based on the Pyxel project:
+![flutterxel showcase](docs/site/assets/images/flutterxel.png)
 
-- Upstream reference: https://github.com/kitao/pyxel
+## Links
 
-The goal is high Pyxel API/resource compatibility with a mobile-first Flutter developer experience.
+- Package: https://pub.dev/packages/flutterxel
+- Install page: https://pub.dev/packages/flutterxel/install
+- Documentation: https://harimkang.github.io/flutterxel/
+- Example games: https://github.com/harimkang/flutterxel/tree/main/examples
+- Upstream inspiration: https://github.com/kitao/pyxel
 
-## Project Status
+## Why flutterxel
 
-Current status: **active implementation, mobile-first runtime path ready, compatibility surface expanded heavily**.
+- Pyxel-compatible API surface with both camelCase and snake_case aliases.
+- Rust-native runtime core for graphics/audio/resource handling.
+- Flutter-first integration through `FlutterxelView`.
+- Full-screen-friendly layout patterns (see `examples/`).
+- Resource persistence support (`.pyxres`, palette load/save paths).
+- Published on pub.dev and ready to use in app projects.
 
-Implemented so far includes:
+## Installation
 
-- Monorepo/workspace bootstrap with Dart workspace + Melos
-- Rust core C ABI and Dart FFI bindings
-- Flutter plugin runtime structure for Android/iOS
-- Pyxel-style public API surface (camelCase + snake_case aliases)
-- Large compatibility constant set (`VERSION`, key/mouse/gamepad constants, palette constants, etc.)
-- Runtime loop and frame lifecycle (`init/run/flip/show/quit/reset`)
-- Input bridge APIs (`btn/btnp/btnr/btnv`, mouse position/wheel, text/files mirror)
-- Drawing primitives and transforms (`cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/blt/bltm`)
-- Camera/clip/palette/dither behavior in runtime fallback and core paths
-- Resource objects and compatibility modeling:
-  - `Image`, `Tilemap`, `Sound`, `Music`, `Tone`, `Channel`, `Seq`
-  - Tilemap operations (`set`, `load`, `from_tmx`, `blt`, `collide`)
-  - Image/tilemap raw pointer snapshots for core interop testing
-- Audio compatibility work:
-  - `play/playm/stop/play_pos` including Pyxel-like signatures
-  - `Sound`/`Music` mutation sync over FFI (`sound_set_*`, `music_set_seq`)
-  - playback progress tracking (`playPos`) and `sec`-based completion behavior
-  - MML parser compatibility improvements including old tokens (`x/X/~`)
-  - WAV export path and ffmpeg-based optional compressed workflow
-- Resource file support in Rust core:
-  - `.pyxres` zip archive with `pyxel_resource.toml`
-  - `format_version <= 4` handling
-  - image/tilemap/sound/music round-trip + exclude flags
-  - `.pyxpal` load/save path
-- Native prebuilt artifact strategy:
-  - Android: `packages/flutterxel/native/android/jniLibs/<abi>/libflutterxel_core.so`
-  - iOS: `packages/flutterxel/native/ios/FlutterxelCore.xcframework`
-- Release/CI automation:
-  - workspace CI (analyze/test), Rust test/fmt, ABI contract checks
-  - tagged native artifact packaging (`v*`)
-  - tag/version validation + `pub publish --dry-run` workflow
+Add `flutterxel` from pub.dev:
 
-## Repository Layout
+```yaml
+dependencies:
+  flutterxel: ^0.0.2
+```
+
+Then run:
+
+```bash
+flutter pub get
+```
+
+## Quick Usage
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutterxel/flutterxel.dart' as flutterxel;
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: GamePage(),
+    );
+  }
+}
+
+class GamePage extends StatefulWidget {
+  const GamePage({super.key});
+
+  @override
+  State<GamePage> createState() => _GamePageState();
+}
+
+class _GamePageState extends State<GamePage> {
+  int playerX = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    flutterxel.init(160, 120, title: 'My flutterxel game', fps: 60);
+    flutterxel.run(_update, _draw);
+  }
+
+  @override
+  void dispose() {
+    flutterxel.stopRunLoop();
+    super.dispose();
+  }
+
+  void _update() {
+    if (flutterxel.btn(flutterxel.KEY_LEFT)) {
+      playerX -= 2;
+    }
+    if (flutterxel.btn(flutterxel.KEY_RIGHT)) {
+      playerX += 2;
+    }
+    playerX = playerX.clamp(0, flutterxel.width - 12).toInt();
+  }
+
+  void _draw() {
+    flutterxel.cls(flutterxel.COLOR_BLACK);
+    flutterxel.rect(playerX, 56, 12, 12, flutterxel.COLOR_CYAN);
+    flutterxel.text(4, 4, 'HELLO FLUTTERXEL', flutterxel.COLOR_WHITE);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final scaleByWidth = constraints.maxWidth / 160;
+          final scaleByHeight = constraints.maxHeight / 120;
+          final scale = (scaleByWidth < scaleByHeight)
+              ? scaleByWidth
+              : scaleByHeight;
+
+          return ColoredBox(
+            color: const Color(0xFF05070E),
+            child: Center(
+              child: flutterxel.FlutterxelView(
+                pixelScale: scale.clamp(1.0, 12.0).toDouble(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+```
+
+## Example Games
+
+Complete, playable examples are included under `examples/`:
+
+- `examples/star_patrol` (top-down shooter)
+- `examples/pixel_puzzle` (puzzle)
+- `examples/void_runner` (runner)
+- `examples/cosmic_survivor` (survival shooter)
+
+Run one:
+
+```bash
+cd examples/star_patrol
+flutter run
+```
+
+## Documentation and API
+
+- Main docs: https://harimkang.github.io/flutterxel/
+- API reference: automatically generated from source during docs build/deploy.
+
+## Monorepo Structure
 
 ```text
 flutterxel/
-├── docs/
-│   ├── architecture/
-│   └── plans/
-├── native/
-│   └── flutterxel_core/
-└── packages/
-    ├── flutterxel/
-    └── flutterxel_tools/
+├── packages/flutterxel        # Flutter plugin package
+├── packages/flutterxel_tools  # Release/build helper tooling
+├── native/flutterxel_core     # Rust core runtime + C ABI
+├── examples/                  # Playable example games
+└── docs/                      # GitHub Pages documentation source
 ```
 
-## Packages
-
-- `packages/flutterxel`
-  - Flutter runtime plugin (mobile-first)
-  - Dart API + FFI bridge to Rust core
-- `packages/flutterxel_tools`
-  - CLI/tooling package
-  - native artifact build helpers and release-check command
-- `native/flutterxel_core`
-  - Rust engine core
-  - stable C ABI boundary for Flutter FFI
-
-## Quick Start (Repo)
+## Local Development
 
 ```bash
-dart pub get
 dart run melos bootstrap
 dart run melos run analyze
 dart run melos run test
 ```
 
-Rust core tests:
+Rust core:
 
 ```bash
 cd native/flutterxel_core
 cargo test
 ```
 
-## Native Artifacts
-
-Maintainer build helper:
-
-```bash
-dart run flutterxel_tools:flutterxel_tools build-native --all
-```
-
-Tag releases (`v*`) produce downloadable artifacts via GitHub Actions:
-
-- `flutterxel-native-artifacts.tgz`
-- `flutterxel-native-package-overlay.tgz`
-
-## Release Validation
-
-Tag/package version alignment check:
-
-```bash
-dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.1
-```
-
-Equivalent script:
-
-```bash
-bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.1
-```
-
-Pre-tag version bump (pubspec + changelog headings):
-
-```bash
-dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.2
-```
-
-## CI Workflows
-
-- `.github/workflows/ci.yml`
-  - workspace analyze/test
-  - Rust fmt/test
-  - ABI contract check
-- `.github/workflows/native_artifacts.yml`
-  - Android/iOS native artifact build and release asset upload on tag
-- `.github/workflows/publish_dry_run.yml`
-  - tag/version validation
-  - `flutter pub publish --dry-run` for monorepo packages
-- `.github/workflows/release_readiness.yml`
-  - pre-tag metadata validation on PR/main (versions + CHANGELOG headings)
-
-## Design/Planning Docs
-
-- `docs/architecture/2026-02-25-flutterxel-ffi-mobile-architecture.md`
-- `docs/plans/2026-02-25-workspace-bootstrap-implementation-plan.md`
-- `docs/plans/2026-02-26-audio-ffi-old-mml-implementation-plan.md`
-
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+For upstream attribution used in Pyxel compatibility work, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

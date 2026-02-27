@@ -2,6 +2,8 @@
 
 `flutterxel` is a Flutter plugin that provides a Pyxel-style runtime API backed by a Rust core.
 
+![flutterxel showcase](assets/images/flutterxel.png)
+
 This documentation focuses on practical usage of the plugin package at:
 
 - `packages/flutterxel`

@@ -76,3 +76,4 @@ The repository is organized as:
 ## License
 
 MIT.
+Upstream attribution for Pyxel compatibility work: https://github.com/harimkang/flutterxel/blob/main/THIRD_PARTY_NOTICES.md
