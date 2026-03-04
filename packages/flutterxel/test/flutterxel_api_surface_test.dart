@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 String _writeTestPcm16Wav(
   Directory dir, {
@@ -68,6 +69,29 @@ String _writeTestPcm16Wav(
   ];
   bytes.addAll(List<int>.filled(dataSize, 0, growable: false));
   file.writeAsBytesSync(bytes, flush: true);
+  return file.path;
+}
+
+String _writeTestPng(
+  Directory dir, {
+  required String name,
+  required int width,
+  required int height,
+  required List<int> rgb24Pixels,
+}) {
+  final image = img.Image(width: width, height: height);
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      final rgb = rgb24Pixels[y * width + x];
+      final r = (rgb >> 16) & 0xFF;
+      final g = (rgb >> 8) & 0xFF;
+      final b = rgb & 0xFF;
+      image.setPixelRgb(x, y, r, g, b);
+    }
+  }
+
+  final file = File('${dir.path}/$name');
+  file.writeAsBytesSync(img.encodePng(image), flush: true);
   return file.path;
 }
 
@@ -763,6 +787,70 @@ void main() {
       }
     }
   });
+
+  test(
+    'Image.fromImage loads PNG with source dimensions and palette-mapped pixels',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync('flutterxel_png_');
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestPng(
+        tempDir,
+        name: 'palette.png',
+        width: 2,
+        height: 2,
+        rgb24Pixels: const <int>[
+          0x000000, // COLOR_BLACK
+          0x2b335f, // COLOR_NAVY
+          0xeeeeee, // COLOR_WHITE
+          0xff9798, // COLOR_PINK
+        ],
+      );
+
+      final loaded = flutterxel.Image.fromImage(pngPath);
+      expect(loaded.width, 2);
+      expect(loaded.height, 2);
+      expect(loaded.pget(0, 0), flutterxel.COLOR_BLACK);
+      expect(loaded.pget(1, 0), flutterxel.COLOR_NAVY);
+      expect(loaded.pget(0, 1), flutterxel.COLOR_WHITE);
+      expect(loaded.pget(1, 1), flutterxel.COLOR_PINK);
+    },
+  );
+
+  test(
+    'Image.load decodes PNG into an existing image at the requested offset',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync(
+        'flutterxel_png_load_',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestPng(
+        tempDir,
+        name: 'offset.png',
+        width: 1,
+        height: 1,
+        rgb24Pixels: const <int>[0x010101],
+      );
+
+      final target = flutterxel.Image(4, 4);
+      target.cls(flutterxel.COLOR_RED);
+      target.load(2, 1, pngPath);
+
+      expect(target.pget(0, 0), flutterxel.COLOR_RED);
+      expect(target.pget(2, 1), flutterxel.COLOR_BLACK);
+    },
+  );
 
   test('image and tilemap data_ptr expose raw byte layout snapshots', () {
     flutterxel.init(8, 8);

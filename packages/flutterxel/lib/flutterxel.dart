@@ -12,6 +12,7 @@ import 'package:flutter/gestures.dart'
     show PointerScrollEvent, PointerSignalEvent;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:image/image.dart' as image_lib;
 
 import 'flutterxel_bindings_generated.dart';
 import 'src/pyxel_constants.dart';
@@ -498,6 +499,44 @@ int? _parsePaletteLine(String line) {
 
   return int.tryParse(trimmed) ??
       (hexLike ? int.tryParse(trimmed, radix: 16) : null);
+}
+
+int _rgbDistanceSquared(int lhsRgb24, int rhsRgb24) {
+  final lhsR = (lhsRgb24 >> 16) & 0xFF;
+  final lhsG = (lhsRgb24 >> 8) & 0xFF;
+  final lhsB = lhsRgb24 & 0xFF;
+  final rhsR = (rhsRgb24 >> 16) & 0xFF;
+  final rhsG = (rhsRgb24 >> 8) & 0xFF;
+  final rhsB = rhsRgb24 & 0xFF;
+  final dr = lhsR - rhsR;
+  final dg = lhsG - rhsG;
+  final db = lhsB - rhsB;
+  return dr * dr + dg * dg + db * db;
+}
+
+int _nearestPaletteIndexFromRgb24(int rgb24, List<int> paletteRgb24) {
+  if (paletteRgb24.isEmpty) {
+    return 0;
+  }
+  var bestIndex = 0;
+  var bestDistance = _rgbDistanceSquared(rgb24, paletteRgb24.first);
+  for (var i = 1; i < paletteRgb24.length; i++) {
+    final distance = _rgbDistanceSquared(rgb24, paletteRgb24[i]);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
+image_lib.Image? _tryDecodeRasterImage(String filename) {
+  final file = File(filename);
+  if (!file.existsSync()) {
+    return null;
+  }
+  final bytes = file.readAsBytesSync();
+  return image_lib.decodeImage(bytes);
 }
 
 double _fallbackNoiseHash(int seed, int x, int y, int z) {
@@ -3162,8 +3201,20 @@ class Image {
   }
 
   static Image fromImage(String filename, {bool? includeColors}) {
-    final image = Image(IMAGE_SIZE, IMAGE_SIZE);
-    image.load(0, 0, filename, include_colors: includeColors);
+    final decoded = _tryDecodeRasterImage(filename);
+    if (decoded == null) {
+      final image = Image(IMAGE_SIZE, IMAGE_SIZE);
+      image.load(0, 0, filename, include_colors: includeColors);
+      return image;
+    }
+
+    final image = Image(decoded.width, decoded.height);
+    image._loadDecodedRaster(
+      0,
+      0,
+      decoded,
+      includeColors: includeColors == true,
+    );
     return image;
   }
 
@@ -3263,7 +3314,45 @@ class Image {
     }
   }
 
+  void _loadDecodedRaster(
+    int dstX,
+    int dstY,
+    image_lib.Image decoded, {
+    required bool includeColors,
+  }) {
+    final mappedColors = <int, int>{};
+    final discoveredPalette = <int>[];
+    for (var y = 0; y < decoded.height; y++) {
+      for (var x = 0; x < decoded.width; x++) {
+        final pixel = decoded.getPixel(x, y);
+        final rgb24 =
+            ((pixel.r.toInt() & 0xFF) << 16) |
+            ((pixel.g.toInt() & 0xFF) << 8) |
+            (pixel.b.toInt() & 0xFF);
+
+        final mapped = mappedColors.putIfAbsent(rgb24, () {
+          if (!includeColors) {
+            return _nearestPaletteIndexFromRgb24(rgb24, DEFAULT_COLORS);
+          }
+          if (discoveredPalette.length < NUM_COLORS) {
+            discoveredPalette.add(rgb24);
+            return discoveredPalette.length - 1;
+          }
+          return _nearestPaletteIndexFromRgb24(rgb24, discoveredPalette);
+        });
+
+        _setLocalPixel(dstX + x, dstY + y, mapped);
+      }
+    }
+  }
+
   void load(int x, int y, String filename, {bool? include_colors}) {
+    final decoded = _tryDecodeRasterImage(filename);
+    if (decoded != null) {
+      _loadDecodedRaster(x, y, decoded, includeColors: include_colors == true);
+      return;
+    }
+
     final file = File(filename);
     if (!file.existsSync()) {
       return;
