@@ -150,6 +150,22 @@ class FlutterxelTools {
     return candidates.first;
   }
 
+  static String _pixelSnapScriptPath() {
+    final sep = Platform.pathSeparator;
+    final candidates = <String>[
+      '${Directory.current.path}${sep}packages${sep}flutterxel_tools${sep}tool${sep}pixel_snap_image.sh',
+      '${Directory.current.path}${sep}tool${sep}pixel_snap_image.sh',
+    ];
+
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
+    }
+
+    return candidates.first;
+  }
+
   static Future<int> execute(
     List<String> args, {
     Future<ProcessResult> Function(String executable, List<String> arguments)?
@@ -180,7 +196,8 @@ class FlutterxelTools {
 
     if (command != 'build-native' &&
         command != 'release-check' &&
-        command != 'release-bump') {
+        command != 'release-bump' &&
+        command != 'pixel-snap') {
       onStdout(dispatch(results));
       return 0;
     }
@@ -190,8 +207,22 @@ class FlutterxelTools {
       'build-native' => _buildNativeScriptPath(),
       'release-check' => _releaseCheckScriptPath(),
       'release-bump' => _releaseBumpScriptPath(),
+      'pixel-snap' => _pixelSnapScriptPath(),
       _ => '',
     };
+    if (command == 'pixel-snap') {
+      final input = commandArgs['input'] as String?;
+      if (input == null || input.isEmpty) {
+        onStderr('pixel-snap requires --input <path>.');
+        return 64;
+      }
+
+      final output = commandArgs['output'] as String?;
+      if (output == null || output.isEmpty) {
+        onStderr('pixel-snap requires --output <path>.');
+        return 64;
+      }
+    }
     if (!File(scriptPath).existsSync()) {
       onStderr('$command script not found: $scriptPath');
       return 66;
@@ -221,6 +252,23 @@ class FlutterxelTools {
       final version = commandArgs['version'] as String?;
       if (version != null && version.isNotEmpty) {
         forwarded.addAll(['--version', version]);
+      }
+    } else if (command == 'pixel-snap') {
+      final input = commandArgs['input'] as String?;
+      final output = commandArgs['output'] as String?;
+      final colors = commandArgs['colors'] as String?;
+
+      if (input != null && input.isNotEmpty) {
+        forwarded.addAll(['--input', input]);
+      }
+      if (output != null && output.isNotEmpty) {
+        forwarded.addAll(['--output', output]);
+      }
+      if (colors != null && colors.isNotEmpty) {
+        forwarded.addAll(['--colors', colors]);
+      }
+      if (commandArgs['overwrite'] == true) {
+        forwarded.add('--overwrite');
       }
     }
     forwarded.addAll(commandArgs.rest);

@@ -142,4 +142,72 @@ void main() {
     expect(arguments!.first, contains('bump_release_versions.sh'));
     expect(arguments, containsAll(<String>['--version', '0.0.2']));
   });
+
+  test('execute runs pixel-snap script with forwarded args', () async {
+    String? executable;
+    List<String>? arguments;
+    final script = File('tool/pixel_snap_image.sh');
+    final scriptExisted = script.existsSync();
+    if (!scriptExisted) {
+      script.createSync(recursive: true);
+      script.writeAsStringSync('#!/usr/bin/env bash\n');
+    }
+    addTearDown(() {
+      if (!scriptExisted && script.existsSync()) {
+        script.deleteSync();
+      }
+    });
+
+    final exitCode = await FlutterxelTools.execute(
+      const [
+        'pixel-snap',
+        '--input',
+        'assets/raw/a.png',
+        '--output',
+        'assets/pixel/a.png',
+        '--colors',
+        '16',
+        '--overwrite',
+      ],
+      runProcess: (exec, args) async {
+        executable = exec;
+        arguments = args;
+        return ProcessResult(12345, 0, 'ok', '');
+      },
+      onStdout: (_) {},
+      onStderr: (_) {},
+    );
+
+    expect(exitCode, 0);
+    expect(executable, 'bash');
+    expect(arguments, isNotNull);
+    expect(arguments!.first, contains('pixel_snap_image.sh'));
+    expect(
+      arguments,
+      containsAll(<String>[
+        '--input',
+        'assets/raw/a.png',
+        '--output',
+        'assets/pixel/a.png',
+        '--colors',
+        '16',
+        '--overwrite',
+      ]),
+    );
+  });
+
+  test(
+    'execute returns 64 when pixel-snap required args are missing',
+    () async {
+      final logs = <String>[];
+      final exitCode = await FlutterxelTools.execute(
+        const ['pixel-snap', '--input', 'a.png'],
+        runProcess: (exec, args) async => ProcessResult(12345, 0, '', ''),
+        onStdout: (_) {},
+        onStderr: logs.add,
+      );
+      expect(exitCode, 64);
+      expect(logs.join('\n'), contains('--output'));
+    },
+  );
 }
