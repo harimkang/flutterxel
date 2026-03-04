@@ -185,6 +185,7 @@ final Map<int, ({int snd, int startedFrame, double? sec, bool loop})>
 _fallbackPlaybackMeta =
     <int, ({int snd, int startedFrame, double? sec, bool loop})>{};
 List<int> _fallbackFrameBuffer = <int>[];
+Int32List _nativeViewFrameBuffer = Int32List(0);
 int _fallbackCameraX = 0;
 int _fallbackCameraY = 0;
 int _fallbackClipX = 0;
@@ -2995,6 +2996,30 @@ List<int> frameBufferSnapshot() {
   }
 
   return ptr.asTypedList(len).toList(growable: false);
+}
+
+List<int> _frameBufferSnapshotForView() {
+  _ensureInitialized('frameBufferSnapshot');
+  final bindings = _getBindingsOrNull();
+  if (bindings == null) {
+    return _fallbackFrameBuffer;
+  }
+
+  final len = bindings.flutterxel_core_framebuffer_len();
+  if (len <= 0) {
+    return const <int>[];
+  }
+
+  final ptr = bindings.flutterxel_core_framebuffer_ptr();
+  if (ptr == ffi.nullptr) {
+    return const <int>[];
+  }
+
+  if (_nativeViewFrameBuffer.length != len) {
+    _nativeViewFrameBuffer = Int32List(len);
+  }
+  _nativeViewFrameBuffer.setAll(0, ptr.asTypedList(len));
+  return _nativeViewFrameBuffer;
 }
 
 class Seq<T> extends ListBase<T> {
@@ -6256,7 +6281,8 @@ class _FlutterxelViewState extends State<FlutterxelView> {
     final view = AnimatedBuilder(
       animation: _frameNotifier,
       builder: (context, _) {
-        final frame = frameBufferSnapshot();
+        final frame = _frameBufferSnapshotForView();
+        final frameVersion = frameCount;
         return RepaintBoundary(
           child: CustomPaint(
             size: Size(
@@ -6265,6 +6291,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
             ),
             painter: _FlutterxelViewPainter(
               frame: frame,
+              frameVersion: frameVersion,
               frameWidth: viewWidth,
               frameHeight: viewHeight,
               pixelScale: widget.pixelScale,
@@ -6301,6 +6328,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
 class _FlutterxelViewPainter extends CustomPainter {
   _FlutterxelViewPainter({
     required this.frame,
+    required this.frameVersion,
     required this.frameWidth,
     required this.frameHeight,
     required this.pixelScale,
@@ -6309,6 +6337,7 @@ class _FlutterxelViewPainter extends CustomPainter {
   });
 
   final List<int> frame;
+  final int frameVersion;
   final int frameWidth;
   final int frameHeight;
   final double pixelScale;
@@ -6332,20 +6361,47 @@ class _FlutterxelViewPainter extends CustomPainter {
       paints.add(Paint()..color = color);
     }
 
-    for (var index = 0; index < pixelsToDraw; index++) {
-      final colorIndex = frame[index].abs() % paints.length;
-      final x = (index % frameWidth) * pixelScale;
-      final y = (index ~/ frameWidth) * pixelScale;
-      canvas.drawRect(
-        Rect.fromLTWH(x, y, pixelScale, pixelScale),
-        paints[colorIndex],
-      );
+    for (var y = 0; y < frameHeight; y++) {
+      final rowStart = y * frameWidth;
+      if (rowStart >= pixelsToDraw) {
+        break;
+      }
+      final rowEnd = math.min(rowStart + frameWidth, pixelsToDraw);
+      var runStart = rowStart;
+      var runColorIndex = frame[rowStart].abs() % paints.length;
+
+      for (var index = rowStart + 1; index < rowEnd; index++) {
+        final colorIndex = frame[index].abs() % paints.length;
+        if (colorIndex == runColorIndex) {
+          continue;
+        }
+        final x = (runStart - rowStart) * pixelScale;
+        final runWidth = (index - runStart) * pixelScale;
+        if (runWidth > 0) {
+          canvas.drawRect(
+            Rect.fromLTWH(x, y * pixelScale, runWidth, pixelScale),
+            paints[runColorIndex],
+          );
+        }
+        runStart = index;
+        runColorIndex = colorIndex;
+      }
+
+      final x = (runStart - rowStart) * pixelScale;
+      final runWidth = (rowEnd - runStart) * pixelScale;
+      if (runWidth > 0) {
+        canvas.drawRect(
+          Rect.fromLTWH(x, y * pixelScale, runWidth, pixelScale),
+          paints[runColorIndex],
+        );
+      }
     }
   }
 
   @override
   bool shouldRepaint(covariant _FlutterxelViewPainter oldDelegate) {
-    return !identical(oldDelegate.frame, frame) ||
+    return oldDelegate.frameVersion != frameVersion ||
+        !identical(oldDelegate.frame, frame) ||
         oldDelegate.frameWidth != frameWidth ||
         oldDelegate.frameHeight != frameHeight ||
         oldDelegate.pixelScale != pixelScale ||

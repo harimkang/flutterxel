@@ -1,3 +1,10 @@
+## 0.0.9
+
+- Fixed native core default image bank capacity to initialize/reset at `256` so multi-row sprite-sheet coordinates remain valid in native mode.
+- Optimized native `blt` sampling to avoid per-call full source bank cloning while preserving safe copy semantics.
+- Added native regression coverage for image-bank pixel writes at row indices beyond `16`.
+- Optimized Flutter view rendering by reusing a native frame buffer snapshot and batching horizontal same-color pixel runs into single draw calls.
+
 ## 0.0.8
 
 - Fixed iOS backend fallback shadowing by removing C fallback symbol exports from `ios/Classes/flutterxel.c`.

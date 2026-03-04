@@ -17,6 +17,7 @@ const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 const TILE_SIZE: i32 = 8;
+const DEFAULT_IMAGE_BANK_SIZE: i32 = 256;
 const MIN_FONT_CODE: u32 = 32;
 const MAX_FONT_CODE: u32 = 127;
 const FONT_WIDTH: usize = 4;
@@ -208,7 +209,7 @@ impl Default for RuntimeState {
             mouse_visible: true,
             frame_buffer: Vec::new(),
             image_banks: HashMap::new(),
-            image_bank_size: 16,
+            image_bank_size: DEFAULT_IMAGE_BANK_SIZE,
             tilemaps: HashMap::new(),
             sounds: HashMap::new(),
             musics: HashMap::new(),
@@ -1168,25 +1169,26 @@ fn build_resource_toml(
 }
 
 fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
-    let Some(source) = state.image_banks.get(&call.img).cloned() else {
-        return false;
-    };
-
     let source_size = state.image_bank_size;
     if source_size <= 0 {
         return false;
     }
 
     let source_size_usize = source_size as usize;
-    if source.len() < source_size_usize * source_size_usize {
-        return false;
-    }
-
     let width = call.w.abs().round() as i32;
     let height = call.h.abs().round() as i32;
     if width <= 0 || height <= 0 {
         return true;
     }
+    let Ok(width_usize) = usize::try_from(width) else {
+        return false;
+    };
+    let Ok(height_usize) = usize::try_from(height) else {
+        return false;
+    };
+    let Some(sample_len) = width_usize.checked_mul(height_usize) else {
+        return false;
+    };
 
     let flip_x = call.w < 0.0;
     let flip_y = call.h < 0.0;
@@ -1194,18 +1196,38 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     let base_dy = call.y.round() as i32;
     let base_sx = call.u.round() as i32;
     let base_sy = call.v.round() as i32;
+    let sampled_colors: Vec<Option<i32>> = {
+        let Some(source) = state.image_banks.get(&call.img) else {
+            return false;
+        };
+        if source.len() < source_size_usize * source_size_usize {
+            return false;
+        }
+
+        let mut sampled = vec![None; sample_len];
+        for dy in 0..height {
+            for dx in 0..width {
+                let src_x = base_sx + if flip_x { width - 1 - dx } else { dx };
+                let src_y = base_sy + if flip_y { height - 1 - dy } else { dy };
+
+                if src_x < 0 || src_x >= source_size || src_y < 0 || src_y >= source_size {
+                    continue;
+                }
+
+                let src_index = src_y as usize * source_size_usize + src_x as usize;
+                let sample_index = dy as usize * width_usize + dx as usize;
+                sampled[sample_index] = source.get(src_index).copied();
+            }
+        }
+        sampled
+    };
 
     for dy in 0..height {
         for dx in 0..width {
-            let src_x = base_sx + if flip_x { width - 1 - dx } else { dx };
-            let src_y = base_sy + if flip_y { height - 1 - dy } else { dy };
-
-            if src_x < 0 || src_x >= source_size || src_y < 0 || src_y >= source_size {
+            let sample_index = dy as usize * width_usize + dx as usize;
+            let Some(color) = sampled_colors[sample_index] else {
                 continue;
-            }
-
-            let src_index = src_y as usize * source_size_usize + src_x as usize;
-            let color = source[src_index];
+            };
             if call.colkey == Some(color) {
                 continue;
             }
@@ -1761,7 +1783,7 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.mouse_visible = true;
     state.frame_buffer.clear();
     state.image_banks.clear();
-    state.image_bank_size = 16;
+    state.image_bank_size = DEFAULT_IMAGE_BANK_SIZE;
     state.tilemaps.clear();
     state.sounds.clear();
     state.musics.clear();
@@ -1900,7 +1922,7 @@ pub extern "C" fn flutterxel_core_reset() -> bool {
     state.mouse_visible = true;
     state.frame_buffer.clear();
     state.image_banks.clear();
-    state.image_bank_size = 16;
+    state.image_bank_size = DEFAULT_IMAGE_BANK_SIZE;
     state.tilemaps.clear();
     state.sounds.clear();
     state.musics.clear();
@@ -3569,6 +3591,20 @@ mod tests {
         let mut out = -1;
         assert!(flutterxel_core_image_pget(0, 1, 1, &mut out));
         assert_eq!(out, 9);
+    }
+
+    #[test]
+    fn init_default_image_bank_supports_sprite_sheet_rows_beyond_16() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_quit());
+        init_runtime(64, 64);
+
+        assert!(flutterxel_core_image_cls(0, 0));
+        assert!(flutterxel_core_image_pset(0, 31, 160, 12));
+
+        let mut out = -1;
+        assert!(flutterxel_core_image_pget(0, 31, 160, &mut out));
+        assert_eq!(out, 12);
     }
 
     #[test]
