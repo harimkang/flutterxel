@@ -54,3 +54,21 @@ Behavior summary:
   - `BackendMode.dart_fallback`
 - `Flutterxel.supportsNativeBltSourceSelection` is derived from `backendMode` and is `true` only on `native_core`.
 - If native bindings load but `flutterxel_core_backend_kind` is missing, backend resolution fails closed with an explicit ABI mismatch error (no heuristic fallback classification).
+
+Backend-branching example:
+
+```dart
+switch (Flutterxel.backendMode) {
+  case BackendMode.native_core:
+    // Full native path
+    break;
+  case BackendMode.c_fallback:
+    // Use compatibility-safe rendering path
+    break;
+  case BackendMode.dart_fallback:
+    // Keep runtime-light behavior only
+    break;
+}
+
+final supportsFastPath = Flutterxel.supportsNativeBltSourceSelection;
+```

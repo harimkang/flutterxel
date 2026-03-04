@@ -1,16 +1,32 @@
 # flutterxel_example
 
-Demonstrates how to use the flutterxel plugin.
+Flutterxel example app with an Agent Map MVP scene.
 
-## Getting Started
+## Sync Character Assets
 
-This project is a starting point for a Flutter application.
+From repository root:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+./packages/flutterxel/example/tool/sync_reference_characters.sh
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+This copies `reference/characters/*/*_sheet.png` and `*_sheet.meta.json` into:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- `packages/flutterxel/example/assets/characters/<character>/`
+
+## Run Example
+
+```bash
+cd packages/flutterxel/example
+flutter run
+```
+
+## Tests
+
+```bash
+cd packages/flutterxel/example
+flutter test test/character_manifest_test.dart
+flutter test test/agent_state_machine_test.dart
+flutter test test/agent_map_scene_smoke_test.dart
+flutter test test/jsonl_activity_feed_test.dart
+```

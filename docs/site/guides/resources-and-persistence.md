@@ -40,6 +40,21 @@ Important behavior boundaries:
   - load with `preserve_transparent: true, transparent_index: <index>, alpha_threshold: <threshold>`
   - draw with `blt(..., colkey: <same index>)` to skip transparent background pixels
 
+```dart
+// Resource image import (alpha-aware opt-in)
+images[0].load(
+  0,
+  0,
+  'assets/characters/dude/dude_sheet.png',
+  preserve_transparent: true,
+  transparent_index: COLOR_BLACK,
+  alpha_threshold: 0,
+);
+
+// Draw using the same transparent index as colkey
+blt(16, 24, 0, 0, 0, 32, 32, colkey: COLOR_BLACK);
+```
+
 ### `include_colors` Usage Guide
 
 | Goal | Recommended option |
