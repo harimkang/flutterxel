@@ -29,7 +29,7 @@ Add `flutterxel` from pub.dev:
 
 ```yaml
 dependencies:
-  flutterxel: ^0.0.4
+  flutterxel: ^0.0.5
 ```
 
 Then run:
@@ -143,6 +143,13 @@ flutter run
 
 - Main docs: https://harimkang.github.io/flutterxel/
 - API reference: automatically generated from source during docs build/deploy.
+
+## Compatibility Notes
+
+- Global `blt(...)` currently supports image resource ids (`int`) and resource-backed `Image` handles only.
+- For detached `Image(...)` / `Image.fromImage(...)` objects, use `image.blt(...)` instead of global `blt(...)`.
+- Built-in `text(...)` rendering currently supports ASCII code points `32..127`; unsupported code points are skipped.
+- In native-binding mode, resource image mutations (`images[n].pset/cls/set/load`) are synchronized to native core image banks and are reflected by subsequent global `blt(...)` rendering.
 
 ## Monorepo Structure
 

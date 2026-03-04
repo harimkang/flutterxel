@@ -31,3 +31,9 @@ Behavior summary:
 - ASCII code points 32..127 are rendered.
 - newline is supported.
 - unsupported code points are skipped.
+
+## `blt` Source Contract
+
+- Global `blt(...)` accepts image resource ids (`int`) or resource-backed `Image` objects.
+- Detached `Image(...)` / `Image.fromImage(...)` objects should be used via `image.blt(...)`.
+- Resource-image mutations in native mode (`pset`, `cls`, `set`, `load`) are synchronized to the native core image bank used by global `blt(...)`.

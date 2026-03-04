@@ -20,6 +20,13 @@ They are exposed through `Seq<T>` wrappers for Pyxel-style mutation.
 - `set`, `load`, `save`
 - `clip`, `camera`, `pal`, `dither`
 
+Important behavior boundaries:
+
+- Global `blt(...)` accepts only image resource ids (`int`) or resource-backed `Image` handles (for example `images[0]`).
+- Detached images created with `Image(...)` / `Image.fromImage(...)` are not valid as global `blt` source arguments.
+- Use `image.blt(...)` when drawing from detached image objects.
+- In native-binding mode, resource image mutations (`pset`, `cls`, `set`, `load`) now sync directly to native core image banks, so subsequent global `blt(...)` draws reflect those updates.
+
 `Tilemap` supports:
 
 - tile read/write and draw helpers

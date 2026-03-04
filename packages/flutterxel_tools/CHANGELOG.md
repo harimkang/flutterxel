@@ -1,3 +1,8 @@
+## 0.0.5
+
+- Added CI publish workflow support for tagged releases to publish `flutterxel` and `flutterxel_tools` to pub.dev.
+- Updated release metadata to align workspace/package versions with `flutterxel` `0.0.5`.
+
 ## 0.0.4
 
 - No functional tooling changes in this release.

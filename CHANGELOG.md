@@ -1,3 +1,11 @@
+## 0.0.5
+
+- Fixed native rendering mismatch where resource-image mutations (`images[n].pset/cls/load/set`) were not reflected by global `blt(...)` in native-binding mode.
+- Added explicit image mutation/read ABI (`flutterxel_core_image_pset`, `flutterxel_core_image_pget`, `flutterxel_core_image_cls`) across core/header/FFI bindings.
+- Added regression tests for resource image sync behavior on native path.
+- Added CI workflow for pub.dev release publishing on `v*` tags: `.github/workflows/publish_pub_dev.yml`.
+- Updated compatibility/docs notes for `blt` source contract and ASCII-only built-in text behavior.
+
 ## 0.0.4
 
 - Added `Tilemap.fromTmx`/`from_tmx` support for TMX tile sizes that are square integer multiples of `8` (for example `16x16`).

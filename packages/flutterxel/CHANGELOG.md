@@ -1,3 +1,13 @@
+## 0.0.5
+
+- Added native core image-resource mutation ABI integration for `Image` resources:
+  - `flutterxel_core_image_pset`
+  - `flutterxel_core_image_pget`
+  - `flutterxel_core_image_cls`
+- Fixed resource image synchronization gap in native-binding mode so `images[n].pset/cls/load/set` updates are reflected by subsequent global `blt(...)`.
+- Added native-path regression tests covering resource-image `pset` and `load` reflection through global `blt(...)`.
+- Updated ABI version to `0.4.0` for the expanded C ABI surface.
+
 ## 0.0.4
 
 - Added TMX import support in `Tilemap.fromTmx`/`from_tmx` for square tile sizes that are integer multiples of `8` (including `16x16`).
