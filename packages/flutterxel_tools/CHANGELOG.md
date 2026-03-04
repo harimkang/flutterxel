@@ -1,3 +1,10 @@
+## 0.0.3
+
+- Added `pixel-snap` CLI command for asset preprocessing from raw images to palette-quantized pixel-art output.
+- Added `packages/flutterxel_tools/tool/pixel_snap_image.sh` wrapper that runs the vendored SpriteFusion reference implementation via Cargo.
+- Added argument validation and forwarding for `--input`, `--output`, `--colors`, and `--overwrite`.
+- Added command coverage tests and usage/help updates for command discoverability.
+
 ## 0.0.2
 
 - No functional package code changes in this release.

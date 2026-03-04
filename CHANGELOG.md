@@ -1,3 +1,9 @@
+## 0.0.3
+
+- Added tooling-side image preprocessing with `flutterxel_tools pixel-snap`.
+- Added docs for pixel-snap usage in package README, repository README, and docs site guides.
+- Added release notes page for `v0.0.3`.
+
 ## 0.0.2
 
 - Added four polished game examples under `examples/`:
