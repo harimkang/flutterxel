@@ -1,3 +1,14 @@
+## 0.0.7
+
+- Fixed C fallback image bank capacity regression by setting `DEFAULT_IMAGE_BANK_SIZE` to `256` for sprite-sheet addressing compatibility.
+- Added `image_bank_size_regression_test.dart` to lock:
+  - resource image pixel writes at y-coordinates used by multi-row sprite sheets
+  - `blt` sampling across frame widths larger than `16px`
+- Bundled release native artifacts in package layout:
+  - `native/android/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}/libflutterxel_core.so`
+  - `native/ios/FlutterxelCore.xcframework`
+  - `native/ios/libflutterxel_core.a`
+
 ## 0.0.6
 
 - Added backend discriminator ABI integration and fail-closed backend mode resolution:

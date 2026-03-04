@@ -18,7 +18,7 @@ dart run flutterxel_tools:flutterxel_tools --help
 dart run flutterxel_tools:flutterxel_tools run
 dart run flutterxel_tools:flutterxel_tools build-native
 dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.1
-dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.6
+dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.7
 dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.png
 ```
 
@@ -50,7 +50,7 @@ bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.1
 Pre-tag version bump helper:
 
 ```bash
-bash packages/flutterxel_tools/tool/bump_release_versions.sh --version 0.0.6
+bash packages/flutterxel_tools/tool/bump_release_versions.sh --version 0.0.7
 ```
 
 `release-bump` CLI wrapper runs the same script.

@@ -1,3 +1,12 @@
+## 0.0.7
+
+- Fixed C fallback image bank capacity to match sprite-sheet scale usage by restoring `DEFAULT_IMAGE_BANK_SIZE` to `IMAGE_SIZE` (`256`).
+- Added regression coverage for high-coordinate image-bank writes and frame-width sampling beyond `16px` in `image_bank_size_regression_test.dart`.
+- Bundled prebuilt Rust native artifacts into `packages/flutterxel/native` for release packaging:
+  - Android: `jniLibs` (`arm64-v8a`, `armeabi-v7a`, `x86_64`)
+  - iOS: `FlutterxelCore.xcframework` and `libflutterxel_core.a`
+- Updated release/docs metadata for `0.0.7`.
+
 ## 0.0.6
 
 - Added backend discriminator ABI contract (`flutterxel_core_backend_kind`) and tightened ABI parity checks across native header, plugin header, and generated Dart bindings.

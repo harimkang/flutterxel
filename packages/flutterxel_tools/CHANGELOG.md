@@ -1,3 +1,8 @@
+## 0.0.7
+
+- No functional CLI behavior changes in this release.
+- Updated release metadata to align workspace/package versions with `flutterxel` `0.0.7`.
+
 ## 0.0.6
 
 - No functional CLI/tooling behavior changes in this release.
