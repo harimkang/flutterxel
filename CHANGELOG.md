@@ -1,3 +1,13 @@
+## 0.0.8
+
+- Fixed iOS backend symbol shadowing by replacing `ios/Classes/flutterxel.c` with a stub translation unit so `flutterxel_core_*` is no longer exported from the plugin binary.
+- Repackaged iOS Rust core outputs to `packages/flutterxel/ios/Frameworks/FlutterxelCore.xcframework` with a consistent static library name (`libflutterxel_core.a`) across device and simulator slices.
+- Updated iOS loading/linking integration:
+  - podspec now vendors `ios/Frameworks/FlutterxelCore.xcframework` and force-loads slice libraries
+  - Dart loader now defers `DynamicLibrary.process()` to last on iOS
+- Updated CI native artifact packaging and docs to match the new iOS framework location.
+- Rebuilt and bundled release native artifacts for Android and iOS.
+
 ## 0.0.7
 
 - Fixed C fallback image bank capacity to match sprite-sheet scale usage by restoring `DEFAULT_IMAGE_BANK_SIZE` to `IMAGE_SIZE` (`256`).

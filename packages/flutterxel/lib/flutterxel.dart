@@ -256,8 +256,9 @@ ffi.DynamicLibrary _openLibrary() {
     }
   }
 
-  final attempted = <String>['process'];
+  final attempted = <String>[];
   Object? lastError;
+  final processLastOnThisPlatform = Platform.operatingSystem == 'ios';
 
   if (libraryOverride != null && libraryOverride.isNotEmpty) {
     try {
@@ -276,16 +277,27 @@ ffi.DynamicLibrary _openLibrary() {
     }
   }
 
-  try {
-    final processLibrary = ffi.DynamicLibrary.process();
-    if (hasVersionSymbol(processLibrary)) {
+  ffi.DynamicLibrary? tryProcessImage() {
+    attempted.add('process');
+    try {
+      final processLibrary = ffi.DynamicLibrary.process();
+      if (hasVersionSymbol(processLibrary)) {
+        return processLibrary;
+      }
+      lastError = ArgumentError(
+        'Missing flutterxel_core_version_major in process image.',
+      );
+    } catch (error) {
+      lastError = error;
+    }
+    return null;
+  }
+
+  if (!processLastOnThisPlatform) {
+    final processLibrary = tryProcessImage();
+    if (processLibrary != null) {
       return processLibrary;
     }
-    lastError = ArgumentError(
-      'Missing flutterxel_core_version_major in process image.',
-    );
-  } catch (error) {
-    lastError = error;
   }
 
   for (final candidate in candidates) {
@@ -300,6 +312,13 @@ ffi.DynamicLibrary _openLibrary() {
       );
     } catch (error) {
       lastError = error;
+    }
+  }
+
+  if (processLastOnThisPlatform) {
+    final processLibrary = tryProcessImage();
+    if (processLibrary != null) {
+      return processLibrary;
     }
   }
 

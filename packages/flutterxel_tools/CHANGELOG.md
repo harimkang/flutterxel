@@ -1,3 +1,11 @@
+## 0.0.8
+
+- Updated native artifact build script output layout for iOS to:
+  - `packages/flutterxel/ios/Frameworks/FlutterxelCore.xcframework`
+- Updated iOS xcframework packaging to emit consistent slice library names for CocoaPods compatibility.
+- Updated release workflow artifact paths and overlay packaging to match the new iOS framework location.
+- Updated release metadata to align workspace/package versions with `flutterxel` `0.0.8`.
+
 ## 0.0.7
 
 - No functional CLI behavior changes in this release.

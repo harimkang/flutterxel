@@ -19,7 +19,9 @@ ROOT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 CORE_DIR="$ROOT_DIR/native/flutterxel_core"
 HEADER_DIR="$CORE_DIR/include"
 ANDROID_OUT_DIR="$ROOT_DIR/packages/flutterxel/native/android/jniLibs"
-IOS_OUT_DIR="$ROOT_DIR/packages/flutterxel/native/ios"
+IOS_FRAMEWORKS_OUT_DIR="$ROOT_DIR/packages/flutterxel/ios/Frameworks"
+IOS_BUILD_DIR="$ROOT_DIR/packages/flutterxel/.dart_tool/native_ios_build"
+IOS_LEGACY_NATIVE_OUT_DIR="$ROOT_DIR/packages/flutterxel/native/ios"
 
 BUILD_ANDROID=0
 BUILD_IOS=0
@@ -155,12 +157,15 @@ build_ios() {
     cargo build --release --target x86_64-apple-ios
   )
 
-  local ios_build_dir="$IOS_OUT_DIR/build"
-  local device_lib="$ios_build_dir/libflutterxel_core_ios.a"
-  local sim_universal_lib="$ios_build_dir/libflutterxel_core_ios_sim_universal.a"
-  local xcframework_path="$IOS_OUT_DIR/FlutterxelCore.xcframework"
+  local ios_build_dir="$IOS_BUILD_DIR"
+  local device_dir="$ios_build_dir/ios-arm64"
+  local sim_dir="$ios_build_dir/ios-arm64_x86_64-simulator"
+  local device_lib="$device_dir/libflutterxel_core.a"
+  local sim_universal_lib="$sim_dir/libflutterxel_core.a"
+  local xcframework_path="$IOS_FRAMEWORKS_OUT_DIR/FlutterxelCore.xcframework"
 
-  mkdir -p "$ios_build_dir"
+  rm -rf "$ios_build_dir"
+  mkdir -p "$device_dir" "$sim_dir" "$IOS_FRAMEWORKS_OUT_DIR"
 
   cp "$CORE_DIR/target/aarch64-apple-ios/release/libflutterxel_core.a" "$device_lib"
 
@@ -169,20 +174,21 @@ build_ios() {
     "$CORE_DIR/target/x86_64-apple-ios/release/libflutterxel_core.a" \
     -output "$sim_universal_lib"
 
-  rm -rf "$xcframework_path"
+  rm -rf "$xcframework_path" \
+         "$IOS_LEGACY_NATIVE_OUT_DIR/FlutterxelCore.xcframework" \
+         "$IOS_LEGACY_NATIVE_OUT_DIR/libflutterxel_core.a" \
+         "$IOS_LEGACY_NATIVE_OUT_DIR/build"
   xcodebuild -create-xcframework \
     -library "$device_lib" -headers "$HEADER_DIR" \
     -library "$sim_universal_lib" -headers "$HEADER_DIR" \
     -output "$xcframework_path"
-
-  cp "$device_lib" "$IOS_OUT_DIR/libflutterxel_core.a"
 
   if [[ ! -d "$xcframework_path" ]]; then
     echo "Missing iOS xcframework output: $xcframework_path" >&2
     exit 1
   fi
 
-  echo "[flutterxel_tools] iOS artifacts ready at $IOS_OUT_DIR"
+  echo "[flutterxel_tools] iOS artifacts ready at $IOS_FRAMEWORKS_OUT_DIR"
 }
 
 if [[ "$BUILD_ANDROID" -eq 1 ]]; then
@@ -204,11 +210,8 @@ if [[ -n "$OUT_DIR" ]]; then
 
   if [[ "$BUILD_IOS" -eq 1 ]]; then
     mkdir -p "$OUT_DIR/ios"
-    if [[ -d "$IOS_OUT_DIR/FlutterxelCore.xcframework" ]]; then
-      cp -R "$IOS_OUT_DIR/FlutterxelCore.xcframework" "$OUT_DIR/ios/"
-    fi
-    if [[ -f "$IOS_OUT_DIR/libflutterxel_core.a" ]]; then
-      cp "$IOS_OUT_DIR/libflutterxel_core.a" "$OUT_DIR/ios/"
+    if [[ -d "$IOS_FRAMEWORKS_OUT_DIR/FlutterxelCore.xcframework" ]]; then
+      cp -R "$IOS_FRAMEWORKS_OUT_DIR/FlutterxelCore.xcframework" "$OUT_DIR/ios/"
     fi
   fi
 fi

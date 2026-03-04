@@ -64,14 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flutterxel-ios-xcframework
-          path: packages/flutterxel/native/ios/FlutterxelCore.xcframework
-          if-no-files-found: error
-
-      - name: Upload iOS static library
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutterxel-ios-staticlib
-          path: packages/flutterxel/native/ios/libflutterxel_core.a
+          path: packages/flutterxel/ios/Frameworks/FlutterxelCore.xcframework
           if-no-files-found: error
 
   package:
@@ -95,13 +88,6 @@ jobs:
           name: flutterxel-ios-xcframework
           path: dist/ios/FlutterxelCore.xcframework
 
-      - name: Download iOS static library
-        if: needs.ios.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: flutterxel-ios-staticlib
-          path: dist/ios
-
       - name: Create combined archive
         run: |
           mkdir -p release
@@ -112,12 +98,8 @@ jobs:
             cp -R dist/android/jniLibs overlay/packages/flutterxel/native/android/
           fi
           if [[ -d dist/ios/FlutterxelCore.xcframework ]]; then
-            mkdir -p overlay/packages/flutterxel/native/ios
-            cp -R dist/ios/FlutterxelCore.xcframework overlay/packages/flutterxel/native/ios/
-          fi
-          if [[ -f dist/ios/libflutterxel_core.a ]]; then
-            mkdir -p overlay/packages/flutterxel/native/ios
-            cp dist/ios/libflutterxel_core.a overlay/packages/flutterxel/native/ios/
+            mkdir -p overlay/packages/flutterxel/ios/Frameworks
+            cp -R dist/ios/FlutterxelCore.xcframework overlay/packages/flutterxel/ios/Frameworks/
           fi
           tar -czf release/flutterxel-native-package-overlay.tgz -C overlay .
 

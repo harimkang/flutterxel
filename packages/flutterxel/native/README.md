@@ -12,17 +12,13 @@ Place per-ABI shared libraries under:
 
 ## iOS
 
-Prefer xcframework packaging:
+Use xcframework packaging under the plugin iOS directory:
 
-- `native/ios/FlutterxelCore.xcframework`
-
-Alternative static library packaging (advanced):
-
-- `native/ios/libflutterxel_core.a`
+- `ios/Frameworks/FlutterxelCore.xcframework`
 
 ## Runtime Loading Priority
 
-The Dart runtime attempts to load `flutterxel_core` first and falls back to the C scaffold library `flutterxel`.
+The Dart runtime attempts native-core loading first.
 
 ## Maintainer Build Command
 
@@ -43,7 +39,9 @@ dart run flutterxel_tools:flutterxel_tools build-native --all
 On tag push (`v*`), GitHub Actions `native-artifacts` publishes two assets:
 
 - `flutterxel-native-artifacts.tgz`: platform-split bundle (`android/`, `ios/`)
-- `flutterxel-native-package-overlay.tgz`: direct overlay for repository/package layout (`packages/flutterxel/native/...`)
+- `flutterxel-native-package-overlay.tgz`: direct overlay for repository/package layout
+  - Android: `packages/flutterxel/native/android/...`
+  - iOS: `packages/flutterxel/ios/Frameworks/...`
 
 To apply the overlay archive in a release branch:
 

@@ -27,11 +27,11 @@ This package is scaffolded and ready for progressive implementation:
 For release builds without requiring end-user Rust toolchains:
 
 - Android prebuilt `.so` files: `native/android/jniLibs/<abi>/libflutterxel_core.so`
-- iOS prebuilt xcframework: `native/ios/FlutterxelCore.xcframework`
+- iOS prebuilt xcframework: `ios/Frameworks/FlutterxelCore.xcframework`
 
 Runtime loading prefers `flutterxel_core` and falls back to `flutterxel` scaffold library.
 
-Tag releases (`v*`) publish prebuilt native bundles via GitHub Actions, including a package-overlay archive that can be extracted directly into `packages/flutterxel/native`.
+Tag releases (`v*`) publish prebuilt native bundles via GitHub Actions, including a package-overlay archive that can be extracted directly into `packages/flutterxel`.
 
 Release tags also trigger `.github/workflows/publish_dry_run.yml`, which validates package versions against the tag and runs `pub publish --dry-run` for monorepo packages.
 

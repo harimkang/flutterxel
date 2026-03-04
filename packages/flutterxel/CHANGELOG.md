@@ -1,3 +1,12 @@
+## 0.0.8
+
+- Fixed iOS backend fallback shadowing by removing C fallback symbol exports from `ios/Classes/flutterxel.c`.
+- Moved bundled iOS native core artifact path to:
+  - `ios/Frameworks/FlutterxelCore.xcframework`
+- Updated iOS pod integration to vendor the xcframework directly and force-load static library slices to avoid linker stripping.
+- Updated Dart runtime native loader on iOS to try explicit library opens before `DynamicLibrary.process()`.
+- Refreshed bundled native artifacts with rebuilt Android `.so` files and iOS xcframework slices.
+
 ## 0.0.7
 
 - Fixed C fallback image bank capacity regression by setting `DEFAULT_IMAGE_BANK_SIZE` to `256` for sprite-sheet addressing compatibility.

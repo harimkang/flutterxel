@@ -13,26 +13,28 @@ Flutter runtime plugin for a Pyxel-compatible engine backed by Rust FFI.
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'flutterxel contributors' => 'opensource@flutterxel.dev' }
 
-  # This will ensure the source files in Classes/ are included in the native
-  # builds of apps using this FFI plugin. Podspec does not support relative
-  # paths, so Classes contains a forwarder C file that relatively imports
-  # `../src/*` so that the C sources can be shared among all target platforms.
+  # Keep the C source list non-empty for plugin compilation, but iOS symbols
+  # must come from the vendored Rust core xcframework, not C fallback exports.
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
 
-  core_xcframework = File.join(__dir__, '../native/ios/FlutterxelCore.xcframework')
-  if File.exist?(core_xcframework)
-    s.vendored_frameworks = '../native/ios/FlutterxelCore.xcframework'
-  end
+  core_xcframework = File.join(__dir__, 'Frameworks/FlutterxelCore.xcframework')
+  pod_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386'
+  }
 
-  core_static_lib = File.join(__dir__, '../native/ios/libflutterxel_core.a')
-  if File.exist?(core_static_lib)
-    s.vendored_libraries = '../native/ios/libflutterxel_core.a'
+  if File.exist?(core_xcframework)
+    s.vendored_frameworks = 'Frameworks/FlutterxelCore.xcframework'
+    pod_xcconfig['OTHER_LDFLAGS[sdk=iphoneos*]'] =
+      '$(inherited) -force_load "${PODS_TARGET_SRCROOT}/Frameworks/FlutterxelCore.xcframework/ios-arm64/libflutterxel_core.a"'
+    pod_xcconfig['OTHER_LDFLAGS[sdk=iphonesimulator*]'] =
+      '$(inherited) -force_load "${PODS_TARGET_SRCROOT}/Frameworks/FlutterxelCore.xcframework/ios-arm64_x86_64-simulator/libflutterxel_core.a"'
   end
 
   # Flutter.framework does not contain a i386 slice.
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
+  s.pod_target_xcconfig = pod_xcconfig
   s.swift_version = '5.0'
 end
