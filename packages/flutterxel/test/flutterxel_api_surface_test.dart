@@ -220,6 +220,29 @@ void main() {
     expect(flutterxel.pget(1, 0), 9);
   });
 
+  test('c fallback bltm tilemap id selects tilemap-dependent source', () {
+    expect(
+      flutterxel.Flutterxel.backendMode,
+      flutterxel.BackendMode.c_fallback,
+      reason:
+          'This regression test must run in forced c_fallback mode. '
+          'Use FLUTTERXEL_FORCE_BACKEND=c_fallback with FLUTTERXEL_LIBRARY_OVERRIDE.',
+    );
+
+    flutterxel.init(16, 16);
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[1].cls(0);
+    flutterxel.images[0].pset(0, 0, 3);
+    flutterxel.images[1].pset(0, 0, 12);
+
+    flutterxel.bltm(0, 0, 0, 0, 0, 1, 1);
+    flutterxel.bltm(8, 0, 1, 0, 0, 1, 1);
+
+    expect(flutterxel.pget(0, 0), 3);
+    expect(flutterxel.pget(8, 0), 12);
+  });
+
   test(
     'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/mouseX/mouseY/mouseWheel/inputKeys/inputText/droppedFiles/setInputText/setDroppedFiles/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {

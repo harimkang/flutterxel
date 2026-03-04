@@ -17,6 +17,7 @@
 #define PRESSED_KEY_CAPACITY 1024
 #define CHANNEL_CAPACITY 64
 #define IMAGE_BANK_CAPACITY 3
+#define TILEMAP_CAPACITY 8
 #define DEFAULT_IMAGE_BANK_SIZE 16
 #define TILE_SIZE 8
 #define RNG_DEFAULT_STATE 0xA3C59AC3D12B9E5DULL
@@ -71,6 +72,7 @@ typedef struct FlutterxelState {
   int32_t image_bank_size;
   int32_t image_banks[IMAGE_BANK_CAPACITY]
                      [DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
+  int32_t tilemap_imgsrc[TILEMAP_CAPACITY];
 } FlutterxelState;
 
 static FlutterxelState g_state = {0};
@@ -86,6 +88,9 @@ static void seed_default_image_bank(void) {
     for (int x = 0; x < DEFAULT_IMAGE_BANK_SIZE; x++) {
       g_state.image_banks[0][y * DEFAULT_IMAGE_BANK_SIZE + x] = (x + y) % 16;
     }
+  }
+  for (int i = 0; i < TILEMAP_CAPACITY; i++) {
+    g_state.tilemap_imgsrc[i] = i % IMAGE_BANK_CAPACITY;
   }
 }
 
@@ -316,6 +321,17 @@ static int32_t* image_bank_for_id(int32_t img) {
   return g_state.image_banks[img];
 }
 
+static int32_t image_bank_for_tilemap(int32_t tm) {
+  if (tm < 0 || tm >= TILEMAP_CAPACITY) {
+    return 0;
+  }
+  int32_t img = g_state.tilemap_imgsrc[tm];
+  if (img < 0 || img >= IMAGE_BANK_CAPACITY) {
+    return 0;
+  }
+  return img;
+}
+
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
   return ABI_VERSION_MAJOR;
 }
@@ -454,6 +470,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.rng_state = RNG_DEFAULT_STATE;
   g_state.noise_seed = NOISE_DEFAULT_SEED;
   memset(g_state.image_banks, 0, sizeof(g_state.image_banks));
+  memset(g_state.tilemap_imgsrc, 0, sizeof(g_state.tilemap_imgsrc));
   reset_palette_map();
   return true;
 }
@@ -1336,9 +1353,13 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_bltm(
     double w,
     double h,
     int32_t colkey) {
-  (void)tm;
   if (!g_state.initialized || g_state.frame_buffer == NULL) {
     return false;
+  }
+  int32_t source_img = image_bank_for_tilemap(tm);
+  int32_t* source_bank = image_bank_for_id(source_img);
+  if (source_bank == NULL) {
+    return true;
   }
 
   int32_t tiles_w = (int32_t)llround(fabs(w));
@@ -1368,7 +1389,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_bltm(
             continue;
           }
 
-          int32_t src_color = g_state.image_banks[0][src_y * g_state.image_bank_size + src_x];
+          int32_t src_color = source_bank[src_y * g_state.image_bank_size + src_x];
           if (colkey != OPTIONAL_I32_NONE && src_color == colkey) {
             continue;
           }
