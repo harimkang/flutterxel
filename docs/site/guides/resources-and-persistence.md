@@ -27,6 +27,11 @@ Important behavior boundaries:
 - Use `image.blt(...)` when drawing from detached image objects.
 - In native-binding mode, resource image mutations (`pset`, `cls`, `set`, `load`) now sync directly to native core image banks, so subsequent global `blt(...)` draws reflect those updates.
 - `Image.load(...)` / `Image.fromImage(...)` keep legacy alpha-agnostic mapping by default.
+- `include_colors` / `includeColors` uses a local discovered-palette mapping:
+  - first discovered color maps to index `0`
+  - next discovered color maps to `1`, and so on
+  - mapping is local to each load call (not a global palette replacement)
+- clearer alias: `use_discovered_palette` / `useDiscoveredPalette` (same behavior as `include_colors`)
 - Optional alpha-aware import is available with:
   - `preserve_transparent` / `preserveTransparent`
   - `transparent_index` / `transparentIndex`
@@ -34,6 +39,14 @@ Important behavior boundaries:
 - Transparent sprite recipe:
   - load with `preserve_transparent: true, transparent_index: <index>, alpha_threshold: <threshold>`
   - draw with `blt(..., colkey: <same index>)` to skip transparent background pixels
+
+### `include_colors` Usage Guide
+
+| Goal | Recommended option |
+|---|---|
+| Keep Pyxel-like default nearest-color behavior | omit `include_colors` |
+| Build compact local palette indices from imported pixels | `include_colors: true` (or `use_discovered_palette: true`) |
+| Import alpha-cutout sprites for `blt(colkey: ...)` | `preserve_transparent: true` + `transparent_index` + `alpha_threshold` |
 
 `Tilemap` supports:
 

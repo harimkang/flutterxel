@@ -643,6 +643,33 @@ int _normalizeAlphaThreshold(int value) {
   return value;
 }
 
+bool _resolveIncludeColorsOption({
+  bool? include_colors,
+  bool? includeColors,
+  bool? use_discovered_palette,
+  bool? useDiscoveredPalette,
+}) {
+  final legacy = _resolveNamedAlias<bool>(
+    snakeName: 'include_colors',
+    snakeValue: include_colors,
+    camelName: 'includeColors',
+    camelValue: includeColors,
+  );
+  final clearer = _resolveNamedAlias<bool>(
+    snakeName: 'use_discovered_palette',
+    snakeValue: use_discovered_palette,
+    camelName: 'useDiscoveredPalette',
+    camelValue: useDiscoveredPalette,
+  );
+  if (legacy != null && clearer != null && legacy != clearer) {
+    throw ArgumentError(
+      'Conflicting values for include_colors/includeColors and '
+      'use_discovered_palette/useDiscoveredPalette.',
+    );
+  }
+  return clearer ?? legacy ?? false;
+}
+
 int _rgbDistanceSquared(int lhsRgb24, int rhsRgb24) {
   final lhsR = (lhsRgb24 >> 16) & 0xFF;
   final lhsG = (lhsRgb24 >> 8) & 0xFF;
@@ -3341,6 +3368,7 @@ class Image {
   static Image from_image(
     String filename, {
     bool? include_colors,
+    bool? use_discovered_palette,
     int? transparent_index,
     int? alpha_threshold,
     bool? preserve_transparent,
@@ -3348,6 +3376,7 @@ class Image {
     return fromImage(
       filename,
       include_colors: include_colors,
+      use_discovered_palette: use_discovered_palette,
       transparent_index: transparent_index,
       alpha_threshold: alpha_threshold,
       preserve_transparent: preserve_transparent,
@@ -3358,6 +3387,8 @@ class Image {
     String filename, {
     bool? include_colors,
     bool? includeColors,
+    bool? use_discovered_palette,
+    bool? useDiscoveredPalette,
     int? transparent_index,
     int? transparentIndex,
     int? alpha_threshold,
@@ -3365,11 +3396,11 @@ class Image {
     bool? preserve_transparent,
     bool? preserveTransparent,
   }) {
-    final resolvedIncludeColors = _resolveNamedAlias<bool>(
-      snakeName: 'include_colors',
-      snakeValue: include_colors,
-      camelName: 'includeColors',
-      camelValue: includeColors,
+    final resolvedIncludeColors = _resolveIncludeColorsOption(
+      include_colors: include_colors,
+      includeColors: includeColors,
+      use_discovered_palette: use_discovered_palette,
+      useDiscoveredPalette: useDiscoveredPalette,
     );
     final resolvedTransparentIndex = _resolveNamedAlias<int>(
       snakeName: 'transparent_index',
@@ -3413,7 +3444,7 @@ class Image {
       0,
       0,
       decoded,
-      includeColors: resolvedIncludeColors == true,
+      includeColors: resolvedIncludeColors,
       transparentIndex: resolvedTransparentIndex,
       alphaThreshold: resolvedAlphaThreshold,
       preserveTransparent: resolvedPreserveTransparent == true,
@@ -3583,6 +3614,8 @@ class Image {
     String filename, {
     bool? include_colors,
     bool? includeColors,
+    bool? use_discovered_palette,
+    bool? useDiscoveredPalette,
     int? transparent_index,
     int? transparentIndex,
     int? alpha_threshold,
@@ -3590,11 +3623,11 @@ class Image {
     bool? preserve_transparent,
     bool? preserveTransparent,
   }) {
-    final resolvedIncludeColors = _resolveNamedAlias<bool>(
-      snakeName: 'include_colors',
-      snakeValue: include_colors,
-      camelName: 'includeColors',
-      camelValue: includeColors,
+    final resolvedIncludeColors = _resolveIncludeColorsOption(
+      include_colors: include_colors,
+      includeColors: includeColors,
+      use_discovered_palette: use_discovered_palette,
+      useDiscoveredPalette: useDiscoveredPalette,
     );
     final resolvedTransparentIndex = _resolveNamedAlias<int>(
       snakeName: 'transparent_index',
@@ -3624,7 +3657,7 @@ class Image {
         x,
         y,
         decoded,
-        includeColors: resolvedIncludeColors == true,
+        includeColors: resolvedIncludeColors,
         transparentIndex: resolvedTransparentIndex,
         alphaThreshold: resolvedAlphaThreshold,
         preserveTransparent: resolvedPreserveTransparent == true,

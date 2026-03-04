@@ -1213,6 +1213,70 @@ void main() {
     },
   );
 
+  test(
+    'include_colors semantics use discovered-palette order for local index mapping',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync(
+        'flutterxel_include_colors_',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestPng(
+        tempDir,
+        name: 'discovered_palette.png',
+        width: 3,
+        height: 1,
+        rgb24Pixels: const <int>[
+          0xD4186C, // first discovered -> 0
+          0x70C6A9, // second discovered -> 1
+          0xD4186C, // repeats first -> 0
+        ],
+      );
+
+      final includeColorsImage = flutterxel.Image.fromImage(
+        pngPath,
+        include_colors: true,
+      );
+      expect(includeColorsImage.pget(0, 0), 0);
+      expect(includeColorsImage.pget(1, 0), 1);
+      expect(includeColorsImage.pget(2, 0), 0);
+    },
+  );
+
+  test('include_colors semantics clearer alias matches include_colors', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync(
+      'flutterxel_include_colors_',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final pngPath = _writeTestPng(
+      tempDir,
+      name: 'discovered_alias.png',
+      width: 2,
+      height: 1,
+      rgb24Pixels: const <int>[0x123456, 0xABCDEF],
+    );
+
+    final legacy = flutterxel.Image.fromImage(pngPath, include_colors: true);
+    final alias = flutterxel.Image.fromImage(
+      pngPath,
+      use_discovered_palette: true,
+    );
+
+    expect(alias.pget(0, 0), legacy.pget(0, 0));
+    expect(alias.pget(1, 0), legacy.pget(1, 0));
+  });
+
   test('image and tilemap data_ptr expose raw byte layout snapshots', () {
     flutterxel.init(8, 8);
 

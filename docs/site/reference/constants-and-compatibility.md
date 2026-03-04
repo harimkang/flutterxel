@@ -22,6 +22,14 @@ The package keeps both naming styles where implemented:
 
 This helps port Pyxel-like code while keeping idiomatic Dart usage available.
 
+For image import options, compatibility aliases are also available:
+
+- `include_colors` / `includeColors`
+- `use_discovered_palette` / `useDiscoveredPalette`
+- `transparent_index` / `transparentIndex`
+- `alpha_threshold` / `alphaThreshold`
+- `preserve_transparent` / `preserveTransparent`
+
 ## Text and Built-in Font
 
 Built-in text uses a 4x6 pixel font (`FONT_WIDTH = 4`, `FONT_HEIGHT = 6`) and now renders glyph shapes consistently in both native and fallback paths.
