@@ -60,6 +60,18 @@ class FlutterxelTools {
       'version',
       help: 'Version to set (for example 0.1.0).',
     );
+    final pixelSnap = parser.addCommand('pixel-snap');
+    pixelSnap.addOption('input', help: 'Input image path to preprocess.');
+    pixelSnap.addOption(
+      'output',
+      help: 'Output image path for processed result.',
+    );
+    pixelSnap.addOption('colors', help: 'Optional palette color count.');
+    pixelSnap.addFlag(
+      'overwrite',
+      negatable: false,
+      help: 'Allow replacing an existing output file.',
+    );
     return parser;
   }
 
@@ -84,6 +96,8 @@ class FlutterxelTools {
         'release-check scaffold: run packages/flutterxel_tools/tool/check_release_versions.sh',
       'release-bump' =>
         'release-bump scaffold: run packages/flutterxel_tools/tool/bump_release_versions.sh',
+      'pixel-snap' =>
+        'pixel-snap scaffold: run packages/flutterxel_tools/tool/pixel_snap_image.sh',
       _ => usage(),
     };
   }

@@ -41,6 +41,20 @@ void main() {
     expect(FlutterxelTools.dispatch(results), contains('release-bump'));
   });
 
+  test('supports pixel-snap command for asset preprocessing workflow', () {
+    final parser = FlutterxelTools.buildParser();
+    final results = parser.parse(const [
+      'pixel-snap',
+      '--input',
+      'assets/raw/hero.png',
+      '--output',
+      'assets/pixel/hero.png',
+      '--colors',
+      '16',
+    ]);
+    expect(FlutterxelTools.dispatch(results), contains('pixel-snap'));
+  });
+
   test('execute runs build-native script with forwarded args', () async {
     String? executable;
     List<String>? arguments;
