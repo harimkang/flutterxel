@@ -3,6 +3,7 @@
 - Added tooling-side image preprocessing with `flutterxel_tools pixel-snap`.
 - Added docs for pixel-snap usage in package README, repository README, and docs site guides.
 - Added release notes page for `v0.0.3`.
+- Fixed runtime PNG loading in `flutterxel.Image.fromImage`/`Image.load` with palette quantization.
 
 ## 0.0.2
 
