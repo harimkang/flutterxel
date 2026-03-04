@@ -16,6 +16,7 @@
 #define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
 #define PRESSED_KEY_CAPACITY 1024
 #define CHANNEL_CAPACITY 64
+#define IMAGE_BANK_CAPACITY 3
 #define DEFAULT_IMAGE_BANK_SIZE 16
 #define TILE_SIZE 8
 #define RNG_DEFAULT_STATE 0xA3C59AC3D12B9E5DULL
@@ -68,7 +69,8 @@ typedef struct FlutterxelState {
   uint64_t rng_state;
   uint32_t noise_seed;
   int32_t image_bank_size;
-  int32_t image_bank0[DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
+  int32_t image_banks[IMAGE_BANK_CAPACITY]
+                     [DEFAULT_IMAGE_BANK_SIZE * DEFAULT_IMAGE_BANK_SIZE];
 } FlutterxelState;
 
 static FlutterxelState g_state = {0};
@@ -79,9 +81,10 @@ static bool is_valid_optional_bool(int8_t value) {
 
 static void seed_default_image_bank(void) {
   g_state.image_bank_size = DEFAULT_IMAGE_BANK_SIZE;
+  memset(g_state.image_banks, 0, sizeof(g_state.image_banks));
   for (int y = 0; y < DEFAULT_IMAGE_BANK_SIZE; y++) {
     for (int x = 0; x < DEFAULT_IMAGE_BANK_SIZE; x++) {
-      g_state.image_bank0[y * DEFAULT_IMAGE_BANK_SIZE + x] = (x + y) % 16;
+      g_state.image_banks[0][y * DEFAULT_IMAGE_BANK_SIZE + x] = (x + y) % 16;
     }
   }
 }
@@ -306,6 +309,13 @@ static int image_bank_pixel_index(int32_t x, int32_t y) {
   return y * size + x;
 }
 
+static int32_t* image_bank_for_id(int32_t img) {
+  if (img < 0 || img >= IMAGE_BANK_CAPACITY) {
+    return NULL;
+  }
+  return g_state.image_banks[img];
+}
+
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
   return ABI_VERSION_MAJOR;
 }
@@ -443,7 +453,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   memset(g_state.channel_play_pos, 0, sizeof(g_state.channel_play_pos));
   g_state.rng_state = RNG_DEFAULT_STATE;
   g_state.noise_seed = NOISE_DEFAULT_SEED;
-  memset(g_state.image_bank0, 0, sizeof(g_state.image_bank0));
+  memset(g_state.image_banks, 0, sizeof(g_state.image_banks));
   reset_palette_map();
   return true;
 }
@@ -858,15 +868,18 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_image_pset(
     int32_t x,
     int32_t y,
     int32_t col) {
-  (void)img;
   if (!g_state.initialized) {
     return false;
+  }
+  int32_t* bank = image_bank_for_id(img);
+  if (bank == NULL) {
+    return true;
   }
   int index = image_bank_pixel_index(x, y);
   if (index < 0) {
     return true;
   }
-  g_state.image_bank0[index] = col;
+  bank[index] = col;
   return true;
 }
 
@@ -875,34 +888,41 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_image_pget(
     int32_t x,
     int32_t y,
     int32_t* col_out) {
-  (void)img;
   if (!g_state.initialized || col_out == NULL) {
     return false;
+  }
+  int32_t* bank = image_bank_for_id(img);
+  if (bank == NULL) {
+    *col_out = 0;
+    return true;
   }
   int index = image_bank_pixel_index(x, y);
   if (index < 0) {
     *col_out = 0;
     return true;
   }
-  *col_out = g_state.image_bank0[index];
+  *col_out = bank[index];
   return true;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col) {
-  (void)img;
   if (!g_state.initialized) {
     return false;
+  }
+  int32_t* bank = image_bank_for_id(img);
+  if (bank == NULL) {
+    return true;
   }
   int32_t size = g_state.image_bank_size;
   if (size <= 0) {
     return true;
   }
   size_t pixel_count = (size_t)size * (size_t)size;
-  if (pixel_count > sizeof(g_state.image_bank0) / sizeof(g_state.image_bank0[0])) {
-    pixel_count = sizeof(g_state.image_bank0) / sizeof(g_state.image_bank0[0]);
+  if (pixel_count > sizeof(g_state.image_banks[0]) / sizeof(g_state.image_banks[0][0])) {
+    pixel_count = sizeof(g_state.image_banks[0]) / sizeof(g_state.image_banks[0][0]);
   }
   for (size_t i = 0; i < pixel_count; i++) {
-    g_state.image_bank0[i] = col;
+    bank[i] = col;
   }
   return true;
 }
@@ -1348,7 +1368,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_bltm(
             continue;
           }
 
-          int32_t src_color = g_state.image_bank0[src_y * g_state.image_bank_size + src_x];
+          int32_t src_color = g_state.image_banks[0][src_y * g_state.image_bank_size + src_x];
           if (colkey != OPTIONAL_I32_NONE && src_color == colkey) {
             continue;
           }
@@ -1374,12 +1394,15 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     int32_t colkey,
     double rotate,
     double scale) {
-  (void)img;
   (void)rotate;
   (void)scale;
 
   if (!g_state.initialized || g_state.frame_buffer == NULL) {
     return false;
+  }
+  int32_t* source_bank = image_bank_for_id(img);
+  if (source_bank == NULL) {
+    return true;
   }
 
   int32_t width = (int32_t)llround(fabs(w));
@@ -1405,7 +1428,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
         continue;
       }
 
-      int32_t src_color = g_state.image_bank0[src_y * g_state.image_bank_size + src_x];
+      int32_t src_color = source_bank[src_y * g_state.image_bank_size + src_x];
       if (colkey != OPTIONAL_I32_NONE && src_color == colkey) {
         continue;
       }
