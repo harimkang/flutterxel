@@ -129,6 +129,46 @@ void main() {
     return major != 0 || minor != 0 || patch != 0;
   }
 
+  test('backend mode resolves to supported discriminator', () {
+    final mode = flutterxel.Flutterxel.backendMode;
+    expect(
+      mode,
+      anyOf(
+        flutterxel.BackendMode.native_core,
+        flutterxel.BackendMode.c_fallback,
+        flutterxel.BackendMode.dart_fallback,
+      ),
+    );
+  });
+
+  test('backend mode capability getters are deterministic in one process', () {
+    final mode1 = flutterxel.Flutterxel.backendMode;
+    final mode2 = flutterxel.Flutterxel.backendMode;
+    expect(mode2, mode1);
+
+    final capability1 = flutterxel.Flutterxel.supportsNativeBltSourceSelection;
+    final capability2 = flutterxel.Flutterxel.supportsNativeBltSourceSelection;
+    expect(capability2, capability1);
+    expect(capability1, mode1 == flutterxel.BackendMode.native_core);
+  });
+
+  test('backend mode throws explicit error when backend symbol is missing', () {
+    expect(
+      () => flutterxel.Flutterxel.resolveBackendModeFromLookup(
+        <T extends ffi.NativeType>(String symbolName) {
+          throw ArgumentError('missing symbol: $symbolName');
+        },
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('flutterxel_core_backend_kind'),
+        ),
+      ),
+    );
+  });
+
   test(
     'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/mouseX/mouseY/mouseWheel/inputKeys/inputText/droppedFiles/setInputText/setDroppedFiles/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {

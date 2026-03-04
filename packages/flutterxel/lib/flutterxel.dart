@@ -23,6 +23,9 @@ const int _optionalI32None = -2147483648; // INT32_MIN
 const int _optionalBoolNone = -1;
 const int _optionalBoolFalse = 0;
 const int _optionalBoolTrue = 1;
+const int _backendKindNativeCore = 1;
+const int _backendKindCFallback = 2;
+const int _backendKindDartFallback = 3;
 const int _i64Min = -0x8000000000000000;
 const int _i64Max = 0x7FFFFFFFFFFFFFFF;
 const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
@@ -131,6 +134,8 @@ const List<int> _builtinFontData = <int>[
   0xEEEEE0,
 ];
 
+enum BackendMode { native_core, c_fallback, dart_fallback }
+
 class _FallbackTilemap {
   _FallbackTilemap({
     required this.width,
@@ -208,6 +213,7 @@ int _fallbackRngState = _fallbackRngDefaultState;
 int _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
 FlutterxelBindings? _bindings;
 Object? _bindingsLoadError;
+BackendMode? _cachedBackendMode;
 const int _detachedSoundPlayIdBase = 100000;
 final Finalizer<ffi.Pointer<ffi.Void>> _nativeBufferFinalizer =
     Finalizer<ffi.Pointer<ffi.Void>>((pointer) {
@@ -294,6 +300,34 @@ FlutterxelBindings? _getBindingsOrNull() {
   } catch (error) {
     _bindingsLoadError = error;
     return null;
+  }
+}
+
+BackendMode _backendModeFromDiscriminator(int discriminator) {
+  return switch (discriminator) {
+    _backendKindNativeCore => BackendMode.native_core,
+    _backendKindCFallback => BackendMode.c_fallback,
+    _backendKindDartFallback => BackendMode.dart_fallback,
+    _ => throw StateError(
+      'ABI mismatch: flutterxel_core_backend_kind returned unknown '
+      'discriminator $discriminator.',
+    ),
+  };
+}
+
+BackendMode _resolveBackendModeFromBindings(FlutterxelBindings? bindings) {
+  if (bindings == null) {
+    return BackendMode.dart_fallback;
+  }
+  try {
+    final discriminator = bindings.flutterxel_core_backend_kind();
+    return _backendModeFromDiscriminator(discriminator);
+  } catch (error) {
+    throw StateError(
+      'ABI mismatch: loaded native bindings are missing '
+      'flutterxel_core_backend_kind. Rebuild native artifacts and regenerate '
+      'Dart bindings. Original error: $error',
+    );
   }
 }
 
@@ -5798,6 +5832,27 @@ class Flutterxel {
 
   static int versionPatch() =>
       _getBindingsOrNull()?.flutterxel_core_version_patch() ?? 0;
+
+  static BackendMode get backendMode {
+    final cached = _cachedBackendMode;
+    if (cached != null) {
+      return cached;
+    }
+    final resolved = _resolveBackendModeFromBindings(_getBindingsOrNull());
+    _cachedBackendMode = resolved;
+    return resolved;
+  }
+
+  static BackendMode resolveBackendModeFromLookup(
+    ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
+  ) {
+    return _resolveBackendModeFromBindings(
+      FlutterxelBindings.fromLookup(lookup),
+    );
+  }
+
+  static bool get supportsNativeBltSourceSelection =>
+      backendMode == BackendMode.native_core;
 }
 
 const List<Color> _defaultPalette = <Color>[
