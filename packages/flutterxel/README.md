@@ -65,6 +65,22 @@ const flutterxel.FlutterxelView(pixelScale: 3)
 - arrow keys -> `KEY_LEFT/KEY_RIGHT/KEY_UP/KEY_DOWN`
 - `space/enter/escape` -> `KEY_SPACE/KEY_RETURN/KEY_ESCAPE`
 
+## Test Backend Forcing
+
+For deterministic backend-path regression tests, runtime loading supports:
+
+- `FLUTTERXEL_FORCE_BACKEND`: `native_core`, `c_fallback`, `dart_fallback`
+- `FLUTTERXEL_LIBRARY_OVERRIDE`: absolute shared-library path to load first
+
+Example for forced `c_fallback` tests on host:
+
+```bash
+HOST_LIB="$(./tool/build_c_scaffold_host.sh)"
+FLUTTERXEL_FORCE_BACKEND=c_fallback \
+FLUTTERXEL_LIBRARY_OVERRIDE="$HOST_LIB" \
+flutter test test/flutterxel_api_surface_test.dart --plain-name "forced c fallback mode"
+```
+
 ## Monorepo
 
 The repository is organized as:

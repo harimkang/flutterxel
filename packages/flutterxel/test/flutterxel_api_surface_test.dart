@@ -169,6 +169,34 @@ void main() {
     );
   });
 
+  test('forced c fallback mode enforces c fallback backend path', () {
+    if (Platform.environment['FLUTTERXEL_FORCE_BACKEND'] != 'c_fallback') {
+      return;
+    }
+
+    final overridePath = Platform.environment['FLUTTERXEL_LIBRARY_OVERRIDE'];
+    expect(
+      overridePath != null && overridePath.isNotEmpty,
+      isTrue,
+      reason:
+          'Set FLUTTERXEL_LIBRARY_OVERRIDE to a host-built flutterxel.c shared library path.',
+    );
+
+    expect(
+      flutterxel.Flutterxel.backendMode,
+      flutterxel.BackendMode.c_fallback,
+      reason:
+          'FLUTTERXEL_FORCE_BACKEND=c_fallback requested but backend mode did not switch.',
+    );
+
+    flutterxel.init(4, 4);
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].pset(0, 0, 11);
+    flutterxel.blt(0, 0, 0, 0, 0, 1, 1);
+    expect(flutterxel.pget(0, 0), 11);
+  });
+
   test(
     'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/mouseX/mouseY/mouseWheel/inputKeys/inputText/droppedFiles/setInputText/setDroppedFiles/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {

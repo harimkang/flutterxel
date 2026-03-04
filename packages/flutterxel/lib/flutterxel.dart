@@ -26,6 +26,8 @@ const int _optionalBoolTrue = 1;
 const int _backendKindNativeCore = 1;
 const int _backendKindCFallback = 2;
 const int _backendKindDartFallback = 3;
+const String _forceBackendEnv = 'FLUTTERXEL_FORCE_BACKEND';
+const String _libraryOverrideEnv = 'FLUTTERXEL_LIBRARY_OVERRIDE';
 const int _i64Min = -0x8000000000000000;
 const int _i64Max = 0x7FFFFFFFFFFFFFFF;
 const Set<int> _transientValueKeys = <int>{MOUSE_WHEEL_X, MOUSE_WHEEL_Y};
@@ -221,6 +223,9 @@ final Finalizer<ffi.Pointer<ffi.Void>> _nativeBufferFinalizer =
     });
 
 ffi.DynamicLibrary _openLibrary() {
+  final libraryOverrideRaw = Platform.environment[_libraryOverrideEnv];
+  final libraryOverride = libraryOverrideRaw?.trim();
+
   final candidates = switch (Platform.operatingSystem) {
     'ios' => const [
       'flutterxel_core.framework/flutterxel_core',
@@ -253,6 +258,24 @@ ffi.DynamicLibrary _openLibrary() {
 
   final attempted = <String>['process'];
   Object? lastError;
+
+  if (libraryOverride != null && libraryOverride.isNotEmpty) {
+    try {
+      final library = ffi.DynamicLibrary.open(libraryOverride);
+      if (hasVersionSymbol(library)) {
+        return library;
+      }
+      throw ArgumentError(
+        'Missing flutterxel_core_version_major in "$libraryOverride".',
+      );
+    } catch (error) {
+      throw ArgumentError(
+        'Unable to load native library override from '
+        '$_libraryOverrideEnv="$libraryOverride". Last error: $error',
+      );
+    }
+  }
+
   try {
     final processLibrary = ffi.DynamicLibrary.process();
     if (hasVersionSymbol(processLibrary)) {
@@ -295,6 +318,12 @@ FlutterxelBindings? _getBindingsOrNull() {
   }
 
   try {
+    if (_forcedBackendModeFromEnvironment() == BackendMode.dart_fallback) {
+      _bindingsLoadError = StateError(
+        'Native bindings disabled by $_forceBackendEnv=dart_fallback.',
+      );
+      return null;
+    }
     _bindings = FlutterxelBindings(_openLibrary());
     return _bindings;
   } catch (error) {
@@ -315,14 +344,59 @@ BackendMode _backendModeFromDiscriminator(int discriminator) {
   };
 }
 
+String _backendModeEnvValue(BackendMode mode) {
+  return switch (mode) {
+    BackendMode.native_core => 'native_core',
+    BackendMode.c_fallback => 'c_fallback',
+    BackendMode.dart_fallback => 'dart_fallback',
+  };
+}
+
+BackendMode? _forcedBackendModeFromEnvironment() {
+  final raw = Platform.environment[_forceBackendEnv]?.trim();
+  if (raw == null || raw.isEmpty) {
+    return null;
+  }
+  return switch (raw) {
+    'native_core' => BackendMode.native_core,
+    'c_fallback' => BackendMode.c_fallback,
+    'dart_fallback' => BackendMode.dart_fallback,
+    _ => throw StateError(
+      'Invalid $_forceBackendEnv value "$raw". '
+      'Supported values: native_core, c_fallback, dart_fallback.',
+    ),
+  };
+}
+
 BackendMode _resolveBackendModeFromBindings(FlutterxelBindings? bindings) {
+  final forcedBackend = _forcedBackendModeFromEnvironment();
   if (bindings == null) {
+    if (forcedBackend != null && forcedBackend != BackendMode.dart_fallback) {
+      final override = Platform.environment[_libraryOverrideEnv];
+      throw StateError(
+        '$_forceBackendEnv=${_backendModeEnvValue(forcedBackend)} requested '
+        'but native bindings are unavailable.'
+        '${override == null || override.isEmpty ? '' : ' '
+                  '($_libraryOverrideEnv="$override")'}'
+        '${_bindingsLoadError == null ? '' : ' Load error: $_bindingsLoadError'}',
+      );
+    }
     return BackendMode.dart_fallback;
   }
   try {
     final discriminator = bindings.flutterxel_core_backend_kind();
-    return _backendModeFromDiscriminator(discriminator);
-  } catch (error) {
+    final resolved = _backendModeFromDiscriminator(discriminator);
+    if (forcedBackend != null && forcedBackend != resolved) {
+      final override = Platform.environment[_libraryOverrideEnv];
+      throw StateError(
+        '$_forceBackendEnv=${_backendModeEnvValue(forcedBackend)} requested '
+        'but loaded backend is ${_backendModeEnvValue(resolved)}.'
+        '${override == null || override.isEmpty ? '' : ' '
+                  '($_libraryOverrideEnv="$override")'}',
+      );
+    }
+    return resolved;
+  } on ArgumentError catch (error) {
     throw StateError(
       'ABI mismatch: loaded native bindings are missing '
       'flutterxel_core_backend_kind. Rebuild native artifacts and regenerate '
