@@ -344,6 +344,7 @@ class _ParsedTmxLayer {
   const _ParsedTmxLayer({
     required this.width,
     required this.height,
+    required this.tileScale,
     required this.tilesetFirstGid,
     required this.tilesetColumns,
     required this.gids,
@@ -351,6 +352,7 @@ class _ParsedTmxLayer {
 
   final int width;
   final int height;
+  final int tileScale;
   final int tilesetFirstGid;
   final int tilesetColumns;
   final List<int> gids;
@@ -389,11 +391,17 @@ _ParsedTmxLayer _parseTmxLayer(String tmxText, int layerIndex) {
   final mapAttrs = _parseXmlAttributes(mapMatch.group(1)!);
   final tileWidth = _requiredIntAttr(mapAttrs, 'tilewidth', 'TMX map');
   final tileHeight = _requiredIntAttr(mapAttrs, 'tileheight', 'TMX map');
-  if (tileWidth != TILE_SIZE || tileHeight != TILE_SIZE) {
+  if (tileWidth <= 0 || tileHeight <= 0 || tileWidth != tileHeight) {
     throw FormatException(
-      "TMX file's tile size is not ${TILE_SIZE}x$TILE_SIZE.",
+      "TMX file's tile size must be a positive square, got ${tileWidth}x$tileHeight.",
     );
   }
+  if (tileWidth % TILE_SIZE != 0) {
+    throw FormatException(
+      "TMX file's tile size must be ${TILE_SIZE}x$TILE_SIZE or an integer multiple.",
+    );
+  }
+  final tileScale = tileWidth ~/ TILE_SIZE;
 
   final tilesetMatches = RegExp(
     r'<tileset\b([^>]*)>',
@@ -458,6 +466,7 @@ _ParsedTmxLayer _parseTmxLayer(String tmxText, int layerIndex) {
   return _ParsedTmxLayer(
     width: layerWidth,
     height: layerHeight,
+    tileScale: tileScale,
     tilesetFirstGid: tilesetFirstGid,
     tilesetColumns: tilesetColumns,
     gids: gids,
@@ -3967,17 +3976,46 @@ class Tilemap {
       throw FormatException("Failed to open file '$filename'");
     }
     final parsed = _parseTmxLayer(file.readAsStringSync(), layer);
-    final tilemap = Tilemap(parsed.width, parsed.height, 0);
+    final tileScale = parsed.tileScale;
+    final tilemap = Tilemap(
+      parsed.width * tileScale,
+      parsed.height * tileScale,
+      0,
+    );
+
+    void writeNormalizedTile(
+      int dstX,
+      int dstY,
+      int srcTileX,
+      int srcTileY, {
+      required bool empty,
+    }) {
+      for (var dy = 0; dy < tileScale; dy++) {
+        for (var dx = 0; dx < tileScale; dx++) {
+          if (empty) {
+            tilemap._writeTileRaw(dstX + dx, dstY + dy, (0, 0));
+            continue;
+          }
+          tilemap._writeTileRaw(dstX + dx, dstY + dy, (
+            srcTileX * tileScale + dx,
+            srcTileY * tileScale + dy,
+          ));
+        }
+      }
+    }
+
     for (var i = 0; i < parsed.gids.length; i++) {
-      final x = i % parsed.width;
-      final y = i ~/ parsed.width;
+      final x = (i % parsed.width) * tileScale;
+      final y = (i ~/ parsed.width) * tileScale;
       final gid = parsed.gids[i];
-      final tileId = gid > parsed.tilesetFirstGid
-          ? gid - parsed.tilesetFirstGid
-          : 0;
+      if (gid <= 0 || gid < parsed.tilesetFirstGid) {
+        writeNormalizedTile(x, y, 0, 0, empty: true);
+        continue;
+      }
+      final tileId = gid - parsed.tilesetFirstGid;
       final tileX = tileId % parsed.tilesetColumns;
       final tileY = tileId ~/ parsed.tilesetColumns;
-      tilemap._writeTileRaw(x, y, (tileX, tileY));
+      writeNormalizedTile(x, y, tileX, tileY, empty: false);
     }
     return tilemap;
   }

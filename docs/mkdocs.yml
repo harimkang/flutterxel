@@ -48,6 +48,7 @@ nav:
       - Constants and Compatibility: reference/constants-and-compatibility.md
       - Licensing and Attribution: reference/licensing-and-attribution.md
   - Release Notes:
+      - v0.0.4: release-notes/v0.0.4.md
       - v0.0.3: release-notes/v0.0.3.md
       - v0.0.2: release-notes/v0.0.2.md
   - Docs Workflow: contributing.md

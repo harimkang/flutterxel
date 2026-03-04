@@ -1,3 +1,8 @@
+## 0.0.4
+
+- No functional tooling changes in this release.
+- Version updated to keep workspace/package release metadata aligned with `flutterxel` `0.0.4`.
+
 ## 0.0.3
 
 - Added `pixel-snap` CLI command for asset preprocessing from raw images to palette-quantized pixel-art output.

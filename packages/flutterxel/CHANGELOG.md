@@ -1,3 +1,10 @@
+## 0.0.4
+
+- Added TMX import support in `Tilemap.fromTmx`/`from_tmx` for square tile sizes that are integer multiples of `8` (including `16x16`).
+- Added TMX tile normalization so imported larger tiles are expanded into internal `8x8` tile coordinates.
+- Added TMX validation for unsupported tile sizes (non-positive, non-square, or not divisible by `8`).
+- Added regression tests for `16x16` normalization and invalid-size rejection.
+
 ## 0.0.3
 
 - Added PNG binary decoding support for `Image.fromImage` and `Image.load`.

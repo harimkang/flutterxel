@@ -23,7 +23,7 @@ They are exposed through `Seq<T>` wrappers for Pyxel-style mutation.
 `Tilemap` supports:
 
 - tile read/write and draw helpers
-- TMX import via `fromTmx(...)`
+- TMX import via `fromTmx(...)` (supports `8x8` and square multiples of `8`, normalized internally to `8x8`)
 - tilemap `set(...)`, `load(...)`, `save(...)`
 
 ## Runtime Resource File I/O

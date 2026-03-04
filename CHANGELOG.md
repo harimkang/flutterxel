@@ -1,3 +1,10 @@
+## 0.0.4
+
+- Added `Tilemap.fromTmx`/`from_tmx` support for TMX tile sizes that are square integer multiples of `8` (for example `16x16`).
+- Added internal normalization from larger TMX tiles to flutterxel's `8x8` tile grid to preserve existing runtime rendering/collision behavior.
+- Added regression coverage for normalized `16x16` imports and invalid (non-divisible) tile-size rejection.
+- Updated release and installation docs for `0.0.4`.
+
 ## 0.0.3
 
 - Added tooling-side image preprocessing with `flutterxel_tools pixel-snap`.

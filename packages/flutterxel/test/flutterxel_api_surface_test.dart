@@ -788,6 +788,69 @@ void main() {
     }
   });
 
+  test('tilemap from_tmx normalizes 16x16 TMX tiles into 8x8 tiles', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync('flutterxel_tmx_16_');
+    final tmxPath = '${tempDir.path}${Platform.pathSeparator}map16.tmx';
+    try {
+      File(tmxPath).writeAsStringSync('''
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="1" height="1" tilewidth="16" tileheight="16">
+ <tileset firstgid="1" name="test16" tilewidth="16" tileheight="16" tilecount="2" columns="2">
+  <image source="test16.png" width="32" height="16"/>
+ </tileset>
+ <layer id="1" name="L1" width="1" height="1">
+  <data encoding="csv">
+2
+  </data>
+ </layer>
+</map>
+''');
+
+      final loaded = flutterxel.Tilemap.from_tmx(tmxPath, 0);
+      expect(loaded.width, 2);
+      expect(loaded.height, 2);
+      expect(loaded.pget(0, 0), (2, 0));
+      expect(loaded.pget(1, 0), (3, 0));
+      expect(loaded.pget(0, 1), (2, 1));
+      expect(loaded.pget(1, 1), (3, 1));
+    } finally {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    }
+  });
+
+  test('tilemap from_tmx rejects TMX tile sizes not divisible by 8', () {
+    flutterxel.init(8, 8);
+    final tempDir = Directory.systemTemp.createTempSync('flutterxel_tmx_bad_');
+    final tmxPath = '${tempDir.path}${Platform.pathSeparator}map_bad.tmx';
+    try {
+      File(tmxPath).writeAsStringSync('''
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="1" height="1" tilewidth="12" tileheight="12">
+ <tileset firstgid="1" name="test" tilewidth="12" tileheight="12" tilecount="1" columns="1">
+  <image source="test.png" width="12" height="12"/>
+ </tileset>
+ <layer id="1" name="L1" width="1" height="1">
+  <data encoding="csv">
+1
+  </data>
+ </layer>
+</map>
+''');
+
+      expect(
+        () => flutterxel.Tilemap.from_tmx(tmxPath, 0),
+        throwsFormatException,
+      );
+    } finally {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    }
+  });
+
   test(
     'Image.fromImage loads PNG with source dimensions and palette-mapped pixels',
     () {
