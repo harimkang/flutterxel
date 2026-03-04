@@ -41,6 +41,7 @@ nav:
       - Input: guides/input.md
       - Audio: guides/audio.md
       - Resources and Persistence: guides/resources-and-persistence.md
+      - Pixel Snap Asset Preprocessing: guides/pixel-snap-asset-preprocessing.md
       - Examples: guides/examples.md
   - Reference:
       - API (Auto-Generated): reference/api.md

@@ -30,6 +30,10 @@ If you want to explore complete sample games, see:
 3. [Read the guides](guides/game-loop-and-rendering.md)
 4. [Open API reference](reference/api.md)
 
+## Tooling Guide
+
+- [Pixel Snap Asset Preprocessing](guides/pixel-snap-asset-preprocessing.md): preprocess external/AI-generated images into grid-aligned palette assets before runtime use.
+
 ## API Reference Policy
 
 The API reference is generated automatically from source code with `dart doc` during docs build/deploy.

@@ -48,3 +48,9 @@ Important behavior:
 ## App Data Directory
 
 - `userDataDir(vendorName, appName)` returns (and creates) a writable per-app directory.
+
+## Asset Preprocessing
+
+Before loading external image assets at runtime, preprocess them with the tooling command described in:
+
+- [Pixel Snap Asset Preprocessing](pixel-snap-asset-preprocessing.md)
