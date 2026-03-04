@@ -95,6 +95,30 @@ String _writeTestPng(
   return file.path;
 }
 
+String _writeTestRgbaPng(
+  Directory dir, {
+  required String name,
+  required int width,
+  required int height,
+  required List<int> rgba32Pixels,
+}) {
+  final image = img.Image(width: width, height: height, numChannels: 4);
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      final rgba = rgba32Pixels[y * width + x];
+      final r = (rgba >> 24) & 0xFF;
+      final g = (rgba >> 16) & 0xFF;
+      final b = (rgba >> 8) & 0xFF;
+      final a = rgba & 0xFF;
+      image.setPixelRgba(x, y, r, g, b, a);
+    }
+  }
+
+  final file = File('${dir.path}/$name');
+  file.writeAsBytesSync(img.encodePng(image), flush: true);
+  return file.path;
+}
+
 bool _hasCommand(String command) {
   final result = Platform.isWindows
       ? Process.runSync('where', <String>[command], runInShell: true)
@@ -1078,6 +1102,114 @@ void main() {
 
       expect(target.pget(0, 0), flutterxel.COLOR_RED);
       expect(target.pget(2, 1), flutterxel.COLOR_BLACK);
+    },
+  );
+
+  test(
+    'Image.load alpha policy keeps legacy mapping when options are unset',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync('flutterxel_alpha_');
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestRgbaPng(
+        tempDir,
+        name: 'alpha_legacy.png',
+        width: 2,
+        height: 1,
+        rgba32Pixels: const <int>[
+          0xD4186C00, // COLOR_RED with alpha=0
+          0x2B335FFF, // COLOR_NAVY opaque
+        ],
+      );
+
+      final image = flutterxel.Image(2, 1);
+      image.cls(flutterxel.COLOR_BLACK);
+      image.load(0, 0, pngPath);
+
+      expect(image.pget(0, 0), flutterxel.COLOR_RED);
+      expect(image.pget(1, 0), flutterxel.COLOR_NAVY);
+    },
+  );
+
+  test(
+    'Image.load alpha policy maps low-alpha pixels to transparent index when opted in',
+    () {
+      flutterxel.init(8, 8);
+      final tempDir = Directory.systemTemp.createTempSync('flutterxel_alpha_');
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestRgbaPng(
+        tempDir,
+        name: 'alpha_map.png',
+        width: 2,
+        height: 1,
+        rgba32Pixels: const <int>[
+          0xD4186C01, // alpha=1 (threshold-hit)
+          0x2B335FFF, // opaque navy
+        ],
+      );
+
+      final image = flutterxel.Image(2, 1);
+      image.load(
+        0,
+        0,
+        pngPath,
+        preserve_transparent: true,
+        transparent_index: flutterxel.COLOR_BLACK,
+        alpha_threshold: 1,
+      );
+
+      expect(image.pget(0, 0), flutterxel.COLOR_BLACK);
+      expect(image.pget(1, 0), flutterxel.COLOR_NAVY);
+    },
+  );
+
+  test(
+    'Image.load alpha policy works with blt colkey to remove transparent background',
+    () {
+      flutterxel.init(16, 16);
+      final tempDir = Directory.systemTemp.createTempSync('flutterxel_alpha_');
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestRgbaPng(
+        tempDir,
+        name: 'alpha_colkey.png',
+        width: 2,
+        height: 1,
+        rgba32Pixels: const <int>[
+          0xD4186C00, // fully transparent
+          0x2B335FFF, // opaque navy
+        ],
+      );
+
+      flutterxel.images[0].cls(flutterxel.COLOR_RED);
+      flutterxel.images[0].load(
+        0,
+        0,
+        pngPath,
+        preserve_transparent: true,
+        transparent_index: flutterxel.COLOR_BLACK,
+        alpha_threshold: 0,
+      );
+
+      flutterxel.cls(flutterxel.COLOR_PINK);
+      flutterxel.blt(0, 0, 0, 0, 0, 2, 1, colkey: flutterxel.COLOR_BLACK);
+
+      expect(flutterxel.pget(0, 0), flutterxel.COLOR_PINK);
+      expect(flutterxel.pget(1, 0), flutterxel.COLOR_NAVY);
     },
   );
 

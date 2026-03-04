@@ -26,6 +26,14 @@ Important behavior boundaries:
 - Detached images created with `Image(...)` / `Image.fromImage(...)` are not valid as global `blt` source arguments.
 - Use `image.blt(...)` when drawing from detached image objects.
 - In native-binding mode, resource image mutations (`pset`, `cls`, `set`, `load`) now sync directly to native core image banks, so subsequent global `blt(...)` draws reflect those updates.
+- `Image.load(...)` / `Image.fromImage(...)` keep legacy alpha-agnostic mapping by default.
+- Optional alpha-aware import is available with:
+  - `preserve_transparent` / `preserveTransparent`
+  - `transparent_index` / `transparentIndex`
+  - `alpha_threshold` / `alphaThreshold` (`0..255`)
+- Transparent sprite recipe:
+  - load with `preserve_transparent: true, transparent_index: <index>, alpha_threshold: <threshold>`
+  - draw with `blt(..., colkey: <same index>)` to skip transparent background pixels
 
 `Tilemap` supports:
 
