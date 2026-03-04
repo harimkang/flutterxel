@@ -1,3 +1,9 @@
+## 0.0.6
+
+- No functional CLI/tooling behavior changes in this release.
+- Updated release metadata to align workspace/package versions with `flutterxel` `0.0.6`.
+- Maintainer release path is CI dry-run validation on tag plus manual pub.dev publish.
+
 ## 0.0.5
 
 - Added CI publish workflow support for tagged releases to publish `flutterxel` and `flutterxel_tools` to pub.dev.

@@ -1,3 +1,14 @@
+## 0.0.6
+
+- Added backend discriminator ABI contract (`flutterxel_core_backend_kind`) and tightened ABI parity checks across native header, plugin header, and generated Dart bindings.
+- Added runtime backend introspection API (`BackendMode`, `Flutterxel.backendMode`) and capability surface (`Flutterxel.supportsNativeBltSourceSelection`) with fail-closed ABI mismatch handling.
+- Added deterministic fallback test forcing with `FLUTTERXEL_FORCE_BACKEND` and `FLUTTERXEL_LIBRARY_OVERRIDE`, plus host C scaffold helper script for reproducible fallback regressions.
+- Fixed C fallback source-selection mismatches so `blt` honors `img` and `bltm` honors `tm`.
+- Added opt-in alpha-aware image import policy for `Image.load`/`Image.fromImage` and documented transparent-index + `colkey` usage.
+- Clarified and test-locked `include_colors` semantics, including explicit alias guidance.
+- Added Flutterxel agent-map MVP pipeline in example app (character manifest ingestion, zone state machine, renderer/controller, JSONL activity feed adapter) with test coverage and docs.
+- CI release workflow now uses tag-triggered dry-run validation (`publish_dry_run.yml`) before manual pub.dev publish.
+
 ## 0.0.5
 
 - Fixed native rendering mismatch where resource-image mutations (`images[n].pset/cls/load/set`) were not reflected by global `blt(...)` in native-binding mode.

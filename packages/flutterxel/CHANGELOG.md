@@ -1,3 +1,22 @@
+## 0.0.6
+
+- Added backend discriminator ABI integration and fail-closed backend mode resolution:
+  - `BackendMode`
+  - `Flutterxel.backendMode`
+  - `Flutterxel.supportsNativeBltSourceSelection`
+- Added deterministic fallback forcing controls for test environments:
+  - `FLUTTERXEL_FORCE_BACKEND`
+  - `FLUTTERXEL_LIBRARY_OVERRIDE`
+- Fixed C fallback rendering contract mismatches:
+  - `blt` now honors `img` image bank selection
+  - `bltm` now honors `tm` tilemap source selection
+- Added opt-in alpha-aware import options on `Image.load` and `Image.fromImage`:
+  - `preserve_transparent` / `preserveTransparent`
+  - `transparent_index` / `transparentIndex`
+  - `alpha_threshold` / `alphaThreshold`
+- Clarified `include_colors` semantics and added test coverage to lock behavior.
+- Added Agent Map MVP example components under `example/agent_map` with parser, state machine, renderer, and activity feed adapter tests.
+
 ## 0.0.5
 
 - Added native core image-resource mutation ABI integration for `Image` resources:
