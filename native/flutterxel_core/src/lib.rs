@@ -9,7 +9,7 @@ use zip::write::FileOptions;
 use zip::{ZipArchive, ZipWriter};
 
 const ABI_VERSION_MAJOR: u32 = 0;
-const ABI_VERSION_MINOR: u32 = 3;
+const ABI_VERSION_MINOR: u32 = 4;
 const ABI_VERSION_PATCH: u32 = 0;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
 const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
@@ -411,6 +411,33 @@ fn ensure_default_image_bank(state: &mut RuntimeState) {
     }
 
     state.image_banks.insert(0, bank);
+}
+
+fn image_bank_dim(image_bank_size: i32) -> Option<usize> {
+    usize::try_from(image_bank_size.max(1)).ok()
+}
+
+fn image_bank_pixel_index(image_bank_size: i32, x: i32, y: i32) -> Option<usize> {
+    if x < 0 || y < 0 || x >= image_bank_size || y >= image_bank_size {
+        return None;
+    }
+    let size = image_bank_dim(image_bank_size)?;
+    let ux = usize::try_from(x).ok()?;
+    let uy = usize::try_from(y).ok()?;
+    Some(uy * size + ux)
+}
+
+fn ensure_image_bank_mut(state: &mut RuntimeState, img: i32) -> Option<&mut Vec<i32>> {
+    let size = image_bank_dim(state.image_bank_size)?;
+    let expected = size * size;
+    let bank = state
+        .image_banks
+        .entry(img)
+        .or_insert_with(|| vec![0; expected]);
+    if bank.len() != expected {
+        bank.resize(expected, 0);
+    }
+    Some(bank)
 }
 
 fn ensure_default_tilemap(state: &mut RuntimeState) {
@@ -2182,6 +2209,61 @@ pub extern "C" fn flutterxel_core_pget(x: i32, y: i32) -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_image_pset(img: i32, x: i32, y: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let Some(index) = image_bank_pixel_index(state.image_bank_size, x, y) else {
+        return true;
+    };
+    let Some(bank) = ensure_image_bank_mut(&mut state, img) else {
+        return false;
+    };
+    if index < bank.len() {
+        bank[index] = col;
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_image_pget(img: i32, x: i32, y: i32, col_out: *mut i32) -> bool {
+    if col_out.is_null() {
+        return false;
+    }
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let value = image_bank_pixel_index(state.image_bank_size, x, y)
+        .and_then(|index| {
+            state
+                .image_banks
+                .get(&img)
+                .and_then(|bank| bank.get(index))
+                .copied()
+        })
+        .unwrap_or(0);
+    unsafe {
+        *col_out = value;
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_image_cls(img: i32, col: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let Some(bank) = ensure_image_bank_mut(&mut state, img) else {
+        return false;
+    };
+    bank.fill(col);
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_line(x1: i32, y1: i32, x2: i32, y2: i32, col: i32) -> bool {
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -3453,6 +3535,34 @@ mod tests {
             0, 0, 0, 0,
         ];
         assert_eq!(frame_buffer, expected);
+    }
+
+    #[test]
+    fn image_resource_pset_abi_updates_blt_source_bank() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_image_cls(0, 0));
+        assert!(flutterxel_core_image_pset(0, 1, 1, 9));
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            0.0,
+            0.0,
+            0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE,
+            f64::NAN,
+            f64::NAN
+        ));
+        assert_eq!(flutterxel_core_pget(0, 0), 9);
+
+        let mut out = -1;
+        assert!(flutterxel_core_image_pget(0, 1, 1, &mut out));
+        assert_eq!(out, 9);
     }
 
     #[test]

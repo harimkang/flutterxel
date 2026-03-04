@@ -3283,7 +3283,12 @@ class Image {
 
   void _setLocalPixel(int x, int y, int col) {
     if (_imageId != null) {
-      _fallbackSetImagePixel(_imageId, x, y, col);
+      final imageId = _imageId;
+      _fallbackSetImagePixel(imageId, x, y, col);
+      final bindings = _getBindingsOrNull();
+      if (bindings != null) {
+        bindings.flutterxel_core_image_pset(imageId, x, y, col);
+      }
       return;
     }
     final pixels = _pixels;
@@ -3298,7 +3303,20 @@ class Image {
 
   int _getLocalPixel(int x, int y) {
     if (_imageId != null) {
-      return _fallbackGetImagePixel(_imageId, x, y);
+      final imageId = _imageId;
+      final bindings = _getBindingsOrNull();
+      if (bindings != null) {
+        final colOut = calloc<ffi.Int32>();
+        try {
+          final ok = bindings.flutterxel_core_image_pget(imageId, x, y, colOut);
+          if (ok) {
+            return colOut.value;
+          }
+        } finally {
+          calloc.free(colOut);
+        }
+      }
+      return _fallbackGetImagePixel(imageId, x, y);
     }
     final pixels = _pixels;
     if (pixels == null) {
@@ -3446,9 +3464,14 @@ class Image {
       return;
     }
     if (_imageId != null) {
-      final bank = _fallbackEnsureImageBank(_imageId);
+      final imageId = _imageId;
+      final bank = _fallbackEnsureImageBank(imageId);
       for (var i = 0; i < bank.length; i++) {
         bank[i] = col;
+      }
+      final bindings = _getBindingsOrNull();
+      if (bindings != null) {
+        bindings.flutterxel_core_image_cls(imageId, col);
       }
       return;
     }

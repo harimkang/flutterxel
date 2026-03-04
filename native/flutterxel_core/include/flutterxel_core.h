@@ -208,6 +208,19 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_blt(
     double rotate,
     double scale);
 
+// pyxel.images[img].pset(x, y, col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_pset(int32_t img,
+                                                        int32_t x,
+                                                        int32_t y,
+                                                        int32_t col);
+// pyxel.images[img].pget(x, y)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_pget(int32_t img,
+                                                        int32_t x,
+                                                        int32_t y,
+                                                        int32_t* col_out);
+// pyxel.images[img].cls(col)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col);
+
 // pyxel.sound(snd).notes = [...]
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_sound_set_notes(
     int32_t snd,

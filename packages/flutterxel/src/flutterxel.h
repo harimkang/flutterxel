@@ -161,6 +161,16 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_blt(
     double rotate,
     double scale);
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_pset(int32_t img,
+                                                   int32_t x,
+                                                   int32_t y,
+                                                   int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_pget(int32_t img,
+                                                   int32_t x,
+                                                   int32_t y,
+                                                   int32_t* col_out);
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col);
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_notes(
     int32_t snd,
     const int32_t* notes_ptr,

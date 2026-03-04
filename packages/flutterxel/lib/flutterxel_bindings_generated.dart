@@ -725,6 +725,53 @@ class FlutterxelBindings {
         )
       >();
 
+  bool flutterxel_core_image_pset(int img, int x, int y, int col) {
+    return _flutterxel_core_image_pset(img, x, y, col);
+  }
+
+  late final _flutterxel_core_image_psetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32, ffi.Int32)
+        >
+      >('flutterxel_core_image_pset');
+  late final _flutterxel_core_image_pset = _flutterxel_core_image_psetPtr
+      .asFunction<bool Function(int, int, int, int)>();
+
+  bool flutterxel_core_image_pget(
+    int img,
+    int x,
+    int y,
+    ffi.Pointer<ffi.Int32> col_out,
+  ) {
+    return _flutterxel_core_image_pget(img, x, y, col_out);
+  }
+
+  late final _flutterxel_core_image_pgetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.Int32>,
+          )
+        >
+      >('flutterxel_core_image_pget');
+  late final _flutterxel_core_image_pget = _flutterxel_core_image_pgetPtr
+      .asFunction<bool Function(int, int, int, ffi.Pointer<ffi.Int32>)>();
+
+  bool flutterxel_core_image_cls(int img, int col) {
+    return _flutterxel_core_image_cls(img, col);
+  }
+
+  late final _flutterxel_core_image_clsPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_image_cls',
+      );
+  late final _flutterxel_core_image_cls = _flutterxel_core_image_clsPtr
+      .asFunction<bool Function(int, int)>();
+
   bool flutterxel_core_sound_set_notes(
     int snd,
     ffi.Pointer<ffi.Int32> notes_ptr,

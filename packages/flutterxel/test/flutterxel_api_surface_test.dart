@@ -122,6 +122,13 @@ void main() {
     flutterxel.stopRunLoop();
   });
 
+  bool nativeBindingsAvailable() {
+    final major = flutterxel.Flutterxel.versionMajor();
+    final minor = flutterxel.Flutterxel.versionMinor();
+    final patch = flutterxel.Flutterxel.versionPatch();
+    return major != 0 || minor != 0 || patch != 0;
+  }
+
   test(
     'exposes init/run/show/flip/quit/reset/title/icon/perfMonitor/integerScale/screenMode/fullscreen/camera/clip/pal/dither/btn/btnp/btnr/btnv/mouse/warpMouse/mouseX/mouseY/mouseWheel/inputKeys/inputText/droppedFiles/setInputText/setDroppedFiles/cls/pset/pget/line/rect/rectb/circ/circb/elli/ellib/tri/trib/fill/text/bltm/blt/play/playm/stop/playPos/load/save/loadPal/savePal/screenshot/screencast/resetScreencast/userDataDir/rseed/rndi/rndf/nseed/noise/ceil/floor/clamp/sgn/sqrt/sin/cos/atan2 API surface',
     () {
@@ -387,6 +394,51 @@ void main() {
     expect(flutterxel.pget(1, 1), 3);
     flutterxel.blt(0, 0, image0, 0, 0, 1, 1);
     flutterxel.bltm(0, 0, tilemap0, 0, 0, 1, 1);
+  });
+
+  test('resource image pset is reflected by native blt source', () {
+    flutterxel.init(8, 8);
+    if (!nativeBindingsAvailable()) {
+      return;
+    }
+
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].pset(0, 0, 9);
+
+    flutterxel.blt(0, 0, 0, 0, 0, 1, 1);
+    expect(flutterxel.pget(0, 0), 9);
+  });
+
+  test('resource image load is reflected by native blt source', () {
+    flutterxel.init(8, 8);
+    if (!nativeBindingsAvailable()) {
+      return;
+    }
+
+    final tempDir = Directory.systemTemp.createTempSync(
+      'flutterxel_native_img_',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final pngPath = _writeTestPng(
+      tempDir,
+      name: 'single.png',
+      width: 1,
+      height: 1,
+      rgb24Pixels: const <int>[0x2B335F], // COLOR_NAVY
+    );
+
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].load(0, 0, pngPath);
+
+    flutterxel.blt(0, 0, 0, 0, 0, 1, 1);
+    expect(flutterxel.pget(0, 0), flutterxel.COLOR_NAVY);
   });
 
   test('audio resources expose Tone/Sound/Music-style API', () {

@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define ABI_VERSION_MAJOR 0
-#define ABI_VERSION_MINOR 3
+#define ABI_VERSION_MINOR 4
 #define ABI_VERSION_PATCH 0
 #define OPTIONAL_I32_NONE INT32_MIN
 #define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
@@ -292,6 +292,17 @@ static int32_t get_frame_pixel(int32_t x, int32_t y) {
 
   size_t index = (size_t)y * (size_t)g_state.width + (size_t)x;
   return g_state.frame_buffer[index];
+}
+
+static int image_bank_pixel_index(int32_t x, int32_t y) {
+  int32_t size = g_state.image_bank_size;
+  if (size <= 0) {
+    return -1;
+  }
+  if (x < 0 || x >= size || y < 0 || y >= size) {
+    return -1;
+  }
+  return y * size + x;
 }
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void) {
@@ -835,6 +846,60 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_pset(int32_t x, int32_t y, int32_t col) {
 
 FFI_PLUGIN_EXPORT int32_t flutterxel_core_pget(int32_t x, int32_t y) {
   return get_frame_pixel(x, y);
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_pset(
+    int32_t img,
+    int32_t x,
+    int32_t y,
+    int32_t col) {
+  (void)img;
+  if (!g_state.initialized) {
+    return false;
+  }
+  int index = image_bank_pixel_index(x, y);
+  if (index < 0) {
+    return true;
+  }
+  g_state.image_bank0[index] = col;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_pget(
+    int32_t img,
+    int32_t x,
+    int32_t y,
+    int32_t* col_out) {
+  (void)img;
+  if (!g_state.initialized || col_out == NULL) {
+    return false;
+  }
+  int index = image_bank_pixel_index(x, y);
+  if (index < 0) {
+    *col_out = 0;
+    return true;
+  }
+  *col_out = g_state.image_bank0[index];
+  return true;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col) {
+  (void)img;
+  if (!g_state.initialized) {
+    return false;
+  }
+  int32_t size = g_state.image_bank_size;
+  if (size <= 0) {
+    return true;
+  }
+  size_t pixel_count = (size_t)size * (size_t)size;
+  if (pixel_count > sizeof(g_state.image_bank0) / sizeof(g_state.image_bank0[0])) {
+    pixel_count = sizeof(g_state.image_bank0) / sizeof(g_state.image_bank0[0]);
+  }
+  for (size_t i = 0; i < pixel_count; i++) {
+    g_state.image_bank0[i] = col;
+  }
+  return true;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_line(
