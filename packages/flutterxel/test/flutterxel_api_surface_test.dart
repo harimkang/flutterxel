@@ -222,6 +222,10 @@ void main() {
   });
 
   test('c fallback blt image bank respects img source bank id', () {
+    if (Platform.environment['FLUTTERXEL_FORCE_BACKEND'] != 'c_fallback') {
+      return;
+    }
+
     expect(
       flutterxel.Flutterxel.backendMode,
       flutterxel.BackendMode.c_fallback,
@@ -245,6 +249,10 @@ void main() {
   });
 
   test('c fallback bltm tilemap id selects tilemap-dependent source', () {
+    if (Platform.environment['FLUTTERXEL_FORCE_BACKEND'] != 'c_fallback') {
+      return;
+    }
+
     expect(
       flutterxel.Flutterxel.backendMode,
       flutterxel.BackendMode.c_fallback,
