@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 
+import 'activity_feed.dart';
 import 'agent_state.dart';
 import 'agent_state_machine.dart';
 import 'character_manifest.dart';
@@ -12,15 +14,20 @@ typedef AgentManifestProvider = Future<List<CharacterManifest>> Function();
 class AgentMapController {
   AgentMapController({
     AgentStateMachine? stateMachine,
+    ActivityFeed? activityFeed,
     AgentManifestProvider? manifestProvider,
     this.syncedAssetRoot = 'assets/characters',
   }) : _stateMachine = stateMachine ?? AgentStateMachine(),
+       _activityFeed = activityFeed,
        _manifestProvider = manifestProvider;
 
   final AgentStateMachine _stateMachine;
+  final ActivityFeed? _activityFeed;
   final AgentManifestProvider? _manifestProvider;
   final String syncedAssetRoot;
   final List<CharacterManifest> _manifests = <CharacterManifest>[];
+  StreamSubscription<AgentZone>? _activitySubscription;
+  AgentZone? _latestFeedZone;
 
   bool _initialized = false;
   int _renderTickCount = 0;
@@ -47,6 +54,11 @@ class AgentMapController {
       ..clear()
       ..addAll(manifests.take(3));
 
+    _activitySubscription?.cancel();
+    _activitySubscription = _activityFeed?.zones().listen((zone) {
+      _latestFeedZone = zone;
+    });
+
     for (var i = 0; i < _manifests.length; i++) {
       final manifest = _manifests[i];
       final sheetFile = File(manifest.sheetAssetPath);
@@ -72,11 +84,16 @@ class AgentMapController {
     if (!_initialized) {
       throw StateError('AgentMapController.initialize() must be called first.');
     }
-    final zone = _syntheticZoneForTick(_renderTickCount);
+    final zone = _latestFeedZone ?? _syntheticZoneForTick(_renderTickCount);
     final state = _stateMachine.advance(zone);
     _render(state);
     _renderTickCount += 1;
     return state;
+  }
+
+  void dispose() {
+    _activitySubscription?.cancel();
+    _activitySubscription = null;
   }
 
   Future<List<CharacterManifest>> _loadDefaultManifests() async {
