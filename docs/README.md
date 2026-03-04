@@ -24,6 +24,27 @@ Build output:
 
 - `docs/.site/`
 
+## pixel-snap Tooling Command
+
+Asset preprocessing is handled by `flutterxel_tools pixel-snap` (tooling layer, not runtime).
+
+Examples:
+
+```bash
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.png
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.snapped.png --colors 16 --overwrite
+```
+
+Arguments:
+
+- `--input` (required), `--output` (required)
+- `--colors` (optional), `--overwrite` (optional)
+
+Prerequisites:
+
+- Rust/Cargo installed
+- `reference/spritefusion-pixel-snapper` available in this repository
+
 ## API Docs Generation
 
 API reference is generated automatically from the real package code:

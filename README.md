@@ -170,6 +170,30 @@ cd native/flutterxel_core
 cargo test
 ```
 
+## Asset Preprocessing with pixel-snap
+
+`pixel-snap` is provided by `flutterxel_tools` for converting external/AI-generated images into retro-style assets before runtime usage.
+
+Prerequisite:
+
+- Rust and Cargo must be installed.
+
+Examples:
+
+```bash
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.png
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.snapped.png --colors 16 --overwrite
+```
+
+Arguments:
+
+- `--input` (required): source image path
+- `--output` (required): output image path
+- `--colors` (optional): palette color count
+- `--overwrite` (optional): replace existing output file
+
+Implementation detail: this command shells out to `packages/flutterxel_tools/tool/pixel_snap_image.sh`, which runs `reference/spritefusion-pixel-snapper`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

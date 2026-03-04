@@ -7,6 +7,7 @@ Tooling package for the `flutterxel` monorepo.
 - CLI command surface (`run/watch/play/edit/package/app2html`)
 - Editor-oriented workflows and automation scripts
 - Packaging and build helper integrations
+- Asset preprocessing helpers (`pixel-snap`)
 
 ## Current Status
 
@@ -18,6 +19,7 @@ dart run flutterxel_tools:flutterxel_tools run
 dart run flutterxel_tools:flutterxel_tools build-native
 dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.1
 dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.2
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.png
 ```
 
 `build-native` currently points maintainers to:
@@ -52,6 +54,34 @@ bash packages/flutterxel_tools/tool/bump_release_versions.sh --version 0.0.2
 ```
 
 `release-bump` CLI wrapper runs the same script.
+
+## pixel-snap Asset Preprocessing
+
+`pixel-snap` preprocesses raw images into grid-aligned, palette-quantized assets before runtime use.
+
+Prerequisites:
+
+- Rust and Cargo installed (`cargo --version`)
+- Repository contains `reference/spritefusion-pixel-snapper`
+
+Examples:
+
+```bash
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.png
+dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.snapped.png --colors 16 --overwrite
+```
+
+Arguments:
+
+- `--input`: source image path (required)
+- `--output`: destination image path (required)
+- `--colors`: palette color count (optional, default `16`)
+- `--overwrite`: allow replacing existing output file (optional)
+
+Implementation note:
+
+- CLI command delegates to `packages/flutterxel_tools/tool/pixel_snap_image.sh`
+- Wrapper invokes `reference/spritefusion-pixel-snapper` via Cargo
 
 ## Monorepo Context
 

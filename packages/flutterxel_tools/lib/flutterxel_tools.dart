@@ -75,7 +75,19 @@ class FlutterxelTools {
     return parser;
   }
 
-  static String usage() => buildParser().usage;
+  static String usage() {
+    final parser = buildParser();
+    final commandList = parser.commands.keys.toList()..sort();
+    return [
+      'Usage: flutterxel_tools <command> [arguments]',
+      '',
+      'Global options:',
+      parser.usage.trimRight(),
+      '',
+      'Available commands:',
+      ...commandList.map((command) => '  $command'),
+    ].join('\n');
+  }
 
   static String dispatch(ArgResults results) {
     final command = results.command?.name;
@@ -184,13 +196,13 @@ class FlutterxelTools {
       results = parser.parse(args);
     } on FormatException catch (error) {
       onStderr(error.message);
-      onStdout(parser.usage);
+      onStdout(usage());
       return 64;
     }
 
     final command = results.command?.name;
     if (results['help'] == true || command == null) {
-      onStdout(parser.usage);
+      onStdout(usage());
       return 0;
     }
 

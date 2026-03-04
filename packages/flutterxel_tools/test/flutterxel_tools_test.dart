@@ -55,6 +55,10 @@ void main() {
     expect(FlutterxelTools.dispatch(results), contains('pixel-snap'));
   });
 
+  test('usage includes pixel-snap command', () {
+    expect(FlutterxelTools.usage(), contains('pixel-snap'));
+  });
+
   test('execute runs build-native script with forwarded args', () async {
     String? executable;
     List<String>? arguments;
