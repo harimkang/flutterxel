@@ -11,6 +11,7 @@
 #define ABI_VERSION_MAJOR 0
 #define ABI_VERSION_MINOR 4
 #define ABI_VERSION_PATCH 0
+#define BACKEND_KIND_C_FALLBACK 2
 #define OPTIONAL_I32_NONE INT32_MIN
 #define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
 #define PRESSED_KEY_CAPACITY 1024
@@ -315,6 +316,10 @@ FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_minor(void) {
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_patch(void) {
   return ABI_VERSION_PATCH;
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_backend_kind(void) {
+  return BACKEND_KIND_C_FALLBACK;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_init(

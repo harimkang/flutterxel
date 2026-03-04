@@ -11,6 +11,7 @@ use zip::{ZipArchive, ZipWriter};
 const ABI_VERSION_MAJOR: u32 = 0;
 const ABI_VERSION_MINOR: u32 = 4;
 const ABI_VERSION_PATCH: u32 = 0;
+const BACKEND_KIND_NATIVE_CORE: i32 = 1;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
 const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
@@ -1640,6 +1641,11 @@ pub extern "C" fn flutterxel_core_version_minor() -> u32 {
 #[no_mangle]
 pub extern "C" fn flutterxel_core_version_patch() -> u32 {
     ABI_VERSION_PATCH
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_backend_kind() -> i32 {
+    BACKEND_KIND_NATIVE_CORE
 }
 
 #[no_mangle]
@@ -4526,5 +4532,11 @@ mod tests {
         }
 
         assert!(!flutterxel_core_music_set_seq(2, 1, std::ptr::null(), 2));
+    }
+
+    #[test]
+    fn backend_kind_reports_native_core_discriminator() {
+        let _guard = test_lock();
+        assert_eq!(flutterxel_core_backend_kind(), 1);
     }
 }

@@ -26,11 +26,18 @@ typedef enum FlutterxelCorePlaySndKind {
   FLUTTERXEL_CORE_PLAY_SND_STRING = 2,
 } FlutterxelCorePlaySndKind;
 
+typedef enum FlutterxelCoreBackendKind {
+  FLUTTERXEL_CORE_BACKEND_NATIVE_CORE = 1,
+  FLUTTERXEL_CORE_BACKEND_C_FALLBACK = 2,
+  FLUTTERXEL_CORE_BACKEND_DART_FALLBACK = 3,
+} FlutterxelCoreBackendKind;
+
 typedef void (*FlutterxelCoreFrameCallback)(void* user_data);
 
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_major(void);
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_minor(void);
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_patch(void);
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_backend_kind(void);
 
 // pyxel.init(width, height, *, title=None, fps=None, quit_key=None,
 //            display_scale=None, capture_scale=None, capture_sec=None)

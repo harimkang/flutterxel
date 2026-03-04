@@ -26,11 +26,18 @@ typedef enum FlutterxelCorePlaySndKind {
   FLUTTERXEL_CORE_PLAY_SND_STRING = 2,
 } FlutterxelCorePlaySndKind;
 
+typedef enum FlutterxelCoreBackendKind {
+  FLUTTERXEL_CORE_BACKEND_NATIVE_CORE = 1,
+  FLUTTERXEL_CORE_BACKEND_C_FALLBACK = 2,
+  FLUTTERXEL_CORE_BACKEND_DART_FALLBACK = 3,
+} FlutterxelCoreBackendKind;
+
 typedef void (*FlutterxelCoreFrameCallback)(void* user_data);
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void);
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_minor(void);
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_patch(void);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_backend_kind(void);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_init(
     int32_t width,

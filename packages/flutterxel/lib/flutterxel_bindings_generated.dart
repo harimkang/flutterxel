@@ -59,6 +59,17 @@ class FlutterxelBindings {
   late final _flutterxel_core_version_patch = _flutterxel_core_version_patchPtr
       .asFunction<int Function()>();
 
+  int flutterxel_core_backend_kind() {
+    return _flutterxel_core_backend_kind();
+  }
+
+  late final _flutterxel_core_backend_kindPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function()>>(
+        'flutterxel_core_backend_kind',
+      );
+  late final _flutterxel_core_backend_kind = _flutterxel_core_backend_kindPtr
+      .asFunction<int Function()>();
+
   bool flutterxel_core_init(
     int width,
     int height,
@@ -1294,6 +1305,24 @@ enum FlutterxelCorePlaySndKind {
     2 => FLUTTERXEL_CORE_PLAY_SND_STRING,
     _ => throw ArgumentError(
       "Unknown value for FlutterxelCorePlaySndKind: $value",
+    ),
+  };
+}
+
+enum FlutterxelCoreBackendKind {
+  FLUTTERXEL_CORE_BACKEND_NATIVE_CORE(1),
+  FLUTTERXEL_CORE_BACKEND_C_FALLBACK(2),
+  FLUTTERXEL_CORE_BACKEND_DART_FALLBACK(3);
+
+  final int value;
+  const FlutterxelCoreBackendKind(this.value);
+
+  static FlutterxelCoreBackendKind fromValue(int value) => switch (value) {
+    1 => FLUTTERXEL_CORE_BACKEND_NATIVE_CORE,
+    2 => FLUTTERXEL_CORE_BACKEND_C_FALLBACK,
+    3 => FLUTTERXEL_CORE_BACKEND_DART_FALLBACK,
+    _ => throw ArgumentError(
+      "Unknown value for FlutterxelCoreBackendKind: $value",
     ),
   };
 }

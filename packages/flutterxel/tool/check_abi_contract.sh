@@ -2,10 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-HEADER="$ROOT_DIR/packages/flutterxel/src/flutterxel.h"
+NATIVE_HEADER="$ROOT_DIR/native/flutterxel_core/include/flutterxel_core.h"
+PLUGIN_HEADER="$ROOT_DIR/packages/flutterxel/src/flutterxel.h"
 BINDINGS="$ROOT_DIR/packages/flutterxel/lib/flutterxel_bindings_generated.dart"
 
 SYMBOLS=(
+  flutterxel_core_version_major
+  flutterxel_core_version_minor
+  flutterxel_core_version_patch
+  flutterxel_core_backend_kind
   flutterxel_core_init
   flutterxel_core_quit
   flutterxel_core_run
@@ -98,8 +103,12 @@ contains_symbol() {
 }
 
 for symbol in "${SYMBOLS[@]}"; do
-  if ! contains_symbol "$symbol" "$HEADER"; then
-    echo "Missing symbol in header: $symbol" >&2
+  if ! contains_symbol "$symbol" "$NATIVE_HEADER"; then
+    echo "Missing symbol in native header: $symbol" >&2
+    exit 1
+  fi
+  if ! contains_symbol "$symbol" "$PLUGIN_HEADER"; then
+    echo "Missing symbol in plugin header: $symbol" >&2
     exit 1
   fi
   if ! contains_symbol "$symbol" "$BINDINGS"; then
