@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutterxel'
-  s.version          = '0.0.1'
+  s.version          = '0.0.9'
   s.summary          = 'Flutter runtime plugin for a Pyxel-compatible engine.'
   s.description      = <<-DESC
 Flutter runtime plugin for a Pyxel-compatible engine backed by Rust FFI.
