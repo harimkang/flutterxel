@@ -3,6 +3,11 @@
 - No functional CLI/tooling behavior changes in this release.
 - Updated release metadata to align workspace/package versions with `flutterxel` `0.0.10`.
 
+## 0.0.9
+
+- No functional CLI/tooling behavior changes in this release.
+- Updated release metadata to align workspace/package versions with `flutterxel` `0.0.9`.
+
 ## 0.0.8
 
 - Updated native artifact build script output layout for iOS to:
