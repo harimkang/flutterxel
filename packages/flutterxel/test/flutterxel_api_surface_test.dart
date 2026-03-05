@@ -620,6 +620,24 @@ void main() {
     expect(flutterxel.pget(0, 0), 11);
   });
 
+  test('resource tilemap non-zero pset is reflected by native bltm source', () {
+    flutterxel.init(24, 24);
+    if (!nativeBindingsAvailable()) {
+      return;
+    }
+
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].pset(16, 24, 13);
+
+    final tm0 = flutterxel.tilemaps[0];
+    tm0.cls((0, 0));
+    tm0.pset(5, 4, (2, 3));
+
+    flutterxel.bltm(0, 0, tm0, 5, 4, 1, 1);
+    expect(flutterxel.pget(0, 0), 13);
+  });
+
   test('resource tilemap cls is reflected by native bltm source', () {
     flutterxel.init(16, 16);
     if (!nativeBindingsAvailable()) {
@@ -636,6 +654,15 @@ void main() {
 
     flutterxel.bltm(0, 0, tm0, 0, 0, 1, 1);
     expect(flutterxel.pget(0, 0), 12);
+  });
+
+  test('resource tilemap imgsrc setter keeps value on invalid input', () {
+    flutterxel.init(16, 16);
+    final tm0 = flutterxel.tilemaps[0];
+    tm0.imgsrc = 3;
+
+    expect(() => tm0.imgsrc = 'invalid', throwsA(isA<ArgumentError>()));
+    expect(tm0.imgsrc, 3);
   });
 
   test('audio resources expose Tone/Sound/Music-style API', () {

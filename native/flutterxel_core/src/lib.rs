@@ -18,6 +18,7 @@ const RESOURCE_FORMAT_VERSION: u32 = 4;
 const RESOURCE_RUNTIME_SECTION: &str = "runtime";
 const TILE_SIZE: i32 = 8;
 const DEFAULT_IMAGE_BANK_SIZE: i32 = 256;
+const DEFAULT_TILEMAP_SIZE: u32 = 256;
 const MIN_FONT_CODE: u32 = 32;
 const MAX_FONT_CODE: u32 = 127;
 const FONT_WIDTH: usize = 4;
@@ -451,11 +452,13 @@ fn ensure_default_tilemap(state: &mut RuntimeState) {
 }
 
 fn default_tilemap_resource() -> TilemapResource {
+    let width = DEFAULT_TILEMAP_SIZE as usize;
+    let height = DEFAULT_TILEMAP_SIZE as usize;
     TilemapResource {
-        width: 1,
-        height: 1,
+        width: DEFAULT_TILEMAP_SIZE,
+        height: DEFAULT_TILEMAP_SIZE,
         imgsrc: 0,
-        data: vec![(0, 0)],
+        data: vec![(0, 0); width * height],
     }
 }
 
@@ -472,10 +475,19 @@ fn ensure_tilemap_mut(state: &mut RuntimeState, tm: i32) -> Option<&mut TilemapR
 }
 
 fn normalize_tilemap_cells(tilemap: &mut TilemapResource) -> Option<(usize, usize)> {
-    let width = usize::try_from(tilemap.width).ok()?;
-    let height = usize::try_from(tilemap.height).ok()?;
+    let mut width = usize::try_from(tilemap.width).ok()?;
+    let mut height = usize::try_from(tilemap.height).ok()?;
     if width == 0 || height == 0 {
         return None;
+    }
+    let default_size = DEFAULT_TILEMAP_SIZE as usize;
+    if width < default_size {
+        width = default_size;
+        tilemap.width = DEFAULT_TILEMAP_SIZE;
+    }
+    if height < default_size {
+        height = default_size;
+        tilemap.height = DEFAULT_TILEMAP_SIZE;
     }
     let cell_count = width.checked_mul(height)?;
     if tilemap.data.is_empty() {
@@ -3985,6 +3997,32 @@ mod tests {
             OPTIONAL_I32_NONE
         ));
         assert_eq!(flutterxel_core_pget(0, 0), 11);
+    }
+
+    #[test]
+    fn tilemap_resource_pset_non_zero_abi_updates_bltm_source_tile() {
+        let _guard = test_lock();
+        init_runtime(24, 24);
+
+        assert!(flutterxel_core_image_cls(0, 0));
+        assert!(flutterxel_core_image_pset(0, 16, 24, 13));
+
+        assert!(flutterxel_core_tilemap_set_imgsrc(0, 0));
+        assert!(flutterxel_core_tilemap_cls(0, 0, 0));
+        assert!(flutterxel_core_tilemap_pset(0, 5, 4, 2, 3));
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_bltm(
+            0.0,
+            0.0,
+            0,
+            5.0,
+            4.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE
+        ));
+        assert_eq!(flutterxel_core_pget(0, 0), 13);
     }
 
     #[test]

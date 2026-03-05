@@ -4399,9 +4399,9 @@ class Tilemap {
   int? _resourceTilemapId() => _tilemapId;
   Object get imgsrc => _imgsrc;
   set imgsrc(Object value) {
-    _imgsrc = value;
     final tilemapId = _tilemapId;
     if (tilemapId == null) {
+      _imgsrc = value;
       return;
     }
     if (value is! int) {
@@ -4411,7 +4411,6 @@ class Tilemap {
         'resource tilemap imgsrc must be an int image bank id.',
       );
     }
-    _fallbackEnsureTilemap(tilemapId).imgsrc = value;
     final bindings = _getBindingsOrNull();
     if (bindings != null) {
       final ok = bindings.flutterxel_core_tilemap_set_imgsrc(tilemapId, value);
@@ -4419,6 +4418,8 @@ class Tilemap {
         throw StateError('flutterxel_core_tilemap_set_imgsrc failed.');
       }
     }
+    _fallbackEnsureTilemap(tilemapId).imgsrc = value;
+    _imgsrc = value;
   }
 
   static Tilemap from_tmx(String filename, int layer) {
