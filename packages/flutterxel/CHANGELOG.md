@@ -1,3 +1,24 @@
+## Unreleased
+
+- Added runtime `num_colors` configuration support in `init(...)` with snake/camel aliases:
+  - `num_colors`
+  - `numColors`
+- Added runtime palette count getters:
+  - `num_colors`
+  - `numColors`
+- Expanded native ABI surface with runtime palette count control:
+  - `flutterxel_core_set_num_colors`
+  - `flutterxel_core_num_colors`
+- Refactored Rust core palette mapping to runtime-configurable `16/64/256` behavior (`pal`, `load_pal`, `save_pal` included).
+- Aligned C fallback palette map/runtime contract with runtime `num_colors`.
+- Updated `FlutterxelView` default palette behavior to follow runtime palette count (`16/64/256`) when `palette` is omitted.
+- Added regression coverage for:
+  - `init(num_colors: 64/256)` acceptance and unsupported value rejection
+  - `pal(63, ...)` / `pal(255, ...)`
+  - discovered-palette import limits based on runtime color count
+  - `FlutterxelView` runtime 64/256 default palette selection path
+- Refreshed bundled Android/iOS native artifacts for the expanded ABI.
+
 ## 0.0.10
 
 - Added native tilemap mutation/query ABI sync (`tilemap_pset/pget/cls/set_imgsrc`) and wired resource `Tilemap` mutation paths to native state.

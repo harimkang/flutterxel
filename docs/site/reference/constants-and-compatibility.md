@@ -9,6 +9,8 @@
 This includes:
 
 - color constants
+- runtime palette constants (`NUM_COLORS`, `DEFAULT_NUM_COLORS`, `MAX_NUM_COLORS`, `SUPPORTED_NUM_COLORS`)
+- `MAX_COLORS` (kept as max color-index compatibility alias: `255`)
 - keyboard/mouse constants
 - resource sizing constants (`IMAGE_SIZE`, `TILE_SIZE`, etc.)
 - audio constants
@@ -20,6 +22,11 @@ The package keeps both naming styles where implemented:
 - camelCase (`frameCount`, `loadPal`, `playPos`, ...)
 - snake_case aliases (`frame_count`, `load_pal`, `play_pos`, ...)
 
+Runtime palette options keep both styles as well:
+
+- `init(..., num_colors: 64)` / `init(..., numColors: 64)`
+- `flutterxel.num_colors` / `flutterxel.numColors`
+
 This helps port Pyxel-like code while keeping idiomatic Dart usage available.
 
 For image import options, compatibility aliases are also available:
@@ -29,6 +36,14 @@ For image import options, compatibility aliases are also available:
 - `transparent_index` / `transparentIndex`
 - `alpha_threshold` / `alphaThreshold`
 - `preserve_transparent` / `preserveTransparent`
+
+## Runtime Palette Count Compatibility
+
+- Legacy behavior is unchanged when `num_colors` is omitted (`16` colors).
+- Supported runtime palette counts are currently limited to `16`, `64`, `256`.
+- Native core and C fallback both enforce this contract via ABI (`set/get num_colors`).
+- `pal`, `load_pal`, and `save_pal` now respect runtime palette count rather than fixed `16`.
+- `FlutterxelView` default palette selection also follows runtime palette count when `palette` is not provided.
 
 ## Text and Built-in Font
 

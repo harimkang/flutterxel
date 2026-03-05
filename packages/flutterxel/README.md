@@ -65,6 +65,42 @@ const flutterxel.FlutterxelView(pixelScale: 3)
 - arrow keys -> `KEY_LEFT/KEY_RIGHT/KEY_UP/KEY_DOWN`
 - `space/enter/escape` -> `KEY_SPACE/KEY_RETURN/KEY_ESCAPE`
 
+## Runtime Palette Size (`num_colors` / `numColors`)
+
+`init(...)` now supports runtime palette size selection:
+
+- supported: `16`, `64`, `256`
+- default: `16` (backward compatible)
+- constants: `DEFAULT_NUM_COLORS`, `MAX_NUM_COLORS`, `SUPPORTED_NUM_COLORS`
+
+Example:
+
+```dart
+flutterxel.init(160, 120, num_colors: 64);
+// or
+flutterxel.init(160, 120, numColors: 256);
+```
+
+Read the current runtime value via:
+
+- `flutterxel.numColors`
+- `flutterxel.num_colors`
+
+When `FlutterxelView.palette` is omitted, the view now selects a deterministic
+default palette for the active runtime color count (`16/64/256`).
+You can still pass a custom palette explicitly:
+
+```dart
+flutterxel.FlutterxelView(
+  pixelScale: 3,
+  palette: flutterxel.defaultPaletteForNumColors(256),
+)
+```
+
+If you see `flutterxel_core_set_num_colors` / `flutterxel_core_num_colors`
+missing-symbol errors on native backend, rebuild/bundle native artifacts for the
+same commit as the Dart package update.
+
 ## Test Backend Forcing
 
 For deterministic backend-path regression tests, runtime loading supports:
