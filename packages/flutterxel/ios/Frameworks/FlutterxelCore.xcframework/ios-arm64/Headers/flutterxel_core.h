@@ -85,6 +85,8 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_fullscreen(bool enabled);
 FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_frame_count(void);
 FLUTTERXEL_CORE_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
 FLUTTERXEL_CORE_EXPORT size_t flutterxel_core_framebuffer_len(void);
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_copy_framebuffer(int32_t* dst,
+                                                              size_t dst_len);
 
 // pyxel.btn(key)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btn(int32_t key);
@@ -227,6 +229,30 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_pget(int32_t img,
                                                         int32_t* col_out);
 // pyxel.images[img].cls(col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col);
+// pyxel.images[img].set(...) bulk sync bridge
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_replace(int32_t img,
+                                                           const int32_t* data,
+                                                           size_t len);
+
+// pyxel.tilemaps[tm].pset(x, y, (tile_x, tile_y))
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_tilemap_pset(int32_t tm,
+                                                          int32_t x,
+                                                          int32_t y,
+                                                          int32_t tile_x,
+                                                          int32_t tile_y);
+// pyxel.tilemaps[tm].pget(x, y)
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_tilemap_pget(int32_t tm,
+                                                          int32_t x,
+                                                          int32_t y,
+                                                          int32_t* tile_x_out,
+                                                          int32_t* tile_y_out);
+// pyxel.tilemaps[tm].cls((tile_x, tile_y))
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_tilemap_cls(int32_t tm,
+                                                         int32_t tile_x,
+                                                         int32_t tile_y);
+// pyxel.tilemaps[tm].imgsrc = imgsrc
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_tilemap_set_imgsrc(int32_t tm,
+                                                                int32_t imgsrc);
 
 // pyxel.sound(snd).notes = [...]
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_sound_set_notes(
