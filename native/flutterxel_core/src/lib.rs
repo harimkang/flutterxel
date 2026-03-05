@@ -1213,15 +1213,23 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     if width <= 0 || height <= 0 {
         return true;
     }
-    let Ok(width_usize) = usize::try_from(width) else {
+    let Some(source) = state.image_banks.get(&call.img) else {
         return false;
     };
-    let Ok(height_usize) = usize::try_from(height) else {
+    if source.len() < source_size_usize * source_size_usize {
         return false;
-    };
-    let Some(sample_len) = width_usize.checked_mul(height_usize) else {
-        return false;
-    };
+    }
+
+    let camera_x = state.camera_x;
+    let camera_y = state.camera_y;
+    let clip_x = state.clip_x;
+    let clip_y = state.clip_y;
+    let clip_w = state.clip_w;
+    let clip_h = state.clip_h;
+    let frame_width = state.width;
+    let frame_height = state.height;
+    let palette_map = state.palette_map;
+    let frame_buffer = &mut state.frame_buffer;
 
     let flip_x = call.w < 0.0;
     let flip_y = call.h < 0.0;
@@ -1229,36 +1237,16 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     let base_dy = call.y.round() as i32;
     let base_sx = call.u.round() as i32;
     let base_sy = call.v.round() as i32;
-    let sampled_colors: Vec<Option<i32>> = {
-        let Some(source) = state.image_banks.get(&call.img) else {
-            return false;
-        };
-        if source.len() < source_size_usize * source_size_usize {
-            return false;
-        }
-
-        let mut sampled = vec![None; sample_len];
-        for dy in 0..height {
-            for dx in 0..width {
-                let src_x = base_sx + if flip_x { width - 1 - dx } else { dx };
-                let src_y = base_sy + if flip_y { height - 1 - dy } else { dy };
-
-                if src_x < 0 || src_x >= source_size || src_y < 0 || src_y >= source_size {
-                    continue;
-                }
-
-                let src_index = src_y as usize * source_size_usize + src_x as usize;
-                let sample_index = dy as usize * width_usize + dx as usize;
-                sampled[sample_index] = source.get(src_index).copied();
-            }
-        }
-        sampled
-    };
 
     for dy in 0..height {
         for dx in 0..width {
-            let sample_index = dy as usize * width_usize + dx as usize;
-            let Some(color) = sampled_colors[sample_index] else {
+            let src_x = base_sx + if flip_x { width - 1 - dx } else { dx };
+            let src_y = base_sy + if flip_y { height - 1 - dy } else { dy };
+            if src_x < 0 || src_x >= source_size || src_y < 0 || src_y >= source_size {
+                continue;
+            }
+            let src_index = src_y as usize * source_size_usize + src_x as usize;
+            let Some(color) = source.get(src_index).copied() else {
                 continue;
             };
             if call.colkey == Some(color) {
@@ -1267,7 +1255,21 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
 
             let dst_x = base_dx + dx;
             let dst_y = base_dy + dy;
-            set_frame_pixel(state, dst_x, dst_y, color);
+            set_frame_pixel_raw(
+                frame_buffer,
+                frame_width,
+                frame_height,
+                camera_x,
+                camera_y,
+                clip_x,
+                clip_y,
+                clip_w,
+                clip_h,
+                &palette_map,
+                dst_x,
+                dst_y,
+                color,
+            );
         }
     }
 
@@ -1285,14 +1287,18 @@ fn draw_bltm(
     h: f64,
     colkey: Option<i32>,
 ) -> bool {
-    let Some(tilemap) = state.tilemaps.get(&tm).cloned() else {
-        return false;
-    };
-    let Some(source_bank) = state.image_banks.get(&tilemap.imgsrc).cloned() else {
-        return false;
-    };
     let source_size = state.image_bank_size;
     if source_size <= 0 {
+        return false;
+    }
+    let Some(tilemap) = state.tilemaps.get(&tm) else {
+        return false;
+    };
+    let Some(source_bank) = state.image_banks.get(&tilemap.imgsrc) else {
+        return false;
+    };
+    let source_size_usize = source_size as usize;
+    if source_bank.len() < source_size_usize * source_size_usize {
         return false;
     }
 
@@ -1314,7 +1320,16 @@ fn draw_bltm(
     let base_dy = y.round() as i32;
     let base_tx = u.round() as i32;
     let base_ty = v.round() as i32;
-    let source_size_usize = source_size as usize;
+    let camera_x = state.camera_x;
+    let camera_y = state.camera_y;
+    let clip_x = state.clip_x;
+    let clip_y = state.clip_y;
+    let clip_w = state.clip_w;
+    let clip_h = state.clip_h;
+    let frame_width = state.width;
+    let frame_height = state.height;
+    let palette_map = state.palette_map;
+    let frame_buffer = &mut state.frame_buffer;
 
     for dy in 0..tiles_h {
         for dx in 0..tiles_w {
@@ -1346,7 +1361,21 @@ fn draw_bltm(
 
                     let dst_x = base_dx + dx * TILE_SIZE + px;
                     let dst_y = base_dy + dy * TILE_SIZE + py;
-                    set_frame_pixel(state, dst_x, dst_y, color);
+                    set_frame_pixel_raw(
+                        frame_buffer,
+                        frame_width,
+                        frame_height,
+                        camera_x,
+                        camera_y,
+                        clip_x,
+                        clip_y,
+                        clip_w,
+                        clip_h,
+                        &palette_map,
+                        dst_x,
+                        dst_y,
+                        color,
+                    );
                 }
             }
         }
@@ -1355,13 +1384,53 @@ fn draw_bltm(
     true
 }
 
-fn apply_palette(state: &RuntimeState, col: i32) -> i32 {
+#[inline]
+fn map_palette_color(palette_map: &[i32; 16], col: i32) -> i32 {
     if let Ok(index) = usize::try_from(col) {
-        if index < state.palette_map.len() {
-            return state.palette_map[index];
+        if index < palette_map.len() {
+            return palette_map[index];
         }
     }
     col
+}
+
+#[inline]
+fn set_frame_pixel_raw(
+    frame_buffer: &mut [i32],
+    frame_width: i32,
+    frame_height: i32,
+    camera_x: i32,
+    camera_y: i32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    palette_map: &[i32; 16],
+    x: i32,
+    y: i32,
+    col: i32,
+) {
+    let sx = x - camera_x;
+    let sy = y - camera_y;
+    if sx < 0 || sx >= frame_width || sy < 0 || sy >= frame_height {
+        return;
+    }
+    if sx < clip_x || sy < clip_y {
+        return;
+    }
+    if sx >= clip_x + clip_w || sy >= clip_y + clip_h {
+        return;
+    }
+
+    let index = sy as usize * frame_width as usize + sx as usize;
+    if index >= frame_buffer.len() {
+        return;
+    }
+    frame_buffer[index] = map_palette_color(palette_map, col);
+}
+
+fn apply_palette(state: &RuntimeState, col: i32) -> i32 {
+    map_palette_color(&state.palette_map, col)
 }
 
 fn set_frame_pixel(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
@@ -3694,6 +3763,79 @@ mod tests {
             0, 0, 0, 0,
         ];
         assert_eq!(frame_buffer, expected);
+    }
+
+    #[test]
+    fn blt_supports_negative_width_height_flipping() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_banks.insert(0, vec![1, 2, 3, 4]);
+            state.image_bank_size = 2;
+        }
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            -2.0,
+            -2.0,
+            OPTIONAL_I32_NONE,
+            f64::NAN,
+            f64::NAN
+        ));
+
+        let frame_buffer = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            state.frame_buffer.clone()
+        };
+        // Flipped source [1,2;3,4] draws as [4,3;2,1] at top-left.
+        let expected = [
+            4, 3, 0, 0, //
+            2, 1, 0, 0, //
+            0, 0, 0, 0, //
+            0, 0, 0, 0,
+        ];
+        assert_eq!(frame_buffer, expected);
+    }
+
+    #[test]
+    fn bltm_samples_non_zero_tile_coordinates() {
+        let _guard = test_lock();
+        init_runtime(24, 24);
+        assert!(flutterxel_core_cls(0));
+        {
+            let mut state = runtime_state().lock().expect("runtime state poisoned");
+            state.image_bank_size = 24;
+            let mut bank = vec![0; 24 * 24];
+            bank[8 * 24 + 16] = 14; // tile (2,1) top-left pixel
+            state.image_banks.insert(0, bank);
+            state.tilemaps.insert(
+                0,
+                TilemapResource {
+                    width: 2,
+                    height: 2,
+                    imgsrc: 0,
+                    data: vec![(0, 0), (0, 0), (0, 0), (2, 1)],
+                },
+            );
+        }
+
+        assert!(flutterxel_core_bltm(
+            0.0,
+            0.0,
+            0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE
+        ));
+        assert_eq!(flutterxel_core_pget(0, 0), 14);
     }
 
     #[test]
