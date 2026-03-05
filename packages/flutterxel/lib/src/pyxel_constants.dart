@@ -17,6 +17,9 @@ const String PALETTE_FILE_EXTENSION = '.pyxpal';
 
 // Graphics
 const int NUM_COLORS = 16;
+const int DEFAULT_NUM_COLORS = 16;
+const int MAX_NUM_COLORS = 256;
+const List<int> SUPPORTED_NUM_COLORS = <int>[16, 64, 256];
 const int MAX_COLORS = 255;
 const int NUM_IMAGES = 3;
 const int IMAGE_SIZE = 256;

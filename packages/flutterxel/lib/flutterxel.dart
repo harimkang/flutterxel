@@ -170,6 +170,7 @@ int get frame_count => frameCount;
 
 bool _isInitialized = false;
 int _runtimeFps = 30;
+int _runtimeNumColors = DEFAULT_NUM_COLORS;
 Timer? _runLoopTimer;
 final ValueNotifier<int> _frameNotifier = ValueNotifier<int>(0);
 final Set<int> _fallbackPressedKeys = <int>{};
@@ -207,7 +208,7 @@ bool _fallbackIntegerScaleEnabled = true;
 int _fallbackScreenMode = 0;
 bool _fallbackFullscreenEnabled = false;
 List<int> _fallbackPaletteMap = List<int>.generate(
-  NUM_COLORS,
+  _runtimeNumColors,
   (index) => index,
 );
 int _fallbackImageBankSize = IMAGE_SIZE;
@@ -653,6 +654,8 @@ T? _resolveNamedAlias<T>({
   return camelValue ?? snakeValue;
 }
 
+bool _isSupportedNumColors(int value) => SUPPORTED_NUM_COLORS.contains(value);
+
 int _normalizeAlphaThreshold(int value) {
   if (value < 0 || value > 255) {
     throw ArgumentError.value(
@@ -940,7 +943,7 @@ void _seedFallbackResources() {
   final bank = List<int>.filled(bankSize * bankSize, 0, growable: false);
   for (var y = 0; y < bankSize; y++) {
     for (var x = 0; x < bankSize; x++) {
-      bank[y * bankSize + x] = (x + y) % NUM_COLORS;
+      bank[y * bankSize + x] = (x + y) % _runtimeNumColors;
     }
   }
   _fallbackImageBanks
@@ -961,13 +964,47 @@ void init(
   int? displayScale,
   int? captureScale,
   int? captureSec,
+  int? num_colors,
+  int? numColors,
 }) {
+  final resolvedNumColors =
+      _resolveNamedAlias<int>(
+        snakeName: 'num_colors',
+        snakeValue: num_colors,
+        camelName: 'numColors',
+        camelValue: numColors,
+      ) ??
+      DEFAULT_NUM_COLORS;
+  if (!_isSupportedNumColors(resolvedNumColors)) {
+    throw ArgumentError.value(
+      resolvedNumColors,
+      'num_colors',
+      'must be one of 16, 64, 256.',
+    );
+  }
+
   final bindings = _getBindingsOrNull();
   final titlePtr = title == null
       ? ffi.nullptr
       : title.toNativeUtf8().cast<ffi.Char>();
 
   try {
+    if (bindings != null) {
+      try {
+        final configured = bindings.flutterxel_core_set_num_colors(
+          resolvedNumColors,
+        );
+        if (!configured) {
+          throw StateError('flutterxel_core_set_num_colors failed.');
+        }
+      } on ArgumentError {
+        throw StateError(
+          'Missing ABI symbol: flutterxel_core_set_num_colors. '
+          'Rebuild native artifacts for this flutterxel version.',
+        );
+      }
+    }
+
     final ok =
         bindings?.flutterxel_core_init(
           widthValue,
@@ -989,6 +1026,20 @@ void init(
     height = heightValue;
     frameCount = 0;
     _runtimeFps = (fps ?? 30).clamp(1, 240).toInt();
+    _runtimeNumColors = resolvedNumColors;
+    if (bindings != null) {
+      try {
+        final nativeNumColors = bindings.flutterxel_core_num_colors();
+        if (_isSupportedNumColors(nativeNumColors)) {
+          _runtimeNumColors = nativeNumColors;
+        }
+      } on ArgumentError {
+        throw StateError(
+          'Missing ABI symbol: flutterxel_core_num_colors. '
+          'Rebuild native artifacts for this flutterxel version.',
+        );
+      }
+    }
     _frameNotifier.value = frameCount;
     _fallbackPressedKeys.clear();
     _fallbackPressedFrame.clear();
@@ -1019,7 +1070,10 @@ void init(
     _fallbackIntegerScaleEnabled = true;
     _fallbackScreenMode = 0;
     _fallbackFullscreenEnabled = false;
-    _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
+    _fallbackPaletteMap = List<int>.generate(
+      _runtimeNumColors,
+      (index) => index,
+    );
     _seedFallbackResources();
     _fallbackRngState = _fallbackRngDefaultState;
     _fallbackNoiseSeed = _fallbackNoiseDefaultSeed;
@@ -1080,7 +1134,8 @@ void _clearLocalRuntimeState() {
   _fallbackIntegerScaleEnabled = true;
   _fallbackScreenMode = 0;
   _fallbackFullscreenEnabled = false;
-  _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
+  _runtimeNumColors = DEFAULT_NUM_COLORS;
+  _fallbackPaletteMap = List<int>.generate(_runtimeNumColors, (index) => index);
   _fallbackImageBankSize = IMAGE_SIZE;
   _fallbackImageBanks.clear();
   _fallbackTilemaps.clear();
@@ -1328,6 +1383,20 @@ void _clearTransientInputValues() {
 
 bool get isRunning => _runLoopTimer?.isActive ?? false;
 bool get isMouseVisible => _fallbackMouseVisible;
+int get numColors {
+  if (_isInitialized) {
+    final bindings = _getBindingsOrNull();
+    if (bindings != null) {
+      final nativeNumColors = bindings.flutterxel_core_num_colors();
+      if (_isSupportedNumColors(nativeNumColors)) {
+        _runtimeNumColors = nativeNumColors;
+      }
+    }
+  }
+  return _runtimeNumColors;
+}
+
+int get num_colors => numColors;
 int get mouseX => btnv(MOUSE_POS_X);
 int get mouseY => btnv(MOUSE_POS_Y);
 int get mouseWheel => btnv(MOUSE_WHEEL_Y);
@@ -1615,7 +1684,10 @@ void pal([int? col1, int? col2]) {
   }
   if (bindings == null) {
     if (col1 == null && col2 == null) {
-      _fallbackPaletteMap = List<int>.generate(NUM_COLORS, (index) => index);
+      _fallbackPaletteMap = List<int>.generate(
+        _runtimeNumColors,
+        (index) => index,
+      );
       return;
     }
     if (col1 != null && col1 >= 0 && col1 < _fallbackPaletteMap.length) {
@@ -3694,6 +3766,7 @@ class Image {
   }) {
     final mappedColors = <int, int>{};
     final discoveredPalette = <int>[];
+    final paletteLimit = _runtimeNumColors;
     for (var y = 0; y < decoded.height; y++) {
       for (var x = 0; x < decoded.width; x++) {
         final pixel = decoded.getPixel(x, y);
@@ -3718,7 +3791,7 @@ class Image {
           if (!includeColors) {
             return _nearestPaletteIndexFromRgb24(rgb24, DEFAULT_COLORS);
           }
-          if (discoveredPalette.length < NUM_COLORS) {
+          if (discoveredPalette.length < paletteLimit) {
             discoveredPalette.add(rgb24);
             return discoveredPalette.length - 1;
           }

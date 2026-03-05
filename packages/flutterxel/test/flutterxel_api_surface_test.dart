@@ -415,10 +415,29 @@ void main() {
 
   test('init accepts num_colors=64/256 and rejects unsupported values', () {
     expect(() => flutterxel.init(16, 16, num_colors: 64), returnsNormally);
+    expect(flutterxel.numColors, 64);
+    expect(flutterxel.num_colors, 64);
     flutterxel.quit();
-    expect(() => flutterxel.init(16, 16, num_colors: 256), returnsNormally);
+    expect(() => flutterxel.init(16, 16, numColors: 256), returnsNormally);
+    expect(flutterxel.numColors, 256);
     flutterxel.quit();
     expect(() => flutterxel.init(16, 16, num_colors: 32), throwsArgumentError);
+  });
+
+  test('pal supports 63/255 indices when runtime num_colors is expanded', () {
+    flutterxel.init(16, 16, num_colors: 64);
+    flutterxel.cls(0);
+    flutterxel.pal(63, 5);
+    flutterxel.pset(0, 0, 63);
+    expect(flutterxel.pget(0, 0), 5);
+    flutterxel.quit();
+
+    flutterxel.init(16, 16, num_colors: 256);
+    flutterxel.cls(0);
+    flutterxel.pal(255, 12);
+    flutterxel.pset(0, 0, 255);
+    expect(flutterxel.pget(0, 0), 12);
+    flutterxel.quit();
   });
 
   test(
@@ -1369,6 +1388,54 @@ void main() {
 
     expect(alias.pget(0, 0), legacy.pget(0, 0));
     expect(alias.pget(1, 0), legacy.pget(1, 0));
+  });
+
+  test('use_discovered_palette respects runtime num colors limit', () {
+    final tempDir = Directory.systemTemp.createTempSync(
+      'flutterxel_runtime_palette_limit_',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    final pixels = List<int>.generate(
+      70,
+      (index) =>
+          (((index * 3) & 0xFF) << 16) |
+          (((index * 5) & 0xFF) << 8) |
+          ((index * 7) & 0xFF),
+      growable: false,
+    );
+    final pngPath = _writeTestPng(
+      tempDir,
+      name: 'runtime_palette_limit.png',
+      width: 70,
+      height: 1,
+      rgb24Pixels: pixels,
+    );
+
+    flutterxel.init(80, 8, num_colors: 64);
+    final limited = flutterxel.Image.fromImage(
+      pngPath,
+      use_discovered_palette: true,
+    );
+    final limitedIndices = List<int>.generate(
+      70,
+      (index) => limited.pget(index, 0),
+      growable: false,
+    );
+    expect(limitedIndices.every((index) => index >= 0 && index < 64), isTrue);
+
+    flutterxel.quit();
+    flutterxel.init(80, 8, num_colors: 256);
+    final expanded = flutterxel.Image.fromImage(
+      pngPath,
+      use_discovered_palette: true,
+    );
+    expect(expanded.pget(69, 0), 69);
+    flutterxel.quit();
   });
 
   test('image and tilemap data_ptr expose raw byte layout snapshots', () {
