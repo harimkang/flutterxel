@@ -13,6 +13,7 @@
 #define ABI_VERSION_PATCH 0
 #define BACKEND_KIND_C_FALLBACK 2
 #define DEFAULT_NUM_COLORS 16
+#define MAX_NUM_COLORS 256
 #define OPTIONAL_I32_NONE INT32_MIN
 #define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
 #define PRESSED_KEY_CAPACITY 1024
@@ -53,7 +54,7 @@ typedef struct FlutterxelState {
   int32_t clip_w;
   int32_t clip_h;
   int32_t num_colors;
-  int32_t palette_map[16];
+  int32_t palette_map[MAX_NUM_COLORS];
   int32_t* frame_buffer;
   size_t frame_buffer_len;
   int32_t pressed_keys[PRESSED_KEY_CAPACITY];
@@ -87,12 +88,21 @@ static bool is_supported_num_colors(int32_t num_colors) {
   return num_colors == 16 || num_colors == 64 || num_colors == 256;
 }
 
+static int32_t runtime_num_colors(void) {
+  if (!is_supported_num_colors(g_state.num_colors)) {
+    return DEFAULT_NUM_COLORS;
+  }
+  return g_state.num_colors;
+}
+
 static void seed_default_image_bank(void) {
   g_state.image_bank_size = DEFAULT_IMAGE_BANK_SIZE;
   memset(g_state.image_banks, 0, sizeof(g_state.image_banks));
+  int32_t num_colors = runtime_num_colors();
   for (int y = 0; y < DEFAULT_IMAGE_BANK_SIZE; y++) {
     for (int x = 0; x < DEFAULT_IMAGE_BANK_SIZE; x++) {
-      g_state.image_banks[0][y * DEFAULT_IMAGE_BANK_SIZE + x] = (x + y) % 16;
+      g_state.image_banks[0][y * DEFAULT_IMAGE_BANK_SIZE + x] =
+          (x + y) % num_colors;
     }
   }
   for (int i = 0; i < TILEMAP_CAPACITY; i++) {
@@ -263,13 +273,15 @@ static int find_value_key_index(int32_t key) {
 }
 
 static void reset_palette_map(void) {
-  for (int32_t i = 0; i < 16; i++) {
+  memset(g_state.palette_map, 0, sizeof(g_state.palette_map));
+  int32_t num_colors = runtime_num_colors();
+  for (int32_t i = 0; i < num_colors; i++) {
     g_state.palette_map[i] = i;
   }
 }
 
 static int32_t apply_palette(int32_t col) {
-  if (col < 0 || col >= 16) {
+  if (col < 0 || col >= runtime_num_colors()) {
     return col;
   }
   return g_state.palette_map[col];
@@ -359,6 +371,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_set_num_colors(int32_t num_colors) {
     return false;
   }
   g_state.num_colors = num_colors;
+  reset_palette_map();
   return true;
 }
 
@@ -873,7 +886,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_pal(int32_t col1, int32_t col2) {
     return false;
   }
 
-  if (col1 >= 0 && col1 < 16) {
+  if (col1 >= 0 && col1 < runtime_num_colors()) {
     if (col2_none) {
       g_state.palette_map[col1] = col1;
     } else {
@@ -1815,7 +1828,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_load_pal(const char* filename) {
   }
 
   char line[128];
-  for (int i = 0; i < 16; i++) {
+  int32_t num_colors = runtime_num_colors();
+  for (int32_t i = 0; i < num_colors; i++) {
     if (fgets(line, sizeof(line), fp) == NULL) {
       break;
     }
@@ -1838,7 +1852,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_save_pal(const char* filename) {
     return false;
   }
 
-  for (int i = 0; i < 16; i++) {
+  int32_t num_colors = runtime_num_colors();
+  for (int32_t i = 0; i < num_colors; i++) {
     if (fprintf(fp, "%d\n", g_state.palette_map[i]) < 0) {
       fclose(fp);
       return false;
