@@ -13,6 +13,7 @@ const ABI_VERSION_MINOR: u32 = 4;
 const ABI_VERSION_PATCH: u32 = 0;
 const BACKEND_KIND_NATIVE_CORE: i32 = 1;
 const DEFAULT_NUM_COLORS: i32 = 16;
+const MAX_NUM_COLORS: usize = 256;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
 const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
@@ -121,6 +122,15 @@ fn default_music_resource() -> MusicResource {
     MusicResource { seqs: Vec::new() }
 }
 
+fn palette_identity_map(num_colors: usize) -> [i32; MAX_NUM_COLORS] {
+    let mut palette_map = [0; MAX_NUM_COLORS];
+    let limit = num_colors.min(MAX_NUM_COLORS);
+    for (index, value) in palette_map.iter_mut().take(limit).enumerate() {
+        *value = index as i32;
+    }
+    palette_map
+}
+
 #[derive(Debug)]
 struct RuntimeState {
     initialized: bool,
@@ -152,7 +162,7 @@ struct RuntimeState {
     clip_w: i32,
     clip_h: i32,
     num_colors: i32,
-    palette_map: [i32; 16],
+    palette_map: [i32; MAX_NUM_COLORS],
     pressed_keys: HashSet<i32>,
     pressed_key_frame: HashMap<i32, u64>,
     released_key_frame: HashMap<i32, u64>,
@@ -205,7 +215,7 @@ impl Default for RuntimeState {
             clip_w: 0,
             clip_h: 0,
             num_colors: DEFAULT_NUM_COLORS,
-            palette_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            palette_map: palette_identity_map(DEFAULT_NUM_COLORS as usize),
             pressed_keys: HashSet::new(),
             pressed_key_frame: HashMap::new(),
             released_key_frame: HashMap::new(),
@@ -295,6 +305,18 @@ fn next_random_u32(state: &mut RuntimeState) -> u32 {
 
 fn is_supported_num_colors(num_colors: i32) -> bool {
     matches!(num_colors, 16 | 64 | 256)
+}
+
+fn runtime_num_colors(num_colors: i32) -> usize {
+    if is_supported_num_colors(num_colors) {
+        num_colors as usize
+    } else {
+        DEFAULT_NUM_COLORS as usize
+    }
+}
+
+fn reset_palette_map(palette_map: &mut [i32; MAX_NUM_COLORS], num_colors: i32) {
+    *palette_map = palette_identity_map(runtime_num_colors(num_colors));
 }
 
 fn noise_fade(t: f64) -> f64 {
@@ -1247,6 +1269,7 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     let clip_h = state.clip_h;
     let frame_width = state.width;
     let frame_height = state.height;
+    let num_colors = runtime_num_colors(state.num_colors);
     let palette_map = state.palette_map;
     let frame_buffer = &mut state.frame_buffer;
 
@@ -1285,6 +1308,7 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
                 clip_w,
                 clip_h,
                 &palette_map,
+                num_colors,
                 dst_x,
                 dst_y,
                 color,
@@ -1347,6 +1371,7 @@ fn draw_bltm(
     let clip_h = state.clip_h;
     let frame_width = state.width;
     let frame_height = state.height;
+    let num_colors = runtime_num_colors(state.num_colors);
     let palette_map = state.palette_map;
     let frame_buffer = &mut state.frame_buffer;
 
@@ -1391,6 +1416,7 @@ fn draw_bltm(
                         clip_w,
                         clip_h,
                         &palette_map,
+                        num_colors,
                         dst_x,
                         dst_y,
                         color,
@@ -1404,9 +1430,9 @@ fn draw_bltm(
 }
 
 #[inline]
-fn map_palette_color(palette_map: &[i32; 16], col: i32) -> i32 {
+fn map_palette_color(palette_map: &[i32], num_colors: usize, col: i32) -> i32 {
     if let Ok(index) = usize::try_from(col) {
-        if index < palette_map.len() {
+        if index < num_colors {
             return palette_map[index];
         }
     }
@@ -1424,7 +1450,8 @@ fn set_frame_pixel_raw(
     clip_y: i32,
     clip_w: i32,
     clip_h: i32,
-    palette_map: &[i32; 16],
+    palette_map: &[i32],
+    num_colors: usize,
     x: i32,
     y: i32,
     col: i32,
@@ -1445,11 +1472,15 @@ fn set_frame_pixel_raw(
     if index >= frame_buffer.len() {
         return;
     }
-    frame_buffer[index] = map_palette_color(palette_map, col);
+    frame_buffer[index] = map_palette_color(palette_map, num_colors, col);
 }
 
 fn apply_palette(state: &RuntimeState, col: i32) -> i32 {
-    map_palette_color(&state.palette_map, col)
+    map_palette_color(
+        &state.palette_map,
+        runtime_num_colors(state.num_colors),
+        col,
+    )
 }
 
 fn set_frame_pixel(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
@@ -1798,6 +1829,8 @@ pub extern "C" fn flutterxel_core_set_num_colors(num_colors: i32) -> bool {
     }
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     state.num_colors = num_colors;
+    let runtime_num_colors = state.num_colors;
+    reset_palette_map(&mut state.palette_map, runtime_num_colors);
     true
 }
 
@@ -1862,7 +1895,8 @@ pub extern "C" fn flutterxel_core_init(
     if !is_supported_num_colors(state.num_colors) {
         state.num_colors = DEFAULT_NUM_COLORS;
     }
-    state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    let runtime_num_colors = state.num_colors;
+    reset_palette_map(&mut state.palette_map, runtime_num_colors);
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
@@ -1921,7 +1955,8 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.clip_w = 0;
     state.clip_h = 0;
     state.num_colors = DEFAULT_NUM_COLORS;
-    state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    let runtime_num_colors = state.num_colors;
+    reset_palette_map(&mut state.palette_map, runtime_num_colors);
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
@@ -2061,7 +2096,8 @@ pub extern "C" fn flutterxel_core_reset() -> bool {
     state.clip_w = 0;
     state.clip_h = 0;
     state.num_colors = DEFAULT_NUM_COLORS;
-    state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    let runtime_num_colors = state.num_colors;
+    reset_palette_map(&mut state.palette_map, runtime_num_colors);
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
     state.released_key_frame.clear();
@@ -2350,14 +2386,16 @@ pub extern "C" fn flutterxel_core_pal(col1: i32, col2: i32) -> bool {
 
     let opt_col1 = decode_optional_i32(col1);
     let opt_col2 = decode_optional_i32(col2);
+    let palette_len = runtime_num_colors(state.num_colors);
     match (opt_col1, opt_col2) {
         (None, None) => {
-            state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+            let runtime_num_colors = state.num_colors;
+            reset_palette_map(&mut state.palette_map, runtime_num_colors);
             true
         }
         (Some(src), None) => {
             if let Ok(index) = usize::try_from(src) {
-                if index < state.palette_map.len() {
+                if index < palette_len {
                     state.palette_map[index] = src;
                 }
             }
@@ -2365,7 +2403,7 @@ pub extern "C" fn flutterxel_core_pal(col1: i32, col2: i32) -> bool {
         }
         (Some(src), Some(dst)) => {
             if let Ok(index) = usize::try_from(src) {
-                if index < state.palette_map.len() {
+                if index < palette_len {
                     state.palette_map[index] = dst;
                 }
             }
@@ -3458,7 +3496,8 @@ pub extern "C" fn flutterxel_core_load_pal(filename: *const c_char) -> bool {
         return false;
     }
 
-    for (index, line) in text.lines().take(state.palette_map.len()).enumerate() {
+    let palette_len = runtime_num_colors(state.num_colors);
+    for (index, line) in text.lines().take(palette_len).enumerate() {
         if let Some(value) = parse_palette_line(line) {
             state.palette_map[index] = value;
         }
@@ -3476,18 +3515,18 @@ pub extern "C" fn flutterxel_core_save_pal(filename: *const c_char) -> bool {
         return false;
     };
 
-    let palette = {
+    let (palette, palette_len) = {
         let state = runtime_state().lock().expect("runtime state poisoned");
         if !state.initialized {
             return false;
         }
-        state.palette_map
+        (state.palette_map, runtime_num_colors(state.num_colors))
     };
 
     let Ok(mut file) = File::create(path) else {
         return false;
     };
-    for value in palette {
+    for value in palette.iter().take(palette_len) {
         if writeln!(file, "{value}").is_err() {
             return false;
         }
@@ -3559,6 +3598,7 @@ mod tests {
     }
 
     fn init_runtime(width: i32, height: i32) {
+        assert!(flutterxel_core_set_num_colors(DEFAULT_NUM_COLORS));
         let title = CString::new("test").expect("valid cstring");
         let ok = flutterxel_core_init(
             width,
@@ -3616,10 +3656,37 @@ mod tests {
 
     #[test]
     fn set_num_colors_accepts_16_64_256_only() {
+        let _guard = test_lock();
         assert!(flutterxel_core_set_num_colors(16));
+        assert_eq!(flutterxel_core_num_colors(), 16);
         assert!(flutterxel_core_set_num_colors(64));
+        assert_eq!(flutterxel_core_num_colors(), 64);
         assert!(flutterxel_core_set_num_colors(256));
+        assert_eq!(flutterxel_core_num_colors(), 256);
         assert!(!flutterxel_core_set_num_colors(32));
+        assert_eq!(flutterxel_core_num_colors(), 256);
+        assert!(flutterxel_core_set_num_colors(16));
+    }
+
+    #[test]
+    fn pal_supports_runtime_num_colors_indices() {
+        let _guard = test_lock();
+        init_runtime(8, 8);
+
+        assert!(flutterxel_core_set_num_colors(64));
+        assert!(flutterxel_core_pal(63, 5));
+        assert!(flutterxel_core_pset(0, 0, 63));
+        assert_eq!(flutterxel_core_pget(0, 0), 5);
+        assert!(flutterxel_core_pal(64, 7));
+        assert!(flutterxel_core_pset(1, 0, 64));
+        assert_eq!(flutterxel_core_pget(1, 0), 64);
+
+        assert!(flutterxel_core_set_num_colors(256));
+        assert!(flutterxel_core_pal(255, 12));
+        assert!(flutterxel_core_pset(0, 1, 255));
+        assert_eq!(flutterxel_core_pget(0, 1), 12);
+
+        assert!(flutterxel_core_set_num_colors(16));
     }
 
     #[test]
@@ -4453,6 +4520,35 @@ mod tests {
         assert_eq!(state.palette_map[1], 9);
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_pal_writes_runtime_num_colors_line_count() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+
+        assert!(flutterxel_core_set_num_colors(64));
+        assert!(flutterxel_core_pal(63, 31));
+        let path_64 = tmp_palette_path("palette_lines_64");
+        let c_path_64 = CString::new(path_64.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save_pal(c_path_64.as_ptr()));
+        let text_64 = fs::read_to_string(&path_64).expect("read 64 palette file");
+        assert_eq!(text_64.lines().count(), 64);
+        assert_eq!(text_64.lines().nth(63), Some("31"));
+        let _ = fs::remove_file(path_64);
+
+        assert!(flutterxel_core_set_num_colors(256));
+        assert!(flutterxel_core_pal(255, 127));
+        let path_256 = tmp_palette_path("palette_lines_256");
+        let c_path_256 =
+            CString::new(path_256.to_string_lossy().to_string()).expect("valid cstring");
+        assert!(flutterxel_core_save_pal(c_path_256.as_ptr()));
+        let text_256 = fs::read_to_string(&path_256).expect("read 256 palette file");
+        assert_eq!(text_256.lines().count(), 256);
+        assert_eq!(text_256.lines().nth(255), Some("127"));
+        let _ = fs::remove_file(path_256);
+
+        assert!(flutterxel_core_set_num_colors(16));
     }
 
     #[test]
