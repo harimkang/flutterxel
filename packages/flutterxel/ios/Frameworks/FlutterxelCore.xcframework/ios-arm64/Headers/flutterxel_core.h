@@ -38,6 +38,8 @@ FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_major(void);
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_minor(void);
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_patch(void);
 FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_backend_kind(void);
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_num_colors(int32_t num_colors);
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_num_colors(void);
 
 // pyxel.init(width, height, *, title=None, fps=None, quit_key=None,
 //            display_scale=None, capture_scale=None, capture_sec=None)
