@@ -12,6 +12,8 @@
 #define ABI_VERSION_MINOR 4
 #define ABI_VERSION_PATCH 0
 #define BACKEND_KIND_C_FALLBACK 2
+#define COLOR_MODE_INDEXED 0
+#define COLOR_MODE_TRUECOLOR 1
 #define DEFAULT_NUM_COLORS 16
 #define MAX_NUM_COLORS 256
 #define OPTIONAL_I32_NONE INT32_MIN
@@ -86,6 +88,10 @@ static bool is_valid_optional_bool(int8_t value) {
 
 static bool is_supported_num_colors(int32_t num_colors) {
   return num_colors == 16 || num_colors == 64 || num_colors == 256;
+}
+
+static bool is_supported_color_mode(int32_t color_mode) {
+  return color_mode == COLOR_MODE_INDEXED || color_mode == COLOR_MODE_TRUECOLOR;
 }
 
 static int32_t runtime_num_colors(void) {
@@ -380,6 +386,14 @@ FFI_PLUGIN_EXPORT int32_t flutterxel_core_num_colors(void) {
     return DEFAULT_NUM_COLORS;
   }
   return g_state.num_colors;
+}
+
+FFI_PLUGIN_EXPORT bool flutterxel_core_set_color_mode(int32_t color_mode) {
+  return is_supported_color_mode(color_mode);
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_color_mode(void) {
+  return COLOR_MODE_INDEXED;
 }
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_init(

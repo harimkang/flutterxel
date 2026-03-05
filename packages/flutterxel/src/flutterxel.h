@@ -32,6 +32,11 @@ typedef enum FlutterxelCoreBackendKind {
   FLUTTERXEL_CORE_BACKEND_DART_FALLBACK = 3,
 } FlutterxelCoreBackendKind;
 
+typedef enum FlutterxelCoreColorMode {
+  FLUTTERXEL_CORE_COLOR_MODE_INDEXED = 0,
+  FLUTTERXEL_CORE_COLOR_MODE_TRUECOLOR = 1,
+} FlutterxelCoreColorMode;
+
 typedef void (*FlutterxelCoreFrameCallback)(void* user_data);
 
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void);
@@ -40,6 +45,8 @@ FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_patch(void);
 FFI_PLUGIN_EXPORT int32_t flutterxel_core_backend_kind(void);
 FFI_PLUGIN_EXPORT bool flutterxel_core_set_num_colors(int32_t num_colors);
 FFI_PLUGIN_EXPORT int32_t flutterxel_core_num_colors(void);
+FFI_PLUGIN_EXPORT bool flutterxel_core_set_color_mode(int32_t color_mode);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_color_mode(void);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_init(
     int32_t width,

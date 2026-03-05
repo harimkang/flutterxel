@@ -12,6 +12,8 @@ const ABI_VERSION_MAJOR: u32 = 0;
 const ABI_VERSION_MINOR: u32 = 4;
 const ABI_VERSION_PATCH: u32 = 0;
 const BACKEND_KIND_NATIVE_CORE: i32 = 1;
+const COLOR_MODE_INDEXED: i32 = 0;
+const COLOR_MODE_TRUECOLOR: i32 = 1;
 const DEFAULT_NUM_COLORS: i32 = 16;
 const MAX_NUM_COLORS: usize = 256;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
@@ -1842,6 +1844,16 @@ pub extern "C" fn flutterxel_core_num_colors() -> i32 {
     } else {
         DEFAULT_NUM_COLORS
     }
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_set_color_mode(color_mode: i32) -> bool {
+    matches!(color_mode, COLOR_MODE_INDEXED | COLOR_MODE_TRUECOLOR)
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_color_mode() -> i32 {
+    COLOR_MODE_INDEXED
 }
 
 #[no_mangle]

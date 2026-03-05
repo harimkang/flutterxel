@@ -13,6 +13,8 @@ SYMBOLS=(
   flutterxel_core_backend_kind
   flutterxel_core_set_num_colors
   flutterxel_core_num_colors
+  flutterxel_core_set_color_mode
+  flutterxel_core_color_mode
   flutterxel_core_init
   flutterxel_core_quit
   flutterxel_core_run

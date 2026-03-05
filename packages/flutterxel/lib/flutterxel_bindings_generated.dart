@@ -92,6 +92,28 @@ class FlutterxelBindings {
   late final _flutterxel_core_num_colors = _flutterxel_core_num_colorsPtr
       .asFunction<int Function()>();
 
+  bool flutterxel_core_set_color_mode(int color_mode) {
+    return _flutterxel_core_set_color_mode(color_mode);
+  }
+
+  late final _flutterxel_core_set_color_modePtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_set_color_mode',
+      );
+  late final _flutterxel_core_set_color_mode =
+      _flutterxel_core_set_color_modePtr.asFunction<bool Function(int)>();
+
+  int flutterxel_core_color_mode() {
+    return _flutterxel_core_color_mode();
+  }
+
+  late final _flutterxel_core_color_modePtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function()>>(
+        'flutterxel_core_color_mode',
+      );
+  late final _flutterxel_core_color_mode = _flutterxel_core_color_modePtr
+      .asFunction<int Function()>();
+
   bool flutterxel_core_init(
     int width,
     int height,
@@ -1458,6 +1480,22 @@ enum FlutterxelCoreBackendKind {
     3 => FLUTTERXEL_CORE_BACKEND_DART_FALLBACK,
     _ => throw ArgumentError(
       "Unknown value for FlutterxelCoreBackendKind: $value",
+    ),
+  };
+}
+
+enum FlutterxelCoreColorMode {
+  FLUTTERXEL_CORE_COLOR_MODE_INDEXED(0),
+  FLUTTERXEL_CORE_COLOR_MODE_TRUECOLOR(1);
+
+  final int value;
+  const FlutterxelCoreColorMode(this.value);
+
+  static FlutterxelCoreColorMode fromValue(int value) => switch (value) {
+    0 => FLUTTERXEL_CORE_COLOR_MODE_INDEXED,
+    1 => FLUTTERXEL_CORE_COLOR_MODE_TRUECOLOR,
+    _ => throw ArgumentError(
+      "Unknown value for FlutterxelCoreColorMode: $value",
     ),
   };
 }
