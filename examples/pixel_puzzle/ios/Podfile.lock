@@ -1,6 +1,6 @@
 PODS:
   - Flutter (1.0.0)
-  - flutterxel (0.0.1):
+  - flutterxel (0.0.10):
     - Flutter
 
 DEPENDENCIES:
@@ -15,7 +15,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutterxel: b31429faa59449eb5484d873a37303cc5b98334c
+  flutterxel: 6156969b300d6e43a334712304fffd5d829d7a07
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 
