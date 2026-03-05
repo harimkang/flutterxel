@@ -587,6 +587,43 @@ void main() {
     expect(flutterxel.pget(0, 0), flutterxel.COLOR_NAVY);
   });
 
+  test('resource tilemap pset is reflected by native bltm source', () {
+    flutterxel.init(16, 16);
+    if (!nativeBindingsAvailable()) {
+      return;
+    }
+
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].pset(0, 0, 2);
+    flutterxel.images[0].pset(8, 8, 11);
+
+    final tm0 = flutterxel.tilemaps[0];
+    tm0.cls((0, 0));
+    tm0.pset(0, 0, (1, 1));
+
+    flutterxel.bltm(0, 0, tm0, 0, 0, 1, 1);
+    expect(flutterxel.pget(0, 0), 11);
+  });
+
+  test('resource tilemap cls is reflected by native bltm source', () {
+    flutterxel.init(16, 16);
+    if (!nativeBindingsAvailable()) {
+      return;
+    }
+
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].pset(0, 0, 3);
+    flutterxel.images[0].pset(8, 8, 12);
+
+    final tm0 = flutterxel.tilemaps[0];
+    tm0.cls((1, 1));
+
+    flutterxel.bltm(0, 0, tm0, 0, 0, 1, 1);
+    expect(flutterxel.pget(0, 0), 12);
+  });
+
   test('audio resources expose Tone/Sound/Music-style API', () {
     flutterxel.init(8, 8);
 
