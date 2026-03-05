@@ -4275,8 +4275,9 @@ class Image {
 }
 
 class Tilemap {
-  Tilemap(this.width, this.height, this.imgsrc)
-    : _tilemapId = null,
+  Tilemap(this.width, this.height, Object imgsrc)
+    : _imgsrc = imgsrc,
+      _tilemapId = null,
       _detachedData = List<int>.filled(width * height * 2, 0, growable: false),
       _clipX = 0,
       _clipY = 0,
@@ -4290,7 +4291,7 @@ class Tilemap {
   Tilemap._resource(int tilemapId)
     : width = TILEMAP_SIZE,
       height = TILEMAP_SIZE,
-      imgsrc = 0,
+      _imgsrc = 0,
       _tilemapId = tilemapId,
       _detachedData = null,
       _clipX = 0,
@@ -4304,7 +4305,7 @@ class Tilemap {
 
   final int width;
   final int height;
-  Object imgsrc;
+  Object _imgsrc;
   final int? _tilemapId;
   final List<int>? _detachedData;
   int _clipX;
@@ -4317,6 +4318,29 @@ class Tilemap {
   int _dataPtrCacheLength;
 
   int? _resourceTilemapId() => _tilemapId;
+  Object get imgsrc => _imgsrc;
+  set imgsrc(Object value) {
+    _imgsrc = value;
+    final tilemapId = _tilemapId;
+    if (tilemapId == null) {
+      return;
+    }
+    if (value is! int) {
+      throw ArgumentError.value(
+        value,
+        'imgsrc',
+        'resource tilemap imgsrc must be an int image bank id.',
+      );
+    }
+    _fallbackEnsureTilemap(tilemapId).imgsrc = value;
+    final bindings = _getBindingsOrNull();
+    if (bindings != null) {
+      final ok = bindings.flutterxel_core_tilemap_set_imgsrc(tilemapId, value);
+      if (!ok) {
+        throw StateError('flutterxel_core_tilemap_set_imgsrc failed.');
+      }
+    }
+  }
 
   static Tilemap from_tmx(String filename, int layer) {
     return fromTmx(filename, layer);
@@ -4479,7 +4503,28 @@ class Tilemap {
 
   (int, int) _readTileRaw(int x, int y) {
     if (_tilemapId != null) {
-      return _fallbackGetTile(_tilemapId, x, y);
+      final tilemapId = _tilemapId;
+      final bindings = _getBindingsOrNull();
+      if (bindings != null) {
+        final tileXOut = calloc<ffi.Int32>();
+        final tileYOut = calloc<ffi.Int32>();
+        try {
+          final ok = bindings.flutterxel_core_tilemap_pget(
+            tilemapId,
+            x,
+            y,
+            tileXOut,
+            tileYOut,
+          );
+          if (ok) {
+            return (tileXOut.value, tileYOut.value);
+          }
+        } finally {
+          calloc.free(tileXOut);
+          calloc.free(tileYOut);
+        }
+      }
+      return _fallbackGetTile(tilemapId, x, y);
     }
     final data = _detachedData;
     if (data == null || x < 0 || y < 0 || x >= width || y >= height) {
@@ -4494,7 +4539,21 @@ class Tilemap {
 
   void _writeTileRaw(int x, int y, (int, int) tile) {
     if (_tilemapId != null) {
-      _fallbackSetTile(_tilemapId, x, y, tile.$1, tile.$2);
+      final tilemapId = _tilemapId;
+      _fallbackSetTile(tilemapId, x, y, tile.$1, tile.$2);
+      final bindings = _getBindingsOrNull();
+      if (bindings != null) {
+        final ok = bindings.flutterxel_core_tilemap_pset(
+          tilemapId,
+          x,
+          y,
+          tile.$1,
+          tile.$2,
+        );
+        if (!ok) {
+          throw StateError('flutterxel_core_tilemap_pset failed.');
+        }
+      }
       return;
     }
     final data = _detachedData;
@@ -4511,10 +4570,22 @@ class Tilemap {
 
   void cls((int, int) tile) {
     if (_tilemapId != null) {
-      final tilemap = _fallbackEnsureTilemap(_tilemapId);
+      final tilemapId = _tilemapId;
+      final tilemap = _fallbackEnsureTilemap(tilemapId);
       for (var y = 0; y < tilemap.height; y++) {
         for (var x = 0; x < tilemap.width; x++) {
-          _fallbackSetTile(_tilemapId, x, y, tile.$1, tile.$2);
+          _fallbackSetTile(tilemapId, x, y, tile.$1, tile.$2);
+        }
+      }
+      final bindings = _getBindingsOrNull();
+      if (bindings != null) {
+        final ok = bindings.flutterxel_core_tilemap_cls(
+          tilemapId,
+          tile.$1,
+          tile.$2,
+        );
+        if (!ok) {
+          throw StateError('flutterxel_core_tilemap_cls failed.');
         }
       }
       return;

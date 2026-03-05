@@ -783,6 +783,87 @@ class FlutterxelBindings {
   late final _flutterxel_core_image_cls = _flutterxel_core_image_clsPtr
       .asFunction<bool Function(int, int)>();
 
+  bool flutterxel_core_tilemap_pset(
+    int tm,
+    int x,
+    int y,
+    int tile_x,
+    int tile_y,
+  ) {
+    return _flutterxel_core_tilemap_pset(tm, x, y, tile_x, tile_y);
+  }
+
+  late final _flutterxel_core_tilemap_psetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+          )
+        >
+      >('flutterxel_core_tilemap_pset');
+  late final _flutterxel_core_tilemap_pset = _flutterxel_core_tilemap_psetPtr
+      .asFunction<bool Function(int, int, int, int, int)>();
+
+  bool flutterxel_core_tilemap_pget(
+    int tm,
+    int x,
+    int y,
+    ffi.Pointer<ffi.Int32> tile_x_out,
+    ffi.Pointer<ffi.Int32> tile_y_out,
+  ) {
+    return _flutterxel_core_tilemap_pget(tm, x, y, tile_x_out, tile_y_out);
+  }
+
+  late final _flutterxel_core_tilemap_pgetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.Int32>,
+            ffi.Pointer<ffi.Int32>,
+          )
+        >
+      >('flutterxel_core_tilemap_pget');
+  late final _flutterxel_core_tilemap_pget = _flutterxel_core_tilemap_pgetPtr
+      .asFunction<
+        bool Function(
+          int,
+          int,
+          int,
+          ffi.Pointer<ffi.Int32>,
+          ffi.Pointer<ffi.Int32>,
+        )
+      >();
+
+  bool flutterxel_core_tilemap_cls(int tm, int tile_x, int tile_y) {
+    return _flutterxel_core_tilemap_cls(tm, tile_x, tile_y);
+  }
+
+  late final _flutterxel_core_tilemap_clsPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32, ffi.Int32)>
+      >('flutterxel_core_tilemap_cls');
+  late final _flutterxel_core_tilemap_cls = _flutterxel_core_tilemap_clsPtr
+      .asFunction<bool Function(int, int, int)>();
+
+  bool flutterxel_core_tilemap_set_imgsrc(int tm, int imgsrc) {
+    return _flutterxel_core_tilemap_set_imgsrc(tm, imgsrc);
+  }
+
+  late final _flutterxel_core_tilemap_set_imgsrcPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32, ffi.Int32)>>(
+        'flutterxel_core_tilemap_set_imgsrc',
+      );
+  late final _flutterxel_core_tilemap_set_imgsrc =
+      _flutterxel_core_tilemap_set_imgsrcPtr
+          .asFunction<bool Function(int, int)>();
+
   bool flutterxel_core_sound_set_notes(
     int snd,
     ffi.Pointer<ffi.Int32> notes_ptr,

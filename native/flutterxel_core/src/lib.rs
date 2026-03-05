@@ -447,15 +447,48 @@ fn ensure_default_tilemap(state: &mut RuntimeState) {
         return;
     }
 
-    state.tilemaps.insert(
-        0,
-        TilemapResource {
-            width: 1,
-            height: 1,
-            imgsrc: 0,
-            data: vec![(0, 0)],
-        },
-    );
+    state.tilemaps.insert(0, default_tilemap_resource());
+}
+
+fn default_tilemap_resource() -> TilemapResource {
+    TilemapResource {
+        width: 1,
+        height: 1,
+        imgsrc: 0,
+        data: vec![(0, 0)],
+    }
+}
+
+fn ensure_tilemap_mut(state: &mut RuntimeState, tm: i32) -> Option<&mut TilemapResource> {
+    if tm < 0 {
+        return None;
+    }
+    Some(
+        state
+            .tilemaps
+            .entry(tm)
+            .or_insert_with(default_tilemap_resource),
+    )
+}
+
+fn normalize_tilemap_cells(tilemap: &mut TilemapResource) -> Option<(usize, usize)> {
+    let width = usize::try_from(tilemap.width).ok()?;
+    let height = usize::try_from(tilemap.height).ok()?;
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let cell_count = width.checked_mul(height)?;
+    if tilemap.data.is_empty() {
+        tilemap.data.push((0, 0));
+    }
+    let fill = *tilemap.data.last().unwrap_or(&(0, 0));
+    if tilemap.data.len() < cell_count {
+        tilemap.data.resize(cell_count, fill);
+    }
+    if tilemap.data.len() > cell_count {
+        tilemap.data.truncate(cell_count);
+    }
+    Some((width, height))
 }
 
 fn parse_i32_value(value: &toml::Value) -> Option<i32> {
@@ -1729,6 +1762,7 @@ pub extern "C" fn flutterxel_core_init(
     };
     state.frame_buffer = vec![0; frame_buffer_len];
     state.image_banks.clear();
+    state.image_bank_size = DEFAULT_IMAGE_BANK_SIZE;
     state.tilemaps.clear();
     state.sounds.clear();
     state.musics.clear();
@@ -2288,6 +2322,103 @@ pub extern "C" fn flutterxel_core_image_cls(img: i32, col: i32) -> bool {
         return false;
     };
     bank.fill(col);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_tilemap_pset(
+    tm: i32,
+    x: i32,
+    y: i32,
+    tile_x: i32,
+    tile_y: i32,
+) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let Some(tilemap) = ensure_tilemap_mut(&mut state, tm) else {
+        return false;
+    };
+    let Some((width, height)) = normalize_tilemap_cells(tilemap) else {
+        return false;
+    };
+    if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+        return true;
+    }
+    let index = y as usize * width + x as usize;
+    if index < tilemap.data.len() {
+        tilemap.data[index] = (tile_x, tile_y);
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_tilemap_pget(
+    tm: i32,
+    x: i32,
+    y: i32,
+    tile_x_out: *mut i32,
+    tile_y_out: *mut i32,
+) -> bool {
+    if tile_x_out.is_null() || tile_y_out.is_null() {
+        return false;
+    }
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+
+    let value = state
+        .tilemaps
+        .get(&tm)
+        .and_then(|tilemap| {
+            let width = usize::try_from(tilemap.width).ok()?;
+            let height = usize::try_from(tilemap.height).ok()?;
+            if width == 0 || height == 0 {
+                return None;
+            }
+            if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+                return None;
+            }
+            let index = y as usize * width + x as usize;
+            tilemap.data.get(index).copied()
+        })
+        .unwrap_or((0, 0));
+
+    unsafe {
+        *tile_x_out = value.0;
+        *tile_y_out = value.1;
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_tilemap_cls(tm: i32, tile_x: i32, tile_y: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let Some(tilemap) = ensure_tilemap_mut(&mut state, tm) else {
+        return false;
+    };
+    if normalize_tilemap_cells(tilemap).is_none() {
+        return false;
+    }
+    tilemap.data.fill((tile_x, tile_y));
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_tilemap_set_imgsrc(tm: i32, imgsrc: i32) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let Some(tilemap) = ensure_tilemap_mut(&mut state, tm) else {
+        return false;
+    };
+    tilemap.imgsrc = imgsrc;
     true
 }
 
@@ -3591,6 +3722,59 @@ mod tests {
         let mut out = -1;
         assert!(flutterxel_core_image_pget(0, 1, 1, &mut out));
         assert_eq!(out, 9);
+    }
+
+    #[test]
+    fn tilemap_resource_pset_abi_updates_bltm_source_tile() {
+        let _guard = test_lock();
+        init_runtime(16, 16);
+
+        assert!(flutterxel_core_image_cls(0, 0));
+        assert!(flutterxel_core_image_pset(0, 0, 0, 2));
+        assert!(flutterxel_core_image_pset(0, 8, 8, 11));
+
+        assert!(flutterxel_core_tilemap_set_imgsrc(0, 0));
+        assert!(flutterxel_core_tilemap_cls(0, 0, 0));
+        assert!(flutterxel_core_tilemap_pset(0, 0, 0, 1, 1));
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_bltm(
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE
+        ));
+        assert_eq!(flutterxel_core_pget(0, 0), 11);
+    }
+
+    #[test]
+    fn tilemap_resource_cls_abi_updates_bltm_source_tile() {
+        let _guard = test_lock();
+        init_runtime(16, 16);
+
+        assert!(flutterxel_core_image_cls(0, 0));
+        assert!(flutterxel_core_image_pset(0, 0, 0, 3));
+        assert!(flutterxel_core_image_pset(0, 8, 8, 12));
+
+        assert!(flutterxel_core_tilemap_set_imgsrc(0, 0));
+        assert!(flutterxel_core_tilemap_cls(0, 1, 1));
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_bltm(
+            0.0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE
+        ));
+        assert_eq!(flutterxel_core_pget(0, 0), 12);
     }
 
     #[test]

@@ -54,6 +54,10 @@ SYMBOLS=(
   flutterxel_core_image_pset
   flutterxel_core_image_pget
   flutterxel_core_image_cls
+  flutterxel_core_tilemap_pset
+  flutterxel_core_tilemap_pget
+  flutterxel_core_tilemap_cls
+  flutterxel_core_tilemap_set_imgsrc
   flutterxel_core_sound_set_notes
   flutterxel_core_sound_set_tones
   flutterxel_core_sound_set_volumes

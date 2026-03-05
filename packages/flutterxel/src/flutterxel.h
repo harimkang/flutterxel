@@ -177,6 +177,21 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_image_pget(int32_t img,
                                                    int32_t y,
                                                    int32_t* col_out);
 FFI_PLUGIN_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_tilemap_pset(int32_t tm,
+                                                     int32_t x,
+                                                     int32_t y,
+                                                     int32_t tile_x,
+                                                     int32_t tile_y);
+FFI_PLUGIN_EXPORT bool flutterxel_core_tilemap_pget(int32_t tm,
+                                                     int32_t x,
+                                                     int32_t y,
+                                                     int32_t* tile_x_out,
+                                                     int32_t* tile_y_out);
+FFI_PLUGIN_EXPORT bool flutterxel_core_tilemap_cls(int32_t tm,
+                                                    int32_t tile_x,
+                                                    int32_t tile_y);
+FFI_PLUGIN_EXPORT bool flutterxel_core_tilemap_set_imgsrc(int32_t tm,
+                                                           int32_t imgsrc);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_sound_set_notes(
     int32_t snd,
