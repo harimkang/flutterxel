@@ -177,6 +177,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_image_pget(int32_t img,
                                                    int32_t y,
                                                    int32_t* col_out);
 FFI_PLUGIN_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col);
+FFI_PLUGIN_EXPORT bool flutterxel_core_image_replace(int32_t img,
+                                                      const int32_t* data,
+                                                      size_t len);
 FFI_PLUGIN_EXPORT bool flutterxel_core_tilemap_pset(int32_t tm,
                                                      int32_t x,
                                                      int32_t y,

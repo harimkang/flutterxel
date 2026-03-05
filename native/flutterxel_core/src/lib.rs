@@ -2395,6 +2395,29 @@ pub extern "C" fn flutterxel_core_image_cls(img: i32, col: i32) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_image_replace(img: i32, data: *const i32, len: usize) -> bool {
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    let Some(bank) = ensure_image_bank_mut(&mut state, img) else {
+        return false;
+    };
+    if len != bank.len() {
+        return false;
+    }
+    if len == 0 {
+        return true;
+    }
+    if data.is_null() {
+        return false;
+    }
+    let incoming = unsafe { std::slice::from_raw_parts(data, len) };
+    bank.copy_from_slice(incoming);
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_tilemap_pset(
     tm: i32,
     x: i32,
@@ -3864,6 +3887,36 @@ mod tests {
         let mut out = -1;
         assert!(flutterxel_core_image_pget(0, 1, 1, &mut out));
         assert_eq!(out, 9);
+    }
+
+    #[test]
+    fn image_replace_bulk_abi_updates_blt_source_bank() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        let side = DEFAULT_IMAGE_BANK_SIZE as usize;
+        let mut payload = vec![0; side * side];
+        payload[1 + side] = 7;
+
+        assert!(flutterxel_core_image_replace(
+            0,
+            payload.as_ptr(),
+            payload.len()
+        ));
+
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            0.0,
+            0.0,
+            0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE,
+            f64::NAN,
+            f64::NAN
+        ));
+        assert_eq!(flutterxel_core_pget(0, 0), 7);
     }
 
     #[test]

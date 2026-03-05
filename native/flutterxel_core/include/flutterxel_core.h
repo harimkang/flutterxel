@@ -227,6 +227,10 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_pget(int32_t img,
                                                         int32_t* col_out);
 // pyxel.images[img].cls(col)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_cls(int32_t img, int32_t col);
+// pyxel.images[img].set(...) bulk sync bridge
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_image_replace(int32_t img,
+                                                           const int32_t* data,
+                                                           size_t len);
 
 // pyxel.tilemaps[tm].pset(x, y, (tile_x, tile_y))
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_tilemap_pset(int32_t tm,

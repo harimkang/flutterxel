@@ -3550,13 +3550,53 @@ class Image {
         y < _clipY + _clipH;
   }
 
-  void _setLocalPixel(int x, int y, int col) {
+  void _flushResourceImageToCore() {
+    final imageId = _imageId;
+    if (imageId == null) {
+      return;
+    }
+    final bindings = _getBindingsOrNull();
+    if (bindings == null) {
+      return;
+    }
+    final bank = _fallbackEnsureImageBank(imageId);
+    ffi.Pointer<ffi.Int32> ptr = ffi.nullptr;
+    try {
+      if (bank.isNotEmpty) {
+        ptr = calloc<ffi.Int32>(bank.length);
+        for (var i = 0; i < bank.length; i++) {
+          ptr[i] = bank[i];
+        }
+      }
+      final ok = bindings.flutterxel_core_image_replace(
+        imageId,
+        ptr,
+        bank.length,
+      );
+      if (!ok) {
+        throw StateError('flutterxel_core_image_replace failed.');
+      }
+    } finally {
+      if (ptr != ffi.nullptr) {
+        calloc.free(ptr);
+      }
+    }
+  }
+
+  void _setLocalPixelInternal(
+    int x,
+    int y,
+    int col, {
+    required bool syncNative,
+  }) {
     if (_imageId != null) {
       final imageId = _imageId;
       _fallbackSetImagePixel(imageId, x, y, col);
-      final bindings = _getBindingsOrNull();
-      if (bindings != null) {
-        bindings.flutterxel_core_image_pset(imageId, x, y, col);
+      if (syncNative) {
+        final bindings = _getBindingsOrNull();
+        if (bindings != null) {
+          bindings.flutterxel_core_image_pset(imageId, x, y, col);
+        }
       }
       return;
     }
@@ -3569,6 +3609,9 @@ class Image {
     }
     pixels[y * _width + x] = col;
   }
+
+  void _setLocalPixel(int x, int y, int col) =>
+      _setLocalPixelInternal(x, y, col, syncNative: true);
 
   int _getLocalPixel(int x, int y) {
     if (_imageId != null) {
@@ -3598,15 +3641,20 @@ class Image {
   }
 
   void set(int x, int y, List<String> data) {
+    var didMutate = false;
     for (var row = 0; row < data.length; row++) {
       final line = data[row];
       for (var col = 0; col < line.length; col++) {
         final ch = line[col];
         final parsed = int.tryParse(ch, radix: 16);
         if (parsed != null) {
-          _setLocalPixel(x + col, y + row, parsed);
+          _setLocalPixelInternal(x + col, y + row, parsed, syncNative: false);
+          didMutate = true;
         }
       }
+    }
+    if (didMutate) {
+      _flushResourceImageToCore();
     }
   }
 
@@ -3628,7 +3676,12 @@ class Image {
         if (preserveTransparent &&
             transparentIndex != null &&
             alpha <= alphaThreshold) {
-          _setLocalPixel(dstX + x, dstY + y, transparentIndex);
+          _setLocalPixelInternal(
+            dstX + x,
+            dstY + y,
+            transparentIndex,
+            syncNative: false,
+          );
           continue;
         }
         final rgb24 =
@@ -3647,9 +3700,10 @@ class Image {
           return _nearestPaletteIndexFromRgb24(rgb24, discoveredPalette);
         });
 
-        _setLocalPixel(dstX + x, dstY + y, mapped);
+        _setLocalPixelInternal(dstX + x, dstY + y, mapped, syncNative: false);
       }
     }
+    _flushResourceImageToCore();
   }
 
   void load(

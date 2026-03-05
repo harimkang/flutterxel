@@ -783,6 +783,23 @@ class FlutterxelBindings {
   late final _flutterxel_core_image_cls = _flutterxel_core_image_clsPtr
       .asFunction<bool Function(int, int)>();
 
+  bool flutterxel_core_image_replace(
+    int img,
+    ffi.Pointer<ffi.Int32> data,
+    int len,
+  ) {
+    return _flutterxel_core_image_replace(img, data, len);
+  }
+
+  late final _flutterxel_core_image_replacePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Bool Function(ffi.Int32, ffi.Pointer<ffi.Int32>, ffi.Size)
+        >
+      >('flutterxel_core_image_replace');
+  late final _flutterxel_core_image_replace = _flutterxel_core_image_replacePtr
+      .asFunction<bool Function(int, ffi.Pointer<ffi.Int32>, int)>();
+
   bool flutterxel_core_tilemap_pset(
     int tm,
     int x,

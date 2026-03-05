@@ -587,6 +587,20 @@ void main() {
     expect(flutterxel.pget(0, 0), flutterxel.COLOR_NAVY);
   });
 
+  test('resource image set is reflected by native blt source', () {
+    flutterxel.init(8, 8);
+    if (!nativeBindingsAvailable()) {
+      return;
+    }
+
+    flutterxel.cls(0);
+    flutterxel.images[0].cls(0);
+    flutterxel.images[0].set(0, 0, const <String>['a']);
+
+    flutterxel.blt(0, 0, 0, 0, 0, 1, 1);
+    expect(flutterxel.pget(0, 0), 10);
+  });
+
   test('resource tilemap pset is reflected by native bltm source', () {
     flutterxel.init(16, 16);
     if (!nativeBindingsAvailable()) {

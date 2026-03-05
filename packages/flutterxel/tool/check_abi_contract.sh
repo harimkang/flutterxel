@@ -54,6 +54,7 @@ SYMBOLS=(
   flutterxel_core_image_pset
   flutterxel_core_image_pget
   flutterxel_core_image_cls
+  flutterxel_core_image_replace
   flutterxel_core_tilemap_pset
   flutterxel_core_tilemap_pget
   flutterxel_core_tilemap_cls
