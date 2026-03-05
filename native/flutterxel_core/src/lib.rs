@@ -3583,6 +3583,14 @@ mod tests {
     }
 
     #[test]
+    fn set_num_colors_accepts_16_64_256_only() {
+        assert!(flutterxel_core_set_num_colors(16));
+        assert!(flutterxel_core_set_num_colors(64));
+        assert!(flutterxel_core_set_num_colors(256));
+        assert!(!flutterxel_core_set_num_colors(32));
+    }
+
+    #[test]
     fn cls_fills_entire_framebuffer_with_color_index() {
         let _guard = test_lock();
         init_runtime(4, 4);

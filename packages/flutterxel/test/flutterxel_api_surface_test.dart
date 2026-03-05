@@ -413,6 +413,14 @@ void main() {
     expect(flutterxel.dropped_files, isA<List<String>>());
   });
 
+  test('init accepts num_colors=64/256 and rejects unsupported values', () {
+    expect(() => flutterxel.init(16, 16, num_colors: 64), returnsNormally);
+    flutterxel.quit();
+    expect(() => flutterxel.init(16, 16, num_colors: 256), returnsNormally);
+    flutterxel.quit();
+    expect(() => flutterxel.init(16, 16, num_colors: 32), throwsArgumentError);
+  });
+
   test(
     'accepts Pyxel-compatible named options for init/load/save/play/playm/blt',
     () {
