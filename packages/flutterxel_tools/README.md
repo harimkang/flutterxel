@@ -17,8 +17,8 @@ The CLI command surface is scaffolded with placeholder handlers.
 dart run flutterxel_tools:flutterxel_tools --help
 dart run flutterxel_tools:flutterxel_tools run
 dart run flutterxel_tools:flutterxel_tools build-native
-dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.10
-dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.10
+dart run flutterxel_tools:flutterxel_tools release-check --tag v0.0.11
+dart run flutterxel_tools:flutterxel_tools release-bump --version 0.0.11
 dart run flutterxel_tools:flutterxel_tools pixel-snap --input assets/raw/hero.png --output assets/pixel/hero.png
 ```
 
@@ -42,7 +42,7 @@ For tagged releases (`v*`), `.github/workflows/native_artifacts.yml` builds the 
 Version/tag validation helper:
 
 ```bash
-bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.10
+bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.11
 ```
 
 `release-check` CLI wrapper runs the same script.
@@ -50,7 +50,7 @@ bash packages/flutterxel_tools/tool/check_release_versions.sh --tag v0.0.10
 Pre-tag version bump helper:
 
 ```bash
-bash packages/flutterxel_tools/tool/bump_release_versions.sh --version 0.0.10
+bash packages/flutterxel_tools/tool/bump_release_versions.sh --version 0.0.11
 ```
 
 `release-bump` CLI wrapper runs the same script.

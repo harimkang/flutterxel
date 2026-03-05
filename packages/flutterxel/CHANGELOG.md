@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.0.11
+
 - Added runtime `num_colors` configuration support in `init(...)` with snake/camel aliases:
   - `num_colors`
   - `numColors`
@@ -18,6 +20,7 @@
   - discovered-palette import limits based on runtime color count
   - `FlutterxelView` runtime 64/256 default palette selection path
 - Refreshed bundled Android/iOS native artifacts for the expanded ABI.
+- Updated package release metadata to `0.0.11`.
 
 ## 0.0.10
 

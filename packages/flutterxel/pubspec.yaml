@@ -1,6 +1,6 @@
 name: flutterxel
 description: "Flutter runtime plugin for a Pyxel-compatible engine backed by Rust FFI."
-version: 0.0.10
+version: 0.0.11
 homepage: https://github.com/harimkang/flutterxel
 
 environment:

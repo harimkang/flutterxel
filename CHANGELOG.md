@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 0.0.11
+
 - Added runtime `num_colors` expansion (`16/64/256`) end-to-end across Rust core, C fallback, Dart API, and Flutter view rendering.
 - Added ABI symbols for runtime palette count control:
   - `flutterxel_core_set_num_colors`
@@ -15,6 +17,7 @@
 - Updated `FlutterxelView` default palette strategy for runtime `64/256` color modes.
 - Rebuilt and refreshed bundled Android/iOS native artifacts for the ABI expansion.
 - Added regression tests for runtime `num_colors` API contract and rendering/palette compatibility paths.
+- Updated release metadata to align workspace/package versions with `flutterxel` `0.0.11`.
 
 ## 0.0.10
 
