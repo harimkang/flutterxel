@@ -12,6 +12,7 @@ const ABI_VERSION_MAJOR: u32 = 0;
 const ABI_VERSION_MINOR: u32 = 4;
 const ABI_VERSION_PATCH: u32 = 0;
 const BACKEND_KIND_NATIVE_CORE: i32 = 1;
+const DEFAULT_NUM_COLORS: i32 = 16;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
 const RESOURCE_ARCHIVE_NAME: &str = "pyxel_resource.toml";
 const RESOURCE_FORMAT_VERSION: u32 = 4;
@@ -150,6 +151,7 @@ struct RuntimeState {
     clip_y: i32,
     clip_w: i32,
     clip_h: i32,
+    num_colors: i32,
     palette_map: [i32; 16],
     pressed_keys: HashSet<i32>,
     pressed_key_frame: HashMap<i32, u64>,
@@ -202,6 +204,7 @@ impl Default for RuntimeState {
             clip_y: 0,
             clip_w: 0,
             clip_h: 0,
+            num_colors: DEFAULT_NUM_COLORS,
             palette_map: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             pressed_keys: HashSet::new(),
             pressed_key_frame: HashMap::new(),
@@ -288,6 +291,10 @@ fn next_random_u32(state: &mut RuntimeState) -> u32 {
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1);
     (state.rng_state >> 32) as u32
+}
+
+fn is_supported_num_colors(num_colors: i32) -> bool {
+    matches!(num_colors, 16 | 64 | 256)
 }
 
 fn noise_fade(t: f64) -> f64 {
@@ -1785,6 +1792,26 @@ pub extern "C" fn flutterxel_core_backend_kind() -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_set_num_colors(num_colors: i32) -> bool {
+    if !is_supported_num_colors(num_colors) {
+        return false;
+    }
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    state.num_colors = num_colors;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn flutterxel_core_num_colors() -> i32 {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if is_supported_num_colors(state.num_colors) {
+        state.num_colors
+    } else {
+        DEFAULT_NUM_COLORS
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_init(
     width: i32,
     height: i32,
@@ -1832,6 +1859,9 @@ pub extern "C" fn flutterxel_core_init(
     state.clip_y = 0;
     state.clip_w = width;
     state.clip_h = height;
+    if !is_supported_num_colors(state.num_colors) {
+        state.num_colors = DEFAULT_NUM_COLORS;
+    }
     state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
@@ -1890,6 +1920,7 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.clip_y = 0;
     state.clip_w = 0;
     state.clip_h = 0;
+    state.num_colors = DEFAULT_NUM_COLORS;
     state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();
@@ -2029,6 +2060,7 @@ pub extern "C" fn flutterxel_core_reset() -> bool {
     state.clip_y = 0;
     state.clip_w = 0;
     state.clip_h = 0;
+    state.num_colors = DEFAULT_NUM_COLORS;
     state.palette_map = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     state.pressed_keys.clear();
     state.pressed_key_frame.clear();

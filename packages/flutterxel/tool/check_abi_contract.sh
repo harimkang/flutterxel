@@ -11,6 +11,8 @@ SYMBOLS=(
   flutterxel_core_version_minor
   flutterxel_core_version_patch
   flutterxel_core_backend_kind
+  flutterxel_core_set_num_colors
+  flutterxel_core_num_colors
   flutterxel_core_init
   flutterxel_core_quit
   flutterxel_core_run

@@ -70,6 +70,28 @@ class FlutterxelBindings {
   late final _flutterxel_core_backend_kind = _flutterxel_core_backend_kindPtr
       .asFunction<int Function()>();
 
+  bool flutterxel_core_set_num_colors(int num_colors) {
+    return _flutterxel_core_set_num_colors(num_colors);
+  }
+
+  late final _flutterxel_core_set_num_colorsPtr =
+      _lookup<ffi.NativeFunction<ffi.Bool Function(ffi.Int32)>>(
+        'flutterxel_core_set_num_colors',
+      );
+  late final _flutterxel_core_set_num_colors =
+      _flutterxel_core_set_num_colorsPtr.asFunction<bool Function(int)>();
+
+  int flutterxel_core_num_colors() {
+    return _flutterxel_core_num_colors();
+  }
+
+  late final _flutterxel_core_num_colorsPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function()>>(
+        'flutterxel_core_num_colors',
+      );
+  late final _flutterxel_core_num_colors = _flutterxel_core_num_colorsPtr
+      .asFunction<int Function()>();
+
   bool flutterxel_core_init(
     int width,
     int height,

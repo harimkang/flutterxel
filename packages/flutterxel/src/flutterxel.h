@@ -38,6 +38,8 @@ FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_major(void);
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_minor(void);
 FFI_PLUGIN_EXPORT uint32_t flutterxel_core_version_patch(void);
 FFI_PLUGIN_EXPORT int32_t flutterxel_core_backend_kind(void);
+FFI_PLUGIN_EXPORT bool flutterxel_core_set_num_colors(int32_t num_colors);
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_num_colors(void);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_init(
     int32_t width,

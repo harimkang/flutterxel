@@ -12,6 +12,7 @@
 #define ABI_VERSION_MINOR 4
 #define ABI_VERSION_PATCH 0
 #define BACKEND_KIND_C_FALLBACK 2
+#define DEFAULT_NUM_COLORS 16
 #define OPTIONAL_I32_NONE INT32_MIN
 #define RESOURCE_MAGIC "FLUTTERXEL_RES_V1"
 #define PRESSED_KEY_CAPACITY 1024
@@ -51,6 +52,7 @@ typedef struct FlutterxelState {
   int32_t clip_y;
   int32_t clip_w;
   int32_t clip_h;
+  int32_t num_colors;
   int32_t palette_map[16];
   int32_t* frame_buffer;
   size_t frame_buffer_len;
@@ -79,6 +81,10 @@ static FlutterxelState g_state = {0};
 
 static bool is_valid_optional_bool(int8_t value) {
   return value == -1 || value == 0 || value == 1;
+}
+
+static bool is_supported_num_colors(int32_t num_colors) {
+  return num_colors == 16 || num_colors == 64 || num_colors == 256;
 }
 
 static void seed_default_image_bank(void) {
@@ -348,6 +354,21 @@ FFI_PLUGIN_EXPORT int32_t flutterxel_core_backend_kind(void) {
   return BACKEND_KIND_C_FALLBACK;
 }
 
+FFI_PLUGIN_EXPORT bool flutterxel_core_set_num_colors(int32_t num_colors) {
+  if (!is_supported_num_colors(num_colors)) {
+    return false;
+  }
+  g_state.num_colors = num_colors;
+  return true;
+}
+
+FFI_PLUGIN_EXPORT int32_t flutterxel_core_num_colors(void) {
+  if (!is_supported_num_colors(g_state.num_colors)) {
+    return DEFAULT_NUM_COLORS;
+  }
+  return g_state.num_colors;
+}
+
 FFI_PLUGIN_EXPORT bool flutterxel_core_init(
     int32_t width,
     int32_t height,
@@ -403,6 +424,9 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_init(
   g_state.clip_y = 0;
   g_state.clip_w = width;
   g_state.clip_h = height;
+  if (!is_supported_num_colors(g_state.num_colors)) {
+    g_state.num_colors = DEFAULT_NUM_COLORS;
+  }
   g_state.pressed_key_count = 0;
   g_state.released_key_count = 0;
   g_state.value_count = 0;
@@ -452,6 +476,7 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_quit(void) {
   g_state.clip_y = 0;
   g_state.clip_w = 0;
   g_state.clip_h = 0;
+  g_state.num_colors = DEFAULT_NUM_COLORS;
   g_state.frame_buffer_len = 0;
   g_state.pressed_key_count = 0;
   g_state.released_key_count = 0;
