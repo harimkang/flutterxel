@@ -127,6 +127,10 @@ bool _hasCommand(String command) {
   return result.exitCode == 0;
 }
 
+void _initWithDynamicOptions(Map<Symbol, dynamic> namedArguments) {
+  Function.apply(flutterxel.init, <dynamic>[16, 16], namedArguments);
+}
+
 String? _readPyxresManifest(String path) {
   if (!_hasCommand('unzip')) {
     return null;
@@ -423,6 +427,45 @@ void main() {
     expect(flutterxel.numColors, 256);
     flutterxel.quit();
     expect(() => flutterxel.init(16, 16, num_colors: 32), throwsArgumentError);
+  });
+
+  test(
+    'truecolor init accepts indexed and truecolor named aliases and rejects unsupported values',
+    () {
+      expect(
+        () => _initWithDynamicOptions(<Symbol, dynamic>{#color_mode: 0}),
+        returnsNormally,
+      );
+      flutterxel.quit();
+
+      expect(
+        () => _initWithDynamicOptions(<Symbol, dynamic>{#colorMode: 1}),
+        returnsNormally,
+      );
+      flutterxel.quit();
+
+      expect(
+        () => _initWithDynamicOptions(<Symbol, dynamic>{#color_mode: 999}),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test('truecolor pset/pget preserves rgb24 values', () {
+    _initWithDynamicOptions(<Symbol, dynamic>{#color_mode: 1});
+    flutterxel.cls(0);
+    flutterxel.pset(0, 0, 0x12AB34);
+    expect(flutterxel.pget(0, 0), 0x12AB34);
+    flutterxel.quit();
+  });
+
+  test('truecolor pal acts as a no-op for drawing results', () {
+    _initWithDynamicOptions(<Symbol, dynamic>{#colorMode: 1});
+    flutterxel.cls(0);
+    flutterxel.pal(1, 2);
+    flutterxel.pset(0, 0, 1);
+    expect(flutterxel.pget(0, 0), 1);
+    flutterxel.quit();
   });
 
   test('pal supports 63/255 indices when runtime num_colors is expanded', () {

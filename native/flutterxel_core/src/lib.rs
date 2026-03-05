@@ -3590,6 +3590,9 @@ mod tests {
     use std::sync::{Mutex, OnceLock};
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    const COLOR_MODE_INDEXED: i32 = 0;
+    const COLOR_MODE_TRUECOLOR: i32 = 1;
+
     fn test_lock() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
@@ -3666,6 +3669,52 @@ mod tests {
         assert!(!flutterxel_core_set_num_colors(32));
         assert_eq!(flutterxel_core_num_colors(), 256);
         assert!(flutterxel_core_set_num_colors(16));
+    }
+
+    #[test]
+    fn truecolor_set_color_mode_accepts_supported_values_only() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+        assert_eq!(flutterxel_core_color_mode(), COLOR_MODE_INDEXED);
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        assert_eq!(flutterxel_core_color_mode(), COLOR_MODE_TRUECOLOR);
+        assert!(!flutterxel_core_set_color_mode(999));
+        assert_eq!(flutterxel_core_color_mode(), COLOR_MODE_TRUECOLOR);
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+    }
+
+    #[test]
+    fn truecolor_set_color_mode_rejects_changes_after_init() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        init_runtime(8, 8);
+        assert!(!flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+        assert_eq!(flutterxel_core_color_mode(), COLOR_MODE_TRUECOLOR);
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+    }
+
+    #[test]
+    fn truecolor_pset_pget_roundtrip_preserves_rgb24() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        init_runtime(8, 8);
+        assert!(flutterxel_core_pset(0, 0, 0x12AB34));
+        assert_eq!(flutterxel_core_pget(0, 0), 0x12AB34);
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+    }
+
+    #[test]
+    fn truecolor_pal_is_noop_for_pixel_results() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        init_runtime(8, 8);
+        assert!(flutterxel_core_pal(1, 2));
+        assert!(flutterxel_core_pset(0, 0, 1));
+        assert_eq!(flutterxel_core_pget(0, 0), 1);
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
     }
 
     #[test]
