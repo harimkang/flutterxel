@@ -1,6 +1,7 @@
 import 'dart:ffi' as ffi;
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -439,6 +440,64 @@ void main() {
     expect(flutterxel.pget(0, 0), 12);
     flutterxel.quit();
   });
+
+  testWidgets(
+    'FlutterxelView uses runtime 64-color default palette without modulo-16 truncation',
+    (tester) async {
+      flutterxel.init(4, 4, num_colors: 64);
+      flutterxel.cls(0);
+      flutterxel.pset(0, 0, 63);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: flutterxel.FlutterxelView(pixelScale: 1)),
+        ),
+      );
+      await tester.pump();
+
+      final customPaintFinder = find.descendant(
+        of: find.byType(flutterxel.FlutterxelView),
+        matching: find.byType(CustomPaint),
+      );
+      expect(customPaintFinder, findsOneWidget);
+      final customPaint = tester.widget<CustomPaint>(customPaintFinder);
+      final dynamic painter = customPaint.painter;
+      final palette = List<Color>.from(painter.palette as List<Color>);
+      expect(palette.length, 64);
+      expect(palette[63], flutterxel.defaultPaletteForNumColors(64)[63]);
+      expect(palette[63], isNot(equals(palette[15])));
+      flutterxel.quit();
+    },
+  );
+
+  testWidgets(
+    'FlutterxelView uses runtime 256-color default palette for index 255',
+    (tester) async {
+      flutterxel.init(4, 4, num_colors: 256);
+      flutterxel.cls(0);
+      flutterxel.pset(0, 0, 255);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: flutterxel.FlutterxelView(pixelScale: 1)),
+        ),
+      );
+      await tester.pump();
+
+      final customPaintFinder = find.descendant(
+        of: find.byType(flutterxel.FlutterxelView),
+        matching: find.byType(CustomPaint),
+      );
+      expect(customPaintFinder, findsOneWidget);
+      final customPaint = tester.widget<CustomPaint>(customPaintFinder);
+      final dynamic painter = customPaint.painter;
+      final palette = List<Color>.from(painter.palette as List<Color>);
+      expect(palette.length, 256);
+      expect(palette[255], flutterxel.defaultPaletteForNumColors(256)[255]);
+      expect(palette[255], isNot(equals(palette[15])));
+      flutterxel.quit();
+    },
+  );
 
   test(
     'accepts Pyxel-compatible named options for init/load/save/play/playm/blt',

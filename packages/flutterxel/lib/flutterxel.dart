@@ -6374,7 +6374,7 @@ class Flutterxel {
       backendMode == BackendMode.native_core;
 }
 
-const List<Color> _defaultPalette = <Color>[
+const List<Color> _defaultPalette16 = <Color>[
   Color(0xFF000000),
   Color(0xFF2B335F),
   Color(0xFF7E2072),
@@ -6393,11 +6393,46 @@ const List<Color> _defaultPalette = <Color>[
   Color(0xFFEDC7B0),
 ];
 
+final List<Color> _defaultPalette64 = List<Color>.unmodifiable(
+  List<Color>.generate(64, (index) {
+    final r = ((index >> 4) & 0x03) * 85;
+    final g = ((index >> 2) & 0x03) * 85;
+    final b = (index & 0x03) * 85;
+    return Color.fromARGB(0xFF, r, g, b);
+  }, growable: false),
+);
+
+final List<Color> _defaultPalette256 = List<Color>.unmodifiable(
+  List<Color>.generate(256, (index) {
+    final r = ((index >> 5) & 0x07) * 255 ~/ 7;
+    final g = ((index >> 2) & 0x07) * 255 ~/ 7;
+    final b = (index & 0x03) * 255 ~/ 3;
+    return Color.fromARGB(0xFF, r, g, b);
+  }, growable: false),
+);
+
+List<Color> defaultPaletteForNumColors(int numColors) {
+  switch (numColors) {
+    case DEFAULT_NUM_COLORS:
+      return _defaultPalette16;
+    case 64:
+      return _defaultPalette64;
+    case MAX_NUM_COLORS:
+      return _defaultPalette256;
+    default:
+      throw ArgumentError.value(
+        numColors,
+        'numColors',
+        'must be one of 16, 64, 256.',
+      );
+  }
+}
+
 class FlutterxelView extends StatefulWidget {
   const FlutterxelView({
     super.key,
     this.pixelScale = 4,
-    this.palette = _defaultPalette,
+    this.palette,
     this.backgroundColor = const Color(0xFF000000),
     this.captureInput = true,
     this.autofocus = true,
@@ -6406,7 +6441,7 @@ class FlutterxelView extends StatefulWidget {
   });
 
   final double pixelScale;
-  final List<Color> palette;
+  final List<Color>? palette;
   final Color backgroundColor;
   final bool captureInput;
   final bool autofocus;
@@ -6507,6 +6542,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
       builder: (context, _) {
         final frame = _frameBufferSnapshotForView();
         final frameVersion = frameCount;
+        final palette = widget.palette ?? defaultPaletteForNumColors(numColors);
         return RepaintBoundary(
           child: CustomPaint(
             size: Size(
@@ -6519,7 +6555,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
               frameWidth: viewWidth,
               frameHeight: viewHeight,
               pixelScale: widget.pixelScale,
-              palette: widget.palette,
+              palette: palette,
               backgroundColor: widget.backgroundColor,
             ),
           ),
