@@ -95,6 +95,7 @@ SYMBOLS=(
   flutterxel_core_frame_count
   flutterxel_core_framebuffer_ptr
   flutterxel_core_framebuffer_len
+  flutterxel_core_copy_framebuffer
 )
 
 contains_symbol() {

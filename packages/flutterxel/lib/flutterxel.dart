@@ -186,6 +186,7 @@ _fallbackPlaybackMeta =
     <int, ({int snd, int startedFrame, double? sec, bool loop})>{};
 List<int> _fallbackFrameBuffer = <int>[];
 Int32List _nativeViewFrameBuffer = Int32List(0);
+ffi.Pointer<ffi.Int32> _nativeViewFrameBufferPtr = ffi.nullptr;
 int _fallbackCameraX = 0;
 int _fallbackCameraY = 0;
 int _fallbackClipX = 0;
@@ -1045,6 +1046,7 @@ void quit() {
 }
 
 void _clearLocalRuntimeState() {
+  _disposeNativeViewFrameBuffer();
   width = 0;
   height = 0;
   frameCount = 0;
@@ -2978,6 +2980,30 @@ String userDataDir(String vendorName, String appName) {
 String user_data_dir(String vendorName, String appName) =>
     userDataDir(vendorName, appName);
 
+void _disposeNativeViewFrameBuffer() {
+  if (_nativeViewFrameBufferPtr != ffi.nullptr) {
+    calloc.free(_nativeViewFrameBufferPtr);
+    _nativeViewFrameBufferPtr = ffi.nullptr;
+  }
+  _nativeViewFrameBuffer = Int32List(0);
+}
+
+void _ensureNativeViewFrameBuffer(int len) {
+  if (len <= 0) {
+    _disposeNativeViewFrameBuffer();
+    return;
+  }
+  if (_nativeViewFrameBufferPtr != ffi.nullptr &&
+      _nativeViewFrameBuffer.length == len) {
+    return;
+  }
+  if (_nativeViewFrameBufferPtr != ffi.nullptr) {
+    calloc.free(_nativeViewFrameBufferPtr);
+  }
+  _nativeViewFrameBufferPtr = calloc<ffi.Int32>(len);
+  _nativeViewFrameBuffer = _nativeViewFrameBufferPtr.asTypedList(len);
+}
+
 /// Returns a copy of the current paletted framebuffer.
 List<int> frameBufferSnapshot() {
   _ensureInitialized('frameBufferSnapshot');
@@ -3009,16 +3035,15 @@ List<int> _frameBufferSnapshotForView() {
   if (len <= 0) {
     return const <int>[];
   }
-
-  final ptr = bindings.flutterxel_core_framebuffer_ptr();
+  _ensureNativeViewFrameBuffer(len);
+  final ptr = _nativeViewFrameBufferPtr;
   if (ptr == ffi.nullptr) {
     return const <int>[];
   }
-
-  if (_nativeViewFrameBuffer.length != len) {
-    _nativeViewFrameBuffer = Int32List(len);
+  final ok = bindings.flutterxel_core_copy_framebuffer(ptr, len);
+  if (!ok) {
+    return const <int>[];
   }
-  _nativeViewFrameBuffer.setAll(0, ptr.asTypedList(len));
   return _nativeViewFrameBuffer;
 }
 
@@ -6459,7 +6484,14 @@ class _FlutterxelViewPainter extends CustomPainter {
     required this.pixelScale,
     required this.palette,
     required this.backgroundColor,
-  });
+  }) : paletteSignature = _paletteSignature(palette);
+
+  // Reuse paints across frames to avoid rebuilding per-palette paint lists.
+  static final Map<int, List<_PalettePaintCacheEntry>> _palettePaintCache =
+      <int, List<_PalettePaintCacheEntry>>{};
+  static final Map<int, Paint> _backgroundPaintCache = <int, Paint>{};
+  static const int _maxPalettePaintCacheEntries = 64;
+  static const int _maxBackgroundPaintCacheEntries = 32;
 
   final List<int> frame;
   final int frameVersion;
@@ -6468,10 +6500,77 @@ class _FlutterxelViewPainter extends CustomPainter {
   final double pixelScale;
   final List<Color> palette;
   final Color backgroundColor;
+  final int paletteSignature;
+
+  static int _paletteSignature(List<Color> palette) {
+    var hash = 0x811C9DC5;
+    for (final color in palette) {
+      hash ^= color.toARGB32();
+      hash = (hash * 0x01000193) & 0x7FFFFFFF;
+    }
+    hash ^= palette.length;
+    return hash & 0x7FFFFFFF;
+  }
+
+  static bool _paletteMatches(List<int> expectedValues, List<Color> palette) {
+    if (expectedValues.length != palette.length) {
+      return false;
+    }
+    for (var i = 0; i < expectedValues.length; i++) {
+      if (expectedValues[i] != palette[i].toARGB32()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static List<Paint> _palettePaints(List<Color> palette, int signature) {
+    final bucket = _palettePaintCache[signature];
+    if (bucket != null) {
+      for (final entry in bucket) {
+        if (_paletteMatches(entry.colorValues, palette)) {
+          return entry.paints;
+        }
+      }
+    }
+
+    final colorValues = List<int>.generate(
+      palette.length,
+      (index) => palette[index].toARGB32(),
+      growable: false,
+    );
+    final paints = List<Paint>.generate(
+      palette.length,
+      (index) => Paint()..color = palette[index],
+      growable: false,
+    );
+
+    if (_palettePaintCache.length >= _maxPalettePaintCacheEntries) {
+      _palettePaintCache.clear();
+    }
+    (_palettePaintCache[signature] ??= <_PalettePaintCacheEntry>[]).add(
+      _PalettePaintCacheEntry(colorValues: colorValues, paints: paints),
+    );
+    return paints;
+  }
+
+  static Paint _backgroundPaint(Color color) {
+    final key = color.toARGB32();
+    final cached = _backgroundPaintCache[key];
+    if (cached != null) {
+      return cached;
+    }
+    if (_backgroundPaintCache.length >= _maxBackgroundPaintCacheEntries) {
+      _backgroundPaintCache.clear();
+    }
+    final created = Paint()..color = color;
+    _backgroundPaintCache[key] = created;
+    return created;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final bgPaint = Paint()..color = backgroundColor;
+    final bgPaint = _backgroundPaint(backgroundColor);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
     if (frame.isEmpty || palette.isEmpty) {
@@ -6481,10 +6580,7 @@ class _FlutterxelViewPainter extends CustomPainter {
     final maxPixels = frameWidth * frameHeight;
     final pixelsToDraw = frame.length < maxPixels ? frame.length : maxPixels;
 
-    final paints = <Paint>[];
-    for (final color in palette) {
-      paints.add(Paint()..color = color);
-    }
+    final paints = _palettePaints(palette, paletteSignature);
 
     for (var y = 0; y < frameHeight; y++) {
       final rowStart = y * frameWidth;
@@ -6530,7 +6626,17 @@ class _FlutterxelViewPainter extends CustomPainter {
         oldDelegate.frameWidth != frameWidth ||
         oldDelegate.frameHeight != frameHeight ||
         oldDelegate.pixelScale != pixelScale ||
-        oldDelegate.palette != palette ||
+        oldDelegate.paletteSignature != paletteSignature ||
         oldDelegate.backgroundColor != backgroundColor;
   }
+}
+
+class _PalettePaintCacheEntry {
+  const _PalettePaintCacheEntry({
+    required this.colorValues,
+    required this.paints,
+  });
+
+  final List<int> colorValues;
+  final List<Paint> paints;
 }

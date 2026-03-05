@@ -72,6 +72,8 @@ FFI_PLUGIN_EXPORT bool flutterxel_core_fullscreen(bool enabled);
 FFI_PLUGIN_EXPORT uint64_t flutterxel_core_frame_count(void);
 FFI_PLUGIN_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
 FFI_PLUGIN_EXPORT size_t flutterxel_core_framebuffer_len(void);
+FFI_PLUGIN_EXPORT bool flutterxel_core_copy_framebuffer(int32_t* dst,
+                                                         size_t dst_len);
 
 FFI_PLUGIN_EXPORT bool flutterxel_core_btn(int32_t key);
 FFI_PLUGIN_EXPORT bool flutterxel_core_btnp(int32_t key,

@@ -280,6 +280,21 @@ class FlutterxelBindings {
   late final _flutterxel_core_framebuffer_len =
       _flutterxel_core_framebuffer_lenPtr.asFunction<int Function()>();
 
+  bool flutterxel_core_copy_framebuffer(
+    ffi.Pointer<ffi.Int32> dst,
+    int dst_len,
+  ) {
+    return _flutterxel_core_copy_framebuffer(dst, dst_len);
+  }
+
+  late final _flutterxel_core_copy_framebufferPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Bool Function(ffi.Pointer<ffi.Int32>, ffi.Size)>
+      >('flutterxel_core_copy_framebuffer');
+  late final _flutterxel_core_copy_framebuffer =
+      _flutterxel_core_copy_framebufferPtr
+          .asFunction<bool Function(ffi.Pointer<ffi.Int32>, int)>();
+
   bool flutterxel_core_btn(int key) {
     return _flutterxel_core_btn(key);
   }

@@ -2107,6 +2107,27 @@ pub extern "C" fn flutterxel_core_framebuffer_len() -> usize {
 }
 
 #[no_mangle]
+pub extern "C" fn flutterxel_core_copy_framebuffer(dst: *mut i32, dst_len: usize) -> bool {
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    if dst_len != state.frame_buffer.len() {
+        return false;
+    }
+    if dst_len == 0 {
+        return true;
+    }
+    if dst.is_null() {
+        return false;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(state.frame_buffer.as_ptr(), dst, dst_len);
+    }
+    true
+}
+
+#[no_mangle]
 pub extern "C" fn flutterxel_core_btn(key: i32) -> bool {
     let state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
@@ -3561,6 +3582,26 @@ mod tests {
         };
         assert_eq!(frame_buffer.len(), 16);
         assert!(frame_buffer.iter().all(|pixel| *pixel == 7));
+    }
+
+    #[test]
+    fn copy_framebuffer_exports_current_frame_pixels() {
+        let _guard = test_lock();
+        init_runtime(4, 4);
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_pset(1, 1, 6));
+
+        let len = flutterxel_core_framebuffer_len();
+        let mut copied = vec![0; len];
+        assert!(flutterxel_core_copy_framebuffer(
+            copied.as_mut_ptr(),
+            copied.len()
+        ));
+        assert_eq!(copied[1 + 4], 6);
+        assert!(!flutterxel_core_copy_framebuffer(
+            copied.as_mut_ptr(),
+            copied.len() - 1
+        ));
     }
 
     #[test]

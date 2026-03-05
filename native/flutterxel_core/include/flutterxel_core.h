@@ -85,6 +85,8 @@ FLUTTERXEL_CORE_EXPORT bool flutterxel_core_fullscreen(bool enabled);
 FLUTTERXEL_CORE_EXPORT uint64_t flutterxel_core_frame_count(void);
 FLUTTERXEL_CORE_EXPORT const int32_t* flutterxel_core_framebuffer_ptr(void);
 FLUTTERXEL_CORE_EXPORT size_t flutterxel_core_framebuffer_len(void);
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_copy_framebuffer(int32_t* dst,
+                                                              size_t dst_len);
 
 // pyxel.btn(key)
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_btn(int32_t key);
