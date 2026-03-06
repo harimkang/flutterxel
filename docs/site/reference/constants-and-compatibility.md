@@ -37,6 +37,8 @@ For image import options, compatibility aliases are also available:
 - `alpha_threshold` / `alphaThreshold`
 - `preserve_transparent` / `preserveTransparent`
 
+The transparent-sentinel contract is shared by `Image.fromImage(...)`, `Image.fromBytes(...)`, `image.load(...)`, and `image.loadBytes(...)`: when `preserve_transparent` is enabled and `transparent_index` is provided, indexed and truecolor imports both record that sentinel for later `colkey` blits.
+
 ## Runtime Palette Count Compatibility
 
 - Legacy behavior is unchanged when `num_colors` is omitted (`16` colors).

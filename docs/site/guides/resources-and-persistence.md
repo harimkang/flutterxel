@@ -22,11 +22,10 @@ They are exposed through `Seq<T>` wrappers for Pyxel-style mutation.
 
 Important behavior boundaries:
 
-- Global `blt(...)` accepts only image resource ids (`int`) or resource-backed `Image` handles (for example `images[0]`).
-- Detached images created with `Image(...)` / `Image.fromImage(...)` are not valid as global `blt` source arguments.
-- Use `image.blt(...)` when drawing from detached image objects.
+- Global `blt(...)` accepts image resource ids (`int`), resource-backed `Image` handles, and detached `Image` objects.
+- Use `image.blt(...)` when the destination is another image instead of the screen.
 - In native-binding mode, resource image mutations (`pset`, `cls`, `set`, `load`) now sync directly to native core image banks, so subsequent global `blt(...)` draws reflect those updates.
-- `Image.load(...)` / `Image.fromImage(...)` keep legacy alpha-agnostic mapping by default.
+- `Image.load(...)`, `Image.loadBytes(...)`, `Image.fromImage(...)`, and `Image.fromBytes(...)` keep legacy alpha-agnostic mapping by default.
 - `include_colors` / `includeColors` uses a local discovered-palette mapping:
   - first discovered color maps to index `0`
   - next discovered color maps to `1`, and so on
@@ -36,9 +35,11 @@ Important behavior boundaries:
   - `preserve_transparent` / `preserveTransparent`
   - `transparent_index` / `transparentIndex`
   - `alpha_threshold` / `alphaThreshold` (`0..255`)
-- Transparent sprite recipe:
-  - load with `preserve_transparent: true, transparent_index: <index>, alpha_threshold: <threshold>`
-  - draw with `blt(..., colkey: <same index>)` to skip transparent background pixels
+- Transparent sprite recipe works for both resource-backed and detached image imports:
+  - load with `preserve_transparent: true, transparent_index: <sentinel>, alpha_threshold: <threshold>`
+  - transparent pixels are recorded as `<sentinel>` in both indexed and truecolor imports
+  - draw with `blt(..., colkey: <same sentinel>)` to skip transparent background pixels
+  - if `transparent_index` is omitted, transparent pixels keep the legacy skip-overwrite behavior instead of writing a sentinel
 
 ```dart
 // Resource image import (alpha-aware opt-in)
@@ -53,6 +54,15 @@ images[0].load(
 
 // Draw using the same transparent index as colkey
 blt(16, 24, 0, 0, 0, 32, 32, colkey: COLOR_BLACK);
+
+// Detached truecolor import can use the same sentinel + colkey recipe.
+final sprite = Image.fromBytes(
+  pngBytes,
+  preserve_transparent: true,
+  transparent_index: 0x00FF00FF,
+  alpha_threshold: 0,
+);
+blt(56, 24, sprite, 0, 0, 32, 32, colkey: 0x00FF00FF);
 ```
 
 ### `include_colors` Usage Guide

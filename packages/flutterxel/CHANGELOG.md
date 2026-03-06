@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Fixed truecolor raster import paths for detached and existing images so `preserve_transparent + transparent_index + colkey` preserves the requested transparent sentinel across `Image.fromImage(...)`, `Image.fromBytes(...)`, `Image.load(...)`, and `Image.loadBytes(...)`.
+
 ## 0.0.13
 
 - Added bytes-based detached image APIs:
