@@ -6981,6 +6981,22 @@ List<Color> defaultPaletteForNumColors(int numColors) {
   }
 }
 
+class FlutterxelPointerSample {
+  const FlutterxelPointerSample({
+    required this.localPosition,
+    required this.pixelPosition,
+    required this.buttonMask,
+    required this.wheelDelta,
+    required this.timestamp,
+  });
+
+  final Offset localPosition;
+  final Offset pixelPosition;
+  final int buttonMask;
+  final Offset wheelDelta;
+  final Duration timestamp;
+}
+
 class FlutterxelView extends StatefulWidget {
   const FlutterxelView({
     super.key,
@@ -6991,6 +7007,7 @@ class FlutterxelView extends StatefulWidget {
     this.autofocus = true,
     this.keyboardMapping,
     this.focusNode,
+    this.onPointerSample,
   });
 
   final double pixelScale;
@@ -7000,6 +7017,7 @@ class FlutterxelView extends StatefulWidget {
   final bool autofocus;
   final Map<LogicalKeyboardKey, int>? keyboardMapping;
   final FocusNode? focusNode;
+  final ValueChanged<FlutterxelPointerSample>? onPointerSample;
 
   @override
   State<FlutterxelView> createState() => _FlutterxelViewState();
@@ -7008,6 +7026,7 @@ class FlutterxelView extends StatefulWidget {
 class _FlutterxelViewState extends State<FlutterxelView> {
   late final FocusNode _focusNode;
   late final bool _ownsFocusNode;
+  int _pointerButtonMask = 0;
 
   @override
   void initState() {
@@ -7040,49 +7059,98 @@ class _FlutterxelViewState extends State<FlutterxelView> {
     return KeyEventResult.handled;
   }
 
-  void _handlePointerDown(PointerDownEvent event) {
-    if (!widget.captureInput || !_isInitialized) {
+  bool get _capturesPointer =>
+      widget.captureInput || widget.onPointerSample != null;
+
+  Offset _resolvePixelPosition(Offset localPosition) {
+    final x = (localPosition.dx / widget.pixelScale).floor();
+    final y = (localPosition.dy / widget.pixelScale).floor();
+    final boundedX = x.clamp(0, width > 0 ? width - 1 : 0).toInt();
+    final boundedY = y.clamp(0, height > 0 ? height - 1 : 0).toInt();
+    return Offset(boundedX.toDouble(), boundedY.toDouble());
+  }
+
+  Offset _updatePointerPosition(PointerEvent event) {
+    final pixelPosition = _resolvePixelPosition(event.localPosition);
+    if (widget.captureInput) {
+      setBtnValue(MOUSE_POS_X, pixelPosition.dx.round());
+      setBtnValue(MOUSE_POS_Y, pixelPosition.dy.round());
+    }
+    return pixelPosition;
+  }
+
+  void _emitPointerSample(
+    PointerEvent event, {
+    required Offset pixelPosition,
+    Offset wheelDelta = Offset.zero,
+  }) {
+    final callback = widget.onPointerSample;
+    if (callback == null) {
       return;
     }
-    _focusNode.requestFocus();
-    _updatePointerPosition(event);
-    setBtnState(MOUSE_BUTTON_LEFT, true);
+    callback(
+      FlutterxelPointerSample(
+        localPosition: event.localPosition,
+        pixelPosition: pixelPosition,
+        buttonMask: _pointerButtonMask,
+        wheelDelta: wheelDelta,
+        timestamp: event.timeStamp,
+      ),
+    );
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (!_capturesPointer || !_isInitialized) {
+      return;
+    }
+    final pixelPosition = _updatePointerPosition(event);
+    _pointerButtonMask = event.buttons;
+    if (widget.captureInput) {
+      _focusNode.requestFocus();
+      setBtnState(MOUSE_BUTTON_LEFT, true);
+    }
+    _emitPointerSample(event, pixelPosition: pixelPosition);
   }
 
   void _handlePointerUp(PointerEvent event) {
-    if (!widget.captureInput || !_isInitialized) {
+    if (!_capturesPointer || !_isInitialized) {
       return;
     }
-    _updatePointerPosition(event);
-    setBtnState(MOUSE_BUTTON_LEFT, false);
+    final pixelPosition = _updatePointerPosition(event);
+    _pointerButtonMask = event.buttons;
+    if (widget.captureInput) {
+      setBtnState(MOUSE_BUTTON_LEFT, false);
+    }
+    _emitPointerSample(event, pixelPosition: pixelPosition);
   }
 
   void _handlePointerMove(PointerEvent event) {
-    if (!widget.captureInput || !_isInitialized) {
+    if (!_capturesPointer || !_isInitialized) {
       return;
     }
-    _updatePointerPosition(event);
+    final pixelPosition = _updatePointerPosition(event);
+    _pointerButtonMask = event.buttons;
+    _emitPointerSample(event, pixelPosition: pixelPosition);
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (!widget.captureInput || !_isInitialized) {
+    if (!_capturesPointer || !_isInitialized) {
       return;
     }
     if (event is! PointerScrollEvent) {
       return;
     }
 
-    setBtnValue(MOUSE_WHEEL_X, event.scrollDelta.dx.round());
-    setBtnValue(MOUSE_WHEEL_Y, event.scrollDelta.dy.round());
-  }
-
-  void _updatePointerPosition(PointerEvent event) {
-    final x = (event.localPosition.dx / widget.pixelScale).floor();
-    final y = (event.localPosition.dy / widget.pixelScale).floor();
-    final boundedX = x.clamp(0, width > 0 ? width - 1 : 0).toInt();
-    final boundedY = y.clamp(0, height > 0 ? height - 1 : 0).toInt();
-    setBtnValue(MOUSE_POS_X, boundedX);
-    setBtnValue(MOUSE_POS_Y, boundedY);
+    final pixelPosition = _updatePointerPosition(event);
+    if (widget.captureInput) {
+      setBtnValue(MOUSE_WHEEL_X, event.scrollDelta.dx.round());
+      setBtnValue(MOUSE_WHEEL_Y, event.scrollDelta.dy.round());
+    }
+    _emitPointerSample(
+      event,
+      pixelPosition: pixelPosition,
+      wheelDelta: event.scrollDelta,
+    );
   }
 
   @override
@@ -7118,24 +7186,30 @@ class _FlutterxelViewState extends State<FlutterxelView> {
       },
     );
 
-    if (!widget.captureInput) {
+    if (!_capturesPointer) {
       return view;
+    }
+
+    final listener = Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: _handlePointerDown,
+      onPointerHover: _handlePointerMove,
+      onPointerMove: _handlePointerMove,
+      onPointerSignal: _handlePointerSignal,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerUp,
+      child: view,
+    );
+
+    if (!widget.captureInput) {
+      return listener;
     }
 
     return Focus(
       autofocus: widget.autofocus,
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
-      child: Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: _handlePointerDown,
-        onPointerHover: _handlePointerMove,
-        onPointerMove: _handlePointerMove,
-        onPointerSignal: _handlePointerSignal,
-        onPointerUp: _handlePointerUp,
-        onPointerCancel: _handlePointerUp,
-        child: view,
-      ),
+      child: listener,
     );
   }
 }

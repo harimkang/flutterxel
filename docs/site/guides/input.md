@@ -33,6 +33,11 @@ You can override mappings with `keyboardMapping`.
 - Pointer position -> `MOUSE_POS_X`, `MOUSE_POS_Y`
 - Scroll delta -> `MOUSE_WHEEL_X`, `MOUSE_WHEEL_Y`
 
+You can also observe pointer samples directly from the widget layer:
+
+- `FlutterxelView(onPointerSample: ...)`
+- sample fields: `localPosition`, `pixelPosition`, `buttonMask`, `wheelDelta`, `timestamp`
+
 Utility API:
 
 - `warpMouse(x, y)`
