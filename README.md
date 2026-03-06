@@ -19,6 +19,7 @@ It is built for developers who want fast pixel-game iteration with a familiar AP
 - Pyxel-compatible API surface with both camelCase and snake_case aliases.
 - Rust-native runtime core for graphics/audio/resource handling.
 - Flutter-first integration through `FlutterxelView`.
+- Optional `truecolor` (`0xRRGGBB`) rendering alongside indexed `16/64/256` palette modes.
 - Full-screen-friendly layout patterns (see `examples/`).
 - Resource persistence support (`.pyxres`, palette load/save paths).
 - Published on pub.dev and ready to use in app projects.
@@ -122,6 +123,39 @@ class _GamePageState extends State<GamePage> {
   }
 }
 ```
+
+## Color Modes
+
+`flutterxel` now supports two rendering modes from `init(...)`:
+
+- `COLOR_MODE_INDEXED` (default): palette-index rendering with `num_colors` `16/64/256`
+- `COLOR_MODE_TRUECOLOR`: direct `0xRRGGBB` framebuffer rendering
+
+Example:
+
+```dart
+flutterxel.init(
+  160,
+  120,
+  colorMode: flutterxel.COLOR_MODE_TRUECOLOR,
+);
+
+flutterxel.cls(flutterxel.rgb24(4, 8, 16));
+flutterxel.pset(10, 10, 0x12AB34);
+```
+
+Mode differences:
+
+- `num_colors` only applies to indexed mode
+- `pal()` is active in indexed mode and a no-op in truecolor mode
+- `FlutterxelView` renders truecolor frame values directly without palette quantization
+
+Migration checklist for existing indexed projects:
+
+- Keep `init(...)` unchanged to preserve legacy behavior
+- Add `colorMode: flutterxel.COLOR_MODE_TRUECOLOR` only when you want raw RGB24 pixels
+- Replace palette indices intended as literal colors with `0xRRGGBB` or `flutterxel.rgb24(...)`
+- Remove `num_colors` from `truecolor` init calls
 
 ## Example Games
 

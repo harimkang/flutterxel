@@ -101,6 +101,47 @@ If you see `flutterxel_core_set_num_colors` / `flutterxel_core_num_colors`
 missing-symbol errors on native backend, rebuild/bundle native artifacts for the
 same commit as the Dart package update.
 
+## Color Mode (`color_mode` / `colorMode`)
+
+`init(...)` also supports runtime color mode selection:
+
+- `COLOR_MODE_INDEXED` (default): palette-index rendering
+- `COLOR_MODE_TRUECOLOR`: direct `0xRRGGBB` rendering
+
+Example:
+
+```dart
+flutterxel.init(
+  160,
+  120,
+  color_mode: flutterxel.COLOR_MODE_TRUECOLOR,
+);
+
+flutterxel.cls(flutterxel.rgb24(4, 8, 16));
+flutterxel.pset(8, 8, 0x12AB34);
+```
+
+Runtime helpers:
+
+- `flutterxel.colorMode`
+- `flutterxel.color_mode`
+- `flutterxel.isTruecolor`
+- `flutterxel.rgb24(r, g, b)`
+
+Behavior differences by mode:
+
+- indexed mode uses `num_colors` and `pal()`
+- truecolor mode rejects `num_colors` on `init(...)`
+- truecolor mode keeps raster-import RGB24 values without palette quantization
+- truecolor mode treats `pal()`, `load_pal()`, and `save_pal()` as no-ops
+
+Migration checklist:
+
+- Leave `init(...)` unchanged to stay on indexed mode
+- Add `colorMode: flutterxel.COLOR_MODE_TRUECOLOR` only for raw RGB rendering
+- Convert palette-index literals that should be actual colors to `0xRRGGBB`
+- Remove `num_colors` from truecolor initializers
+
 ## Test Backend Forcing
 
 For deterministic backend-path regression tests, runtime loading supports:

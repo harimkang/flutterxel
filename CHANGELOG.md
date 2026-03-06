@@ -1,5 +1,19 @@
 ## Unreleased
 
+- Added runtime `truecolor` (`0xRRGGBB`) mode across Rust core, C fallback, Dart API, raster import, and `FlutterxelView`.
+- Added ABI symbols for runtime color mode control:
+  - `flutterxel_core_set_color_mode`
+  - `flutterxel_core_color_mode`
+- Added Dart API/runtime helpers:
+  - `init(..., color_mode / colorMode)`
+  - `flutterxel.colorMode` / `flutterxel.color_mode`
+  - `flutterxel.isTruecolor`
+  - `flutterxel.rgb24(...)`
+- Updated mode-specific behavior:
+  - indexed mode keeps palette mapping and `num_colors`
+  - truecolor mode preserves RGB24 framebuffer/import values
+  - truecolor mode treats `pal`, `load_pal`, and `save_pal` as no-ops
+
 ## 0.0.11
 
 - Added runtime `num_colors` expansion (`16/64/256`) end-to-end across Rust core, C fallback, Dart API, and Flutter view rendering.
