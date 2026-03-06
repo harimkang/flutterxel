@@ -6662,6 +6662,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
         final frame = _frameBufferSnapshotForView();
         final frameVersion = frameCount;
         final palette = widget.palette ?? defaultPaletteForNumColors(numColors);
+        final currentColorMode = colorMode;
         return RepaintBoundary(
           child: CustomPaint(
             size: Size(
@@ -6674,6 +6675,7 @@ class _FlutterxelViewState extends State<FlutterxelView> {
               frameWidth: viewWidth,
               frameHeight: viewHeight,
               pixelScale: widget.pixelScale,
+              colorMode: currentColorMode,
               palette: palette,
               backgroundColor: widget.backgroundColor,
             ),
@@ -6711,6 +6713,7 @@ class _FlutterxelViewPainter extends CustomPainter {
     required this.frameWidth,
     required this.frameHeight,
     required this.pixelScale,
+    required this.colorMode,
     required this.palette,
     required this.backgroundColor,
   }) : paletteSignature = _paletteSignature(palette);
@@ -6719,14 +6722,17 @@ class _FlutterxelViewPainter extends CustomPainter {
   static final Map<int, List<_PalettePaintCacheEntry>> _palettePaintCache =
       <int, List<_PalettePaintCacheEntry>>{};
   static final Map<int, Paint> _backgroundPaintCache = <int, Paint>{};
+  static final Map<int, Paint> _truecolorPaintCache = <int, Paint>{};
   static const int _maxPalettePaintCacheEntries = 64;
   static const int _maxBackgroundPaintCacheEntries = 32;
+  static const int _maxTruecolorPaintCacheEntries = 1024;
 
   final List<int> frame;
   final int frameVersion;
   final int frameWidth;
   final int frameHeight;
   final double pixelScale;
+  final int colorMode;
   final List<Color> palette;
   final Color backgroundColor;
   final int paletteSignature;
@@ -6797,17 +6803,80 @@ class _FlutterxelViewPainter extends CustomPainter {
     return created;
   }
 
+  static Paint _truecolorPaint(int rgb24) {
+    final argb = 0xFF000000 | (rgb24 & 0x00FFFFFF);
+    final cached = _truecolorPaintCache[argb];
+    if (cached != null) {
+      return cached;
+    }
+    if (_truecolorPaintCache.length >= _maxTruecolorPaintCacheEntries) {
+      _truecolorPaintCache.clear();
+    }
+    final created = Paint()..color = Color(argb);
+    _truecolorPaintCache[argb] = created;
+    return created;
+  }
+
+  Color debugColorForValue(int value) {
+    if (_isTruecolorMode(colorMode)) {
+      return Color(0xFF000000 | (value & 0x00FFFFFF));
+    }
+    if (palette.isEmpty) {
+      return backgroundColor;
+    }
+    return palette[value.abs() % palette.length];
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final bgPaint = _backgroundPaint(backgroundColor);
     canvas.drawRect(Offset.zero & size, bgPaint);
 
-    if (frame.isEmpty || palette.isEmpty) {
+    if (frame.isEmpty || (!_isTruecolorMode(colorMode) && palette.isEmpty)) {
       return;
     }
 
     final maxPixels = frameWidth * frameHeight;
     final pixelsToDraw = frame.length < maxPixels ? frame.length : maxPixels;
+
+    if (_isTruecolorMode(colorMode)) {
+      for (var y = 0; y < frameHeight; y++) {
+        final rowStart = y * frameWidth;
+        if (rowStart >= pixelsToDraw) {
+          break;
+        }
+        final rowEnd = math.min(rowStart + frameWidth, pixelsToDraw);
+        var runStart = rowStart;
+        var runColor = frame[rowStart] & 0x00FFFFFF;
+
+        for (var index = rowStart + 1; index < rowEnd; index++) {
+          final color = frame[index] & 0x00FFFFFF;
+          if (color == runColor) {
+            continue;
+          }
+          final x = (runStart - rowStart) * pixelScale;
+          final runWidth = (index - runStart) * pixelScale;
+          if (runWidth > 0) {
+            canvas.drawRect(
+              Rect.fromLTWH(x, y * pixelScale, runWidth, pixelScale),
+              _truecolorPaint(runColor),
+            );
+          }
+          runStart = index;
+          runColor = color;
+        }
+
+        final x = (runStart - rowStart) * pixelScale;
+        final runWidth = (rowEnd - runStart) * pixelScale;
+        if (runWidth > 0) {
+          canvas.drawRect(
+            Rect.fromLTWH(x, y * pixelScale, runWidth, pixelScale),
+            _truecolorPaint(runColor),
+          );
+        }
+      }
+      return;
+    }
 
     final paints = _palettePaints(palette, paletteSignature);
 
@@ -6855,6 +6924,7 @@ class _FlutterxelViewPainter extends CustomPainter {
         oldDelegate.frameWidth != frameWidth ||
         oldDelegate.frameHeight != frameHeight ||
         oldDelegate.pixelScale != pixelScale ||
+        oldDelegate.colorMode != colorMode ||
         oldDelegate.paletteSignature != paletteSignature ||
         oldDelegate.backgroundColor != backgroundColor;
   }

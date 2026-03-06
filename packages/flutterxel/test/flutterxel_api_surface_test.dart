@@ -575,6 +575,37 @@ void main() {
     },
   );
 
+  testWidgets('FlutterxelView renders truecolor framebuffer pixels directly', (
+    tester,
+  ) async {
+    flutterxel.init(2, 2, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+    flutterxel.cls(0);
+    flutterxel.pset(0, 0, 0x12AB34);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: flutterxel.FlutterxelView(pixelScale: 1)),
+      ),
+    );
+    await tester.pump();
+
+    final customPaintFinder = find.descendant(
+      of: find.byType(flutterxel.FlutterxelView),
+      matching: find.byType(CustomPaint),
+    );
+    expect(customPaintFinder, findsOneWidget);
+    final customPaint = tester.widget<CustomPaint>(customPaintFinder);
+    final dynamic painter = customPaint.painter;
+    final frame = List<int>.from(painter.frame as List<int>);
+    expect(painter.colorMode, flutterxel.COLOR_MODE_TRUECOLOR);
+    expect(frame.first, 0x12AB34);
+    expect(
+      painter.debugColorForValue(frame.first) as Color,
+      const Color(0xFF12AB34),
+    );
+    flutterxel.quit();
+  });
+
   test(
     'accepts Pyxel-compatible named options for init/load/save/play/playm/blt',
     () {
