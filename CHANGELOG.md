@@ -1,5 +1,10 @@
 ## Unreleased
 
+## 0.0.14
+
+- Fixed truecolor detached/existing image raster import so transparent pixels preserve the requested `transparent_index` sentinel for later `colkey` blits.
+- Updated release metadata and installation docs for `0.0.14`.
+
 ## 0.0.13
 
 - Added agent-map/editor-friendly rendering primitives to `flutterxel`:

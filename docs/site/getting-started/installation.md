@@ -16,7 +16,7 @@ Use the published package from pub.dev:
 
 ```yaml
 dependencies:
-  flutterxel: ^0.0.13
+  flutterxel: ^0.0.14
 ```
 
 Then run:
