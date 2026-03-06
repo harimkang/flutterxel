@@ -32,6 +32,11 @@ typedef enum FlutterxelCoreBackendKind {
   FLUTTERXEL_CORE_BACKEND_DART_FALLBACK = 3,
 } FlutterxelCoreBackendKind;
 
+typedef enum FlutterxelCoreColorMode {
+  FLUTTERXEL_CORE_COLOR_MODE_INDEXED = 0,
+  FLUTTERXEL_CORE_COLOR_MODE_TRUECOLOR = 1,
+} FlutterxelCoreColorMode;
+
 typedef void (*FlutterxelCoreFrameCallback)(void* user_data);
 
 FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_major(void);
@@ -40,6 +45,8 @@ FLUTTERXEL_CORE_EXPORT uint32_t flutterxel_core_version_patch(void);
 FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_backend_kind(void);
 FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_num_colors(int32_t num_colors);
 FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_num_colors(void);
+FLUTTERXEL_CORE_EXPORT bool flutterxel_core_set_color_mode(int32_t color_mode);
+FLUTTERXEL_CORE_EXPORT int32_t flutterxel_core_color_mode(void);
 
 // pyxel.init(width, height, *, title=None, fps=None, quit_key=None,
 //            display_scale=None, capture_scale=None, capture_sec=None)

@@ -30,7 +30,7 @@ Add `flutterxel` from pub.dev:
 
 ```yaml
 dependencies:
-  flutterxel: ^0.0.11
+  flutterxel: ^0.0.12
 ```
 
 Then run:

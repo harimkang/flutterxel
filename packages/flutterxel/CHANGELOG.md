@@ -1,5 +1,23 @@
 ## Unreleased
 
+## 0.0.12
+
+- Added runtime `truecolor` configuration support in `init(...)` with snake/camel aliases:
+  - `color_mode`
+  - `colorMode`
+- Added runtime color mode getters/helpers:
+  - `color_mode`
+  - `colorMode`
+  - `isTruecolor`
+  - `rgb24(...)`
+- Expanded native ABI surface with runtime color mode control:
+  - `flutterxel_core_set_color_mode`
+  - `flutterxel_core_color_mode`
+- Refactored Rust core and C fallback render/resource paths to preserve RGB24 values in truecolor mode.
+- Updated `FlutterxelView` to render truecolor framebuffers directly when the runtime color mode is `truecolor`.
+- Added regression coverage for truecolor init, drawing, raster import, and view-painter paths.
+- Updated package release metadata to `0.0.12`.
+
 ## 0.0.11
 
 - Added runtime `num_colors` configuration support in `init(...)` with snake/camel aliases:
