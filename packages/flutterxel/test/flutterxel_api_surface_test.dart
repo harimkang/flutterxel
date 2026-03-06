@@ -1405,37 +1405,40 @@ void main() {
     );
   });
 
-  test('Image.fromBytes symbol exists for decoded PNG bytes contract', () {
+  test('Image.fromBytes decodes png bytes into detached image', () {
+    flutterxel.init(8, 8);
+
     final bytes = _encodeTestPngBytes(
       width: 2,
       height: 1,
-      rgb24Pixels: const <int>[0x123456, 0xABCDEF],
+      rgb24Pixels: const <int>[0x000000, 0x2B335F],
     );
-    final decoded = img.decodePng(bytes);
-    final source = _flutterxelLibrarySource();
+    final image = flutterxel.Image.fromBytes(bytes);
 
-    expect(decoded, isNotNull);
-    expect(decoded!.width, 2);
-    expect(decoded.height, 1);
-    expect(RegExp(r'static Image\s+fromBytes\s*\(').hasMatch(source), isTrue);
-    expect(RegExp(r'static Image\s+from_bytes\s*\(').hasMatch(source), isTrue);
+    expect(image.width, 2);
+    expect(image.height, 1);
+    expect(image.pget(0, 0), flutterxel.COLOR_BLACK);
+    expect(image.pget(1, 0), flutterxel.COLOR_NAVY);
   });
 
-  test('Image.loadBytes symbol exists for decoded PNG bytes contract', () {
-    final bytes = _encodeTestPngBytes(
-      width: 2,
-      height: 1,
-      rgb24Pixels: const <int>[0x010203, 0x040506],
-    );
-    final decoded = img.decodePng(bytes);
-    final source = _flutterxelLibrarySource();
+  test(
+    'Image.loadBytes decodes PNG bytes into an existing image at the requested offset',
+    () {
+      flutterxel.init(8, 8);
 
-    expect(decoded, isNotNull);
-    expect(decoded!.width, 2);
-    expect(decoded.height, 1);
-    expect(RegExp(r'\bvoid\s+loadBytes\s*\(').hasMatch(source), isTrue);
-    expect(RegExp(r'\bvoid\s+load_bytes\s*\(').hasMatch(source), isTrue);
-  });
+      final bytes = _encodeTestPngBytes(
+        width: 1,
+        height: 1,
+        rgb24Pixels: const <int>[0x000000],
+      );
+      final image = flutterxel.Image(8, 8);
+      image.cls(flutterxel.COLOR_RED);
+      image.loadBytes(2, 3, bytes);
+
+      expect(image.pget(0, 0), flutterxel.COLOR_RED);
+      expect(image.pget(2, 3), flutterxel.COLOR_BLACK);
+    },
+  );
 
   test(
     'Image.load decodes PNG into an existing image at the requested offset',

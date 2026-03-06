@@ -739,8 +739,67 @@ image_lib.Image? _tryDecodeRasterImage(String filename) {
   if (!file.existsSync()) {
     return null;
   }
-  final bytes = file.readAsBytesSync();
-  return image_lib.decodeImage(bytes);
+  return _tryDecodeRasterBytes(file.readAsBytesSync());
+}
+
+image_lib.Image? _tryDecodeRasterBytes(List<int> encodedBytes) {
+  if (encodedBytes.isEmpty) {
+    return null;
+  }
+  return image_lib.decodeImage(Uint8List.fromList(encodedBytes));
+}
+
+({
+  bool includeColors,
+  int? transparentIndex,
+  int alphaThreshold,
+  bool preserveTransparent,
+})
+_resolveRasterImageLoadOptions({
+  bool? include_colors,
+  bool? includeColors,
+  bool? use_discovered_palette,
+  bool? useDiscoveredPalette,
+  int? transparent_index,
+  int? transparentIndex,
+  int? alpha_threshold,
+  int? alphaThreshold,
+  bool? preserve_transparent,
+  bool? preserveTransparent,
+}) {
+  final resolvedIncludeColors = _resolveIncludeColorsOption(
+    include_colors: include_colors,
+    includeColors: includeColors,
+    use_discovered_palette: use_discovered_palette,
+    useDiscoveredPalette: useDiscoveredPalette,
+  );
+  final resolvedTransparentIndex = _resolveNamedAlias<int>(
+    snakeName: 'transparent_index',
+    snakeValue: transparent_index,
+    camelName: 'transparentIndex',
+    camelValue: transparentIndex,
+  );
+  final resolvedAlphaThreshold = _normalizeAlphaThreshold(
+    _resolveNamedAlias<int>(
+          snakeName: 'alpha_threshold',
+          snakeValue: alpha_threshold,
+          camelName: 'alphaThreshold',
+          camelValue: alphaThreshold,
+        ) ??
+        0,
+  );
+  final resolvedPreserveTransparent = _resolveNamedAlias<bool>(
+    snakeName: 'preserve_transparent',
+    snakeValue: preserve_transparent,
+    camelName: 'preserveTransparent',
+    camelValue: preserveTransparent,
+  );
+  return (
+    includeColors: resolvedIncludeColors,
+    transparentIndex: resolvedTransparentIndex,
+    alphaThreshold: resolvedAlphaThreshold,
+    preserveTransparent: resolvedPreserveTransparent == true,
+  );
 }
 
 double _fallbackNoiseHash(int seed, int x, int y, int z) {
@@ -3628,6 +3687,24 @@ class Image {
     );
   }
 
+  static Image from_bytes(
+    Uint8List encodedBytes, {
+    bool? include_colors,
+    bool? use_discovered_palette,
+    int? transparent_index,
+    int? alpha_threshold,
+    bool? preserve_transparent,
+  }) {
+    return fromBytes(
+      encodedBytes,
+      include_colors: include_colors,
+      use_discovered_palette: use_discovered_palette,
+      transparent_index: transparent_index,
+      alpha_threshold: alpha_threshold,
+      preserve_transparent: preserve_transparent,
+    );
+  }
+
   static Image fromImage(
     String filename, {
     bool? include_colors,
@@ -3641,32 +3718,17 @@ class Image {
     bool? preserve_transparent,
     bool? preserveTransparent,
   }) {
-    final resolvedIncludeColors = _resolveIncludeColorsOption(
+    final options = _resolveRasterImageLoadOptions(
       include_colors: include_colors,
       includeColors: includeColors,
       use_discovered_palette: use_discovered_palette,
       useDiscoveredPalette: useDiscoveredPalette,
-    );
-    final resolvedTransparentIndex = _resolveNamedAlias<int>(
-      snakeName: 'transparent_index',
-      snakeValue: transparent_index,
-      camelName: 'transparentIndex',
-      camelValue: transparentIndex,
-    );
-    final resolvedAlphaThreshold = _normalizeAlphaThreshold(
-      _resolveNamedAlias<int>(
-            snakeName: 'alpha_threshold',
-            snakeValue: alpha_threshold,
-            camelName: 'alphaThreshold',
-            camelValue: alphaThreshold,
-          ) ??
-          0,
-    );
-    final resolvedPreserveTransparent = _resolveNamedAlias<bool>(
-      snakeName: 'preserve_transparent',
-      snakeValue: preserve_transparent,
-      camelName: 'preserveTransparent',
-      camelValue: preserveTransparent,
+      transparent_index: transparent_index,
+      transparentIndex: transparentIndex,
+      alpha_threshold: alpha_threshold,
+      alphaThreshold: alphaThreshold,
+      preserve_transparent: preserve_transparent,
+      preserveTransparent: preserveTransparent,
     );
 
     final decoded = _tryDecodeRasterImage(filename);
@@ -3676,10 +3738,10 @@ class Image {
         0,
         0,
         filename,
-        include_colors: resolvedIncludeColors,
-        transparent_index: resolvedTransparentIndex,
-        alpha_threshold: resolvedAlphaThreshold,
-        preserve_transparent: resolvedPreserveTransparent,
+        include_colors: options.includeColors,
+        transparent_index: options.transparentIndex,
+        alpha_threshold: options.alphaThreshold,
+        preserve_transparent: options.preserveTransparent,
       );
       return image;
     }
@@ -3689,10 +3751,53 @@ class Image {
       0,
       0,
       decoded,
-      includeColors: resolvedIncludeColors,
-      transparentIndex: resolvedTransparentIndex,
-      alphaThreshold: resolvedAlphaThreshold,
-      preserveTransparent: resolvedPreserveTransparent == true,
+      includeColors: options.includeColors,
+      transparentIndex: options.transparentIndex,
+      alphaThreshold: options.alphaThreshold,
+      preserveTransparent: options.preserveTransparent,
+    );
+    return image;
+  }
+
+  static Image fromBytes(
+    Uint8List encodedBytes, {
+    bool? include_colors,
+    bool? includeColors,
+    bool? use_discovered_palette,
+    bool? useDiscoveredPalette,
+    int? transparent_index,
+    int? transparentIndex,
+    int? alpha_threshold,
+    int? alphaThreshold,
+    bool? preserve_transparent,
+    bool? preserveTransparent,
+  }) {
+    final options = _resolveRasterImageLoadOptions(
+      include_colors: include_colors,
+      includeColors: includeColors,
+      use_discovered_palette: use_discovered_palette,
+      useDiscoveredPalette: useDiscoveredPalette,
+      transparent_index: transparent_index,
+      transparentIndex: transparentIndex,
+      alpha_threshold: alpha_threshold,
+      alphaThreshold: alphaThreshold,
+      preserve_transparent: preserve_transparent,
+      preserveTransparent: preserveTransparent,
+    );
+    final decoded = _tryDecodeRasterBytes(encodedBytes);
+    if (decoded == null) {
+      throw const FormatException('Failed to decode image bytes.');
+    }
+
+    final image = Image(decoded.width, decoded.height);
+    image._loadDecodedRaster(
+      0,
+      0,
+      decoded,
+      includeColors: options.includeColors,
+      transparentIndex: options.transparentIndex,
+      alphaThreshold: options.alphaThreshold,
+      preserveTransparent: options.preserveTransparent,
     );
     return image;
   }
@@ -3936,32 +4041,17 @@ class Image {
     bool? preserve_transparent,
     bool? preserveTransparent,
   }) {
-    final resolvedIncludeColors = _resolveIncludeColorsOption(
+    final options = _resolveRasterImageLoadOptions(
       include_colors: include_colors,
       includeColors: includeColors,
       use_discovered_palette: use_discovered_palette,
       useDiscoveredPalette: useDiscoveredPalette,
-    );
-    final resolvedTransparentIndex = _resolveNamedAlias<int>(
-      snakeName: 'transparent_index',
-      snakeValue: transparent_index,
-      camelName: 'transparentIndex',
-      camelValue: transparentIndex,
-    );
-    final resolvedAlphaThreshold = _normalizeAlphaThreshold(
-      _resolveNamedAlias<int>(
-            snakeName: 'alpha_threshold',
-            snakeValue: alpha_threshold,
-            camelName: 'alphaThreshold',
-            camelValue: alphaThreshold,
-          ) ??
-          0,
-    );
-    final resolvedPreserveTransparent = _resolveNamedAlias<bool>(
-      snakeName: 'preserve_transparent',
-      snakeValue: preserve_transparent,
-      camelName: 'preserveTransparent',
-      camelValue: preserveTransparent,
+      transparent_index: transparent_index,
+      transparentIndex: transparentIndex,
+      alpha_threshold: alpha_threshold,
+      alphaThreshold: alphaThreshold,
+      preserve_transparent: preserve_transparent,
+      preserveTransparent: preserveTransparent,
     );
 
     final decoded = _tryDecodeRasterImage(filename);
@@ -3970,10 +4060,10 @@ class Image {
         x,
         y,
         decoded,
-        includeColors: resolvedIncludeColors,
-        transparentIndex: resolvedTransparentIndex,
-        alphaThreshold: resolvedAlphaThreshold,
-        preserveTransparent: resolvedPreserveTransparent == true,
+        includeColors: options.includeColors,
+        transparentIndex: options.transparentIndex,
+        alphaThreshold: options.alphaThreshold,
+        preserveTransparent: options.preserveTransparent,
       );
       return;
     }
@@ -3984,6 +4074,71 @@ class Image {
     }
     final lines = file.readAsLinesSync();
     set(x, y, lines);
+  }
+
+  void load_bytes(
+    int x,
+    int y,
+    Uint8List encodedBytes, {
+    bool? include_colors,
+    bool? use_discovered_palette,
+    int? transparent_index,
+    int? alpha_threshold,
+    bool? preserve_transparent,
+  }) {
+    loadBytes(
+      x,
+      y,
+      encodedBytes,
+      include_colors: include_colors,
+      use_discovered_palette: use_discovered_palette,
+      transparent_index: transparent_index,
+      alpha_threshold: alpha_threshold,
+      preserve_transparent: preserve_transparent,
+    );
+  }
+
+  void loadBytes(
+    int x,
+    int y,
+    Uint8List encodedBytes, {
+    bool? include_colors,
+    bool? includeColors,
+    bool? use_discovered_palette,
+    bool? useDiscoveredPalette,
+    int? transparent_index,
+    int? transparentIndex,
+    int? alpha_threshold,
+    int? alphaThreshold,
+    bool? preserve_transparent,
+    bool? preserveTransparent,
+  }) {
+    final options = _resolveRasterImageLoadOptions(
+      include_colors: include_colors,
+      includeColors: includeColors,
+      use_discovered_palette: use_discovered_palette,
+      useDiscoveredPalette: useDiscoveredPalette,
+      transparent_index: transparent_index,
+      transparentIndex: transparentIndex,
+      alpha_threshold: alpha_threshold,
+      alphaThreshold: alphaThreshold,
+      preserve_transparent: preserve_transparent,
+      preserveTransparent: preserveTransparent,
+    );
+    final decoded = _tryDecodeRasterBytes(encodedBytes);
+    if (decoded == null) {
+      throw const FormatException('Failed to decode image bytes.');
+    }
+
+    _loadDecodedRaster(
+      x,
+      y,
+      decoded,
+      includeColors: options.includeColors,
+      transparentIndex: options.transparentIndex,
+      alphaThreshold: options.alphaThreshold,
+      preserveTransparent: options.preserveTransparent,
+    );
   }
 
   void save(String filename, int scale) {
