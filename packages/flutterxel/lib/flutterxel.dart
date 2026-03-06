@@ -170,6 +170,7 @@ int get frame_count => frameCount;
 
 bool _isInitialized = false;
 int _runtimeFps = 30;
+int _runtimeColorMode = COLOR_MODE_INDEXED;
 int _runtimeNumColors = DEFAULT_NUM_COLORS;
 Timer? _runLoopTimer;
 final ValueNotifier<int> _frameNotifier = ValueNotifier<int>(0);
@@ -655,6 +656,16 @@ T? _resolveNamedAlias<T>({
 }
 
 bool _isSupportedNumColors(int value) => SUPPORTED_NUM_COLORS.contains(value);
+bool _isSupportedColorMode(int value) => SUPPORTED_COLOR_MODES.contains(value);
+bool _isTruecolorMode(int value) => value == COLOR_MODE_TRUECOLOR;
+
+int _normalizeRgb24(int value) => value & 0x00FFFFFF;
+
+int _normalizeFallbackResourceColor(int value) =>
+    _isTruecolorMode(_runtimeColorMode) ? _normalizeRgb24(value) : value;
+
+int rgb24(int r, int g, int b) =>
+    ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
 
 int _normalizeAlphaThreshold(int value) {
   if (value < 0 || value > 255) {
@@ -786,6 +797,9 @@ int? _fallbackPixelIndex(int x, int y) {
 }
 
 int _fallbackMapColor(int col) {
+  if (_isTruecolorMode(_runtimeColorMode)) {
+    return _normalizeRgb24(col);
+  }
   if (col >= 0 && col < _fallbackPaletteMap.length) {
     return _fallbackPaletteMap[col];
   }
@@ -859,7 +873,7 @@ void _fallbackSetImagePixel(int imageId, int x, int y, int col) {
     return;
   }
   final bank = _fallbackEnsureImageBank(imageId);
-  bank[index] = col;
+  bank[index] = _normalizeFallbackResourceColor(col);
 }
 
 int _fallbackGetImagePixel(int imageId, int x, int y) {
@@ -943,7 +957,9 @@ void _seedFallbackResources() {
   final bank = List<int>.filled(bankSize * bankSize, 0, growable: false);
   for (var y = 0; y < bankSize; y++) {
     for (var x = 0; x < bankSize; x++) {
-      bank[y * bankSize + x] = (x + y) % _runtimeNumColors;
+      bank[y * bankSize + x] = _isTruecolorMode(_runtimeColorMode)
+          ? rgb24(x, y, x + y)
+          : (x + y) % _runtimeNumColors;
     }
   }
   _fallbackImageBanks
@@ -964,23 +980,49 @@ void init(
   int? displayScale,
   int? captureScale,
   int? captureSec,
+  int? color_mode,
+  int? colorMode,
   int? num_colors,
   int? numColors,
 }) {
-  final resolvedNumColors =
+  final resolvedColorMode =
       _resolveNamedAlias<int>(
-        snakeName: 'num_colors',
-        snakeValue: num_colors,
-        camelName: 'numColors',
-        camelValue: numColors,
+        snakeName: 'color_mode',
+        snakeValue: color_mode,
+        camelName: 'colorMode',
+        camelValue: colorMode,
       ) ??
-      DEFAULT_NUM_COLORS;
+      COLOR_MODE_INDEXED;
+  if (!_isSupportedColorMode(resolvedColorMode)) {
+    throw ArgumentError.value(
+      resolvedColorMode,
+      'color_mode',
+      'must be one of 0, 1.',
+    );
+  }
+
+  final resolvedNumColorsInput = _resolveNamedAlias<int>(
+    snakeName: 'num_colors',
+    snakeValue: num_colors,
+    camelName: 'numColors',
+    camelValue: numColors,
+  );
+  if (_isTruecolorMode(resolvedColorMode) && resolvedNumColorsInput != null) {
+    throw ArgumentError(
+      'num_colors/numColors cannot be used with truecolor mode.',
+    );
+  }
+  final resolvedNumColors = resolvedNumColorsInput ?? DEFAULT_NUM_COLORS;
   if (!_isSupportedNumColors(resolvedNumColors)) {
     throw ArgumentError.value(
       resolvedNumColors,
       'num_colors',
       'must be one of 16, 64, 256.',
     );
+  }
+
+  if (_isInitialized && _runtimeColorMode != resolvedColorMode) {
+    quit();
   }
 
   final bindings = _getBindingsOrNull();
@@ -990,6 +1032,22 @@ void init(
 
   try {
     if (bindings != null) {
+      try {
+        if (!_isInitialized) {
+          final configuredColorMode = bindings.flutterxel_core_set_color_mode(
+            resolvedColorMode,
+          );
+          if (!configuredColorMode) {
+            throw StateError('flutterxel_core_set_color_mode failed.');
+          }
+        }
+      } on ArgumentError {
+        throw StateError(
+          'Missing ABI symbol: flutterxel_core_set_color_mode. '
+          'Rebuild native artifacts for this flutterxel version.',
+        );
+      }
+
       try {
         final configured = bindings.flutterxel_core_set_num_colors(
           resolvedNumColors,
@@ -1026,8 +1084,21 @@ void init(
     height = heightValue;
     frameCount = 0;
     _runtimeFps = (fps ?? 30).clamp(1, 240).toInt();
+    _runtimeColorMode = resolvedColorMode;
     _runtimeNumColors = resolvedNumColors;
     if (bindings != null) {
+      try {
+        final nativeColorMode = bindings.flutterxel_core_color_mode();
+        if (_isSupportedColorMode(nativeColorMode)) {
+          _runtimeColorMode = nativeColorMode;
+        }
+      } on ArgumentError {
+        throw StateError(
+          'Missing ABI symbol: flutterxel_core_color_mode. '
+          'Rebuild native artifacts for this flutterxel version.',
+        );
+      }
+
       try {
         final nativeNumColors = bindings.flutterxel_core_num_colors();
         if (_isSupportedNumColors(nativeNumColors)) {
@@ -1134,6 +1205,7 @@ void _clearLocalRuntimeState() {
   _fallbackIntegerScaleEnabled = true;
   _fallbackScreenMode = 0;
   _fallbackFullscreenEnabled = false;
+  _runtimeColorMode = COLOR_MODE_INDEXED;
   _runtimeNumColors = DEFAULT_NUM_COLORS;
   _fallbackPaletteMap = List<int>.generate(_runtimeNumColors, (index) => index);
   _fallbackImageBankSize = IMAGE_SIZE;
@@ -1383,6 +1455,28 @@ void _clearTransientInputValues() {
 
 bool get isRunning => _runLoopTimer?.isActive ?? false;
 bool get isMouseVisible => _fallbackMouseVisible;
+int get colorMode {
+  if (_isInitialized) {
+    final bindings = _getBindingsOrNull();
+    if (bindings != null) {
+      try {
+        final nativeColorMode = bindings.flutterxel_core_color_mode();
+        if (_isSupportedColorMode(nativeColorMode)) {
+          _runtimeColorMode = nativeColorMode;
+        }
+      } on ArgumentError {
+        throw StateError(
+          'Missing ABI symbol: flutterxel_core_color_mode. '
+          'Rebuild native artifacts for this flutterxel version.',
+        );
+      }
+    }
+  }
+  return _runtimeColorMode;
+}
+
+int get color_mode => colorMode;
+bool get isTruecolor => colorMode == COLOR_MODE_TRUECOLOR;
 int get numColors {
   if (_isInitialized) {
     final bindings = _getBindingsOrNull();
@@ -1612,7 +1706,8 @@ void cls(int col) {
     throw StateError('flutterxel_core_cls failed.');
   }
   if (bindings == null) {
-    _fallbackFrameBuffer.fillRange(0, _fallbackFrameBuffer.length, col);
+    final resolved = _fallbackMapColor(col);
+    _fallbackFrameBuffer.fillRange(0, _fallbackFrameBuffer.length, resolved);
   }
 }
 
@@ -1683,6 +1778,9 @@ void pal([int? col1, int? col2]) {
     throw StateError('flutterxel_core_pal failed.');
   }
   if (bindings == null) {
+    if (_isTruecolorMode(_runtimeColorMode)) {
+      return;
+    }
     if (col1 == null && col2 == null) {
       _fallbackPaletteMap = List<int>.generate(
         _runtimeNumColors,
@@ -2890,6 +2988,9 @@ void save(
 /// Pyxel-compatible load_pal API.
 void loadPal(String filename) {
   _ensureInitialized('load_pal');
+  if (_isTruecolorMode(colorMode)) {
+    return;
+  }
 
   final bindings = _getBindingsOrNull();
   if (bindings != null) {
@@ -2924,6 +3025,9 @@ void load_pal(String filename) => loadPal(filename);
 /// Pyxel-compatible save_pal API.
 void savePal(String filename) {
   _ensureInitialized('save_pal');
+  if (_isTruecolorMode(colorMode)) {
+    return;
+  }
 
   final bindings = _getBindingsOrNull();
   if (bindings != null) {
@@ -3686,13 +3790,14 @@ class Image {
     int col, {
     required bool syncNative,
   }) {
+    final normalizedCol = _normalizeFallbackResourceColor(col);
     if (_imageId != null) {
       final imageId = _imageId;
-      _fallbackSetImagePixel(imageId, x, y, col);
+      _fallbackSetImagePixel(imageId, x, y, normalizedCol);
       if (syncNative) {
         final bindings = _getBindingsOrNull();
         if (bindings != null) {
-          bindings.flutterxel_core_image_pset(imageId, x, y, col);
+          bindings.flutterxel_core_image_pset(imageId, x, y, normalizedCol);
         }
       }
       return;
@@ -3704,7 +3809,7 @@ class Image {
     if (x < 0 || y < 0 || x >= _width || y >= _height) {
       return;
     }
-    pixels[y * _width + x] = col;
+    pixels[y * _width + x] = normalizedCol;
   }
 
   void _setLocalPixel(int x, int y, int col) =>
@@ -3947,12 +4052,13 @@ class Image {
     if (_imageId != null) {
       final imageId = _imageId;
       final bank = _fallbackEnsureImageBank(imageId);
+      final normalized = _normalizeFallbackResourceColor(col);
       for (var i = 0; i < bank.length; i++) {
-        bank[i] = col;
+        bank[i] = normalized;
       }
       final bindings = _getBindingsOrNull();
       if (bindings != null) {
-        bindings.flutterxel_core_image_cls(imageId, col);
+        bindings.flutterxel_core_image_cls(imageId, normalized);
       }
       return;
     }
@@ -3960,8 +4066,9 @@ class Image {
     if (pixels == null) {
       return;
     }
+    final normalized = _normalizeFallbackResourceColor(col);
     for (var i = 0; i < pixels.length; i++) {
-      pixels[i] = col;
+      pixels[i] = normalized;
     }
   }
 

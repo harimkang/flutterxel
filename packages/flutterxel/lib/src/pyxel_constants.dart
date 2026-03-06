@@ -20,6 +20,12 @@ const int NUM_COLORS = 16;
 const int DEFAULT_NUM_COLORS = 16;
 const int MAX_NUM_COLORS = 256;
 const List<int> SUPPORTED_NUM_COLORS = <int>[16, 64, 256];
+const int COLOR_MODE_INDEXED = 0;
+const int COLOR_MODE_TRUECOLOR = 1;
+const List<int> SUPPORTED_COLOR_MODES = <int>[
+  COLOR_MODE_INDEXED,
+  COLOR_MODE_TRUECOLOR,
+];
 const int MAX_COLORS = 255;
 const int NUM_IMAGES = 3;
 const int IMAGE_SIZE = 256;

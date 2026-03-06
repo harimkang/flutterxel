@@ -468,6 +468,39 @@ void main() {
     flutterxel.quit();
   });
 
+  test('truecolor init exposes color mode runtime helpers', () {
+    flutterxel.init(16, 16, color_mode: flutterxel.COLOR_MODE_INDEXED);
+    expect(flutterxel.colorMode, flutterxel.COLOR_MODE_INDEXED);
+    expect(flutterxel.color_mode, flutterxel.COLOR_MODE_INDEXED);
+    expect(flutterxel.isTruecolor, isFalse);
+    flutterxel.quit();
+
+    flutterxel.init(16, 16, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+    expect(flutterxel.colorMode, flutterxel.COLOR_MODE_TRUECOLOR);
+    expect(flutterxel.color_mode, flutterxel.COLOR_MODE_TRUECOLOR);
+    expect(flutterxel.isTruecolor, isTrue);
+    flutterxel.quit();
+  });
+
+  test(
+    'truecolor init rejects num_colors when truecolor mode is requested',
+    () {
+      expect(
+        () => flutterxel.init(
+          16,
+          16,
+          colorMode: flutterxel.COLOR_MODE_TRUECOLOR,
+          num_colors: 64,
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test('truecolor rgb24 packs rgb bytes into a 24-bit integer', () {
+    expect(flutterxel.rgb24(255, 128, 1), 0xFF8001);
+  });
+
   test('pal supports 63/255 indices when runtime num_colors is expanded', () {
     flutterxel.init(16, 16, num_colors: 64);
     flutterxel.cls(0);
