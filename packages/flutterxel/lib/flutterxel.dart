@@ -3872,35 +3872,47 @@ class Image {
     final mappedColors = <int, int>{};
     final discoveredPalette = <int>[];
     final paletteLimit = _runtimeNumColors;
+    final isTruecolor = _isTruecolorMode(_runtimeColorMode);
     for (var y = 0; y < decoded.height; y++) {
       for (var x = 0; x < decoded.width; x++) {
         final pixel = decoded.getPixel(x, y);
         final alpha = pixel.a.toInt() & 0xFF;
-        if (preserveTransparent &&
-            transparentIndex != null &&
-            alpha <= alphaThreshold) {
+        if (preserveTransparent && alpha <= alphaThreshold) {
+          if (!isTruecolor && transparentIndex != null) {
+            _setLocalPixelInternal(
+              dstX + x,
+              dstY + y,
+              transparentIndex,
+              syncNative: false,
+            );
+          }
+          continue;
+        }
+        final rgbValue = rgb24(
+          pixel.r.toInt(),
+          pixel.g.toInt(),
+          pixel.b.toInt(),
+        );
+
+        if (isTruecolor) {
           _setLocalPixelInternal(
             dstX + x,
             dstY + y,
-            transparentIndex,
+            rgbValue,
             syncNative: false,
           );
           continue;
         }
-        final rgb24 =
-            ((pixel.r.toInt() & 0xFF) << 16) |
-            ((pixel.g.toInt() & 0xFF) << 8) |
-            (pixel.b.toInt() & 0xFF);
 
-        final mapped = mappedColors.putIfAbsent(rgb24, () {
+        final mapped = mappedColors.putIfAbsent(rgbValue, () {
           if (!includeColors) {
-            return _nearestPaletteIndexFromRgb24(rgb24, DEFAULT_COLORS);
+            return _nearestPaletteIndexFromRgb24(rgbValue, DEFAULT_COLORS);
           }
           if (discoveredPalette.length < paletteLimit) {
-            discoveredPalette.add(rgb24);
+            discoveredPalette.add(rgbValue);
             return discoveredPalette.length - 1;
           }
-          return _nearestPaletteIndexFromRgb24(rgb24, discoveredPalette);
+          return _nearestPaletteIndexFromRgb24(rgbValue, discoveredPalette);
         });
 
         _setLocalPixelInternal(dstX + x, dstY + y, mapped, syncNative: false);

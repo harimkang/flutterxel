@@ -1462,6 +1462,71 @@ void main() {
   );
 
   test(
+    'truecolor PNG import preserves rgb24 values without palette quantization',
+    () {
+      final tempDir = Directory.systemTemp.createTempSync(
+        'flutterxel_truecolor_png_',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestPng(
+        tempDir,
+        name: 'truecolor.png',
+        width: 2,
+        height: 1,
+        rgb24Pixels: const <int>[0x123456, 0xABCDEF],
+      );
+
+      flutterxel.init(8, 8);
+      final indexed = flutterxel.Image.fromImage(pngPath);
+      flutterxel.quit();
+
+      flutterxel.init(8, 8, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+      final truecolor = flutterxel.Image.fromImage(pngPath);
+
+      expect(indexed.pget(0, 0), isNot(0x123456));
+      expect(indexed.pget(1, 0), isNot(0xABCDEF));
+      expect(truecolor.pget(0, 0), 0x123456);
+      expect(truecolor.pget(1, 0), 0xABCDEF);
+    },
+  );
+
+  test(
+    'truecolor PNG import ignores palette-discovery options and keeps source rgb24',
+    () {
+      flutterxel.init(8, 8, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+      final tempDir = Directory.systemTemp.createTempSync(
+        'flutterxel_truecolor_include_colors_',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+
+      final pngPath = _writeTestPng(
+        tempDir,
+        name: 'include_colors_truecolor.png',
+        width: 2,
+        height: 1,
+        rgb24Pixels: const <int>[0xD4186C, 0x70C6A9],
+      );
+
+      final image = flutterxel.Image.fromImage(
+        pngPath,
+        include_colors: true,
+        use_discovered_palette: true,
+      );
+      expect(image.pget(0, 0), 0xD4186C);
+      expect(image.pget(1, 0), 0x70C6A9);
+    },
+  );
+
+  test(
     'include_colors semantics use discovered-palette order for local index mapping',
     () {
       flutterxel.init(8, 8);
