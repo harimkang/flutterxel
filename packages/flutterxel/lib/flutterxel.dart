@@ -4178,7 +4178,7 @@ class Image {
         final pixel = decoded.getPixel(x, y);
         final alpha = pixel.a.toInt() & 0xFF;
         if (preserveTransparent && alpha <= alphaThreshold) {
-          if (!isTruecolor && transparentIndex != null) {
+          if (transparentIndex != null) {
             _setLocalPixelInternal(
               dstX + x,
               dstY + y,
