@@ -182,8 +182,27 @@ flutter run
 
 - Global `blt(...)` accepts image resource ids (`int`), resource-backed `Image` handles, and detached `Image` instances.
 - Detached `Image(...)` / `Image.fromImage(...)` / `Image.fromBytes(...)` sources use the compatibility screen-local blit path.
+- `bltEx(...)` and `Image.bltEx(...)` scale a source rect into a destination rect with nearest-neighbor sampling.
 - Built-in `text(...)` rendering currently supports ASCII code points `32..127`; unsupported code points are skipped.
 - In native-binding mode, resource image mutations (`images[n].pset/cls/set/load`) are synchronized to native core image banks and are reflected by subsequent global `blt(...)` rendering.
+
+Example:
+
+```dart
+final atlas = flutterxel.Image.fromBytes(encodedPngBytes);
+
+flutterxel.bltEx(
+  40,
+  24,
+  atlas,
+  srcX: 8,
+  srcY: 0,
+  srcW: 8,
+  srcH: 8,
+  dstW: 24,
+  dstH: 24,
+);
+```
 
 ## Monorepo Structure
 

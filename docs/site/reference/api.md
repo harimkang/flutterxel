@@ -20,3 +20,9 @@ This runs `dart doc` in `packages/flutterxel` and outputs files to:
 
 This project intentionally avoids hand-maintained API signature pages.
 Generated API docs are the source of truth for members, signatures, and class-level details.
+
+## Recent Primitive Additions
+
+- `Image.fromBytes(...)` / `image.loadBytes(...)` for bytes-based raster imports
+- `bltEx(...)` / `blt_ex(...)` for nearest-neighbor source-rect to destination-rect blits
+- `Image.bltEx(...)` / `Image.blt_ex(...)` for the same blit semantics on detached images

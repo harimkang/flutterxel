@@ -2362,6 +2362,62 @@ void _fallbackDrawBlt(
   }
 }
 
+int Function(int sx, int sy) _resolveBltPixelSampler(
+  Object img, {
+  required String apiName,
+}) {
+  return switch (img) {
+    int imageId => (int sx, int sy) => _fallbackGetImagePixel(imageId, sx, sy),
+    Image source => (int sx, int sy) => source._getLocalPixel(sx, sy),
+    _ => throw UnsupportedError(
+      '$apiName img supports int id or Image source.',
+    ),
+  };
+}
+
+void _drawNearestNeighborBlt({
+  required int Function(int sx, int sy) samplePixel,
+  required void Function(int x, int y, int color) putPixel,
+  required int dstX,
+  required int dstY,
+  required int srcX,
+  required int srcY,
+  required int srcW,
+  required int srcH,
+  required int dstW,
+  required int dstH,
+  int? colkey,
+}) {
+  final srcWidth = srcW.abs();
+  final srcHeight = srcH.abs();
+  final dstWidth = dstW.abs();
+  final dstHeight = dstH.abs();
+  if (srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0) {
+    return;
+  }
+
+  final flipSrcX = srcW < 0;
+  final flipSrcY = srcH < 0;
+  final flipDstX = dstW < 0;
+  final flipDstY = dstH < 0;
+
+  for (var dy = 0; dy < dstHeight; dy++) {
+    for (var dx = 0; dx < dstWidth; dx++) {
+      final mappedDx = flipDstX ? (dstWidth - 1 - dx) : dx;
+      final mappedDy = flipDstY ? (dstHeight - 1 - dy) : dy;
+      final srcOffsetX = (mappedDx * srcWidth / dstWidth).floor();
+      final srcOffsetY = (mappedDy * srcHeight / dstHeight).floor();
+      final sx = srcX + (flipSrcX ? (srcWidth - 1 - srcOffsetX) : srcOffsetX);
+      final sy = srcY + (flipSrcY ? (srcHeight - 1 - srcOffsetY) : srcOffsetY);
+      final color = samplePixel(sx, sy);
+      if (colkey != null && color == colkey) {
+        continue;
+      }
+      putPixel(dstX + dx, dstY + dy, color);
+    }
+  }
+}
+
 /// Pyxel-compatible bltm API.
 void bltm(
   double x,
@@ -2498,6 +2554,74 @@ void blt(
   if (bindings == null) {
     _fallbackDrawBlt(x, y, imageId, u, v, w, h, colkey: colkey);
   }
+}
+
+void blt_ex(
+  double x,
+  double y,
+  Object img, {
+  required double srcX,
+  required double srcY,
+  required double srcW,
+  required double srcH,
+  required double dstW,
+  required double dstH,
+  int? colkey,
+  double? pivotX,
+  double? pivotY,
+  double? rotate,
+}) {
+  bltEx(
+    x,
+    y,
+    img,
+    srcX: srcX,
+    srcY: srcY,
+    srcW: srcW,
+    srcH: srcH,
+    dstW: dstW,
+    dstH: dstH,
+    colkey: colkey,
+    pivotX: pivotX,
+    pivotY: pivotY,
+    rotate: rotate,
+  );
+}
+
+void bltEx(
+  double x,
+  double y,
+  Object img, {
+  required double srcX,
+  required double srcY,
+  required double srcW,
+  required double srcH,
+  required double dstW,
+  required double dstH,
+  int? colkey,
+  double? pivotX,
+  double? pivotY,
+  double? rotate,
+}) {
+  _ensureInitialized('bltEx');
+  if (rotate != null) {
+    throw UnsupportedError('bltEx rotate is not supported yet.');
+  }
+
+  final samplePixel = _resolveBltPixelSampler(img, apiName: 'bltEx');
+  _drawNearestNeighborBlt(
+    samplePixel: samplePixel,
+    putPixel: (px, py, color) => pset(px, py, color),
+    dstX: x.round() - (pivotX?.round() ?? 0),
+    dstY: y.round() - (pivotY?.round() ?? 0),
+    srcX: srcX.round(),
+    srcY: srcY.round(),
+    srcW: srcW.round(),
+    srcH: srcH.round(),
+    dstW: dstW.round(),
+    dstH: dstH.round(),
+    colkey: colkey,
+  );
 }
 
 void _playImpl(int ch, Object snd, {double? sec, bool? loop, bool? resume}) {
@@ -3615,6 +3739,38 @@ void _screenBlt(
   );
 }
 
+void _screenBltEx(
+  num x,
+  num y,
+  Object img, {
+  required num srcX,
+  required num srcY,
+  required num srcW,
+  required num srcH,
+  required num dstW,
+  required num dstH,
+  int? colkey,
+  num? pivotX,
+  num? pivotY,
+  num? rotate,
+}) {
+  bltEx(
+    x.toDouble(),
+    y.toDouble(),
+    img,
+    srcX: srcX.toDouble(),
+    srcY: srcY.toDouble(),
+    srcW: srcW.toDouble(),
+    srcH: srcH.toDouble(),
+    dstW: dstW.toDouble(),
+    dstH: dstH.toDouble(),
+    colkey: colkey,
+    pivotX: pivotX?.toDouble(),
+    pivotY: pivotY?.toDouble(),
+    rotate: rotate?.toDouble(),
+  );
+}
+
 void _screenBltm(
   num x,
   num y,
@@ -4645,6 +4801,90 @@ class Image {
         pset(dstX + dx, dstY + dy, value);
       }
     }
+  }
+
+  void blt_ex(
+    num x,
+    num y,
+    Object img, {
+    required num srcX,
+    required num srcY,
+    required num srcW,
+    required num srcH,
+    required num dstW,
+    required num dstH,
+    int? colkey,
+    num? pivotX,
+    num? pivotY,
+    num? rotate,
+  }) {
+    bltEx(
+      x,
+      y,
+      img,
+      srcX: srcX,
+      srcY: srcY,
+      srcW: srcW,
+      srcH: srcH,
+      dstW: dstW,
+      dstH: dstH,
+      colkey: colkey,
+      pivotX: pivotX,
+      pivotY: pivotY,
+      rotate: rotate,
+    );
+  }
+
+  void bltEx(
+    num x,
+    num y,
+    Object img, {
+    required num srcX,
+    required num srcY,
+    required num srcW,
+    required num srcH,
+    required num dstW,
+    required num dstH,
+    int? colkey,
+    num? pivotX,
+    num? pivotY,
+    num? rotate,
+  }) {
+    if (rotate != null) {
+      throw UnsupportedError('image.bltEx rotate is not supported yet.');
+    }
+    if (_isScreen) {
+      _screenBltEx(
+        x,
+        y,
+        img,
+        srcX: srcX,
+        srcY: srcY,
+        srcW: srcW,
+        srcH: srcH,
+        dstW: dstW,
+        dstH: dstH,
+        colkey: colkey,
+        pivotX: pivotX,
+        pivotY: pivotY,
+      );
+      return;
+    }
+
+    final samplePixel = _resolveBltPixelSampler(img, apiName: 'image.bltEx');
+    _drawNearestNeighborBlt(
+      samplePixel: samplePixel,
+      putPixel: (px, py, color) => pset(px, py, color),
+      dstX: x.round() - (pivotX?.round() ?? 0),
+      dstY: y.round() - (pivotY?.round() ?? 0),
+      srcX: srcX.round(),
+      srcY: srcY.round(),
+      srcW: srcW.round(),
+      srcH: srcH.round(),
+      dstW: dstW.round(),
+      dstH: dstH.round(),
+      colkey: colkey,
+    );
   }
 
   void bltm(

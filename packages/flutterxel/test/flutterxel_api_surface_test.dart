@@ -142,9 +142,6 @@ Uint8List _encodeTestPngBytes({
   return Uint8List.fromList(img.encodePng(image));
 }
 
-String _flutterxelLibrarySource() =>
-    File('lib/flutterxel.dart').readAsStringSync();
-
 bool _hasCommand(String command) {
   final result = Platform.isWindows
       ? Process.runSync('where', <String>[command], runInShell: true)
@@ -1390,19 +1387,63 @@ void main() {
     expect(flutterxel.pget(0, 0), 7);
   });
 
-  test('bltEx and Image.bltEx symbols exist in the public library source', () {
-    final source = _flutterxelLibrarySource();
+  test('bltEx scales nearest-neighbor into destination rect', () {
+    flutterxel.init(8, 8);
+    flutterxel.cls(0);
 
-    expect(RegExp(r'\bvoid\s+bltEx\s*\(').hasMatch(source), isTrue);
-    expect(RegExp(r'\bvoid\s+blt_ex\s*\(').hasMatch(source), isTrue);
-    expect(
-      RegExp(r'class Image[\s\S]*\bvoid\s+bltEx\s*\(').hasMatch(source),
-      isTrue,
+    final src = flutterxel.Image(2, 1);
+    src.pset(0, 0, 3);
+    src.pset(1, 0, 5);
+
+    flutterxel.bltEx(
+      1,
+      1,
+      src,
+      srcX: 0,
+      srcY: 0,
+      srcW: 2,
+      srcH: 1,
+      dstW: 4,
+      dstH: 2,
     );
-    expect(
-      RegExp(r'class Image[\s\S]*\bvoid\s+blt_ex\s*\(').hasMatch(source),
-      isTrue,
+
+    expect(flutterxel.pget(1, 1), 3);
+    expect(flutterxel.pget(2, 1), 3);
+    expect(flutterxel.pget(3, 1), 5);
+    expect(flutterxel.pget(4, 2), 5);
+  });
+
+  test('Image.bltEx uses pivot to offset the destination rect origin', () {
+    final dst = flutterxel.Image(6, 6);
+    final src = flutterxel.Image(2, 1);
+    src.pset(0, 0, 8);
+    src.pset(1, 0, 11);
+
+    dst.bltEx(
+      3,
+      2,
+      src,
+      srcX: 0,
+      srcY: 0,
+      srcW: 2,
+      srcH: 1,
+      dstW: 4,
+      dstH: 2,
+      pivotX: 2,
+      pivotY: 1,
     );
+
+    expect(dst.pget(1, 1), 8);
+    expect(dst.pget(2, 1), 8);
+    expect(dst.pget(3, 2), 11);
+    expect(dst.pget(4, 2), 11);
+  });
+
+  test('blt_ex aliases are exposed for top-level and Image blits', () {
+    expect(flutterxel.blt_ex, isA<Function>());
+
+    final image = flutterxel.Image(2, 2);
+    expect(image.blt_ex, isA<Function>());
   });
 
   test('Image.fromBytes decodes png bytes into detached image', () {
