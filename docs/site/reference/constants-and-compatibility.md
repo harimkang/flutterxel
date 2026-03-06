@@ -57,8 +57,8 @@ Behavior summary:
 
 ## `blt` Source Contract
 
-- Global `blt(...)` accepts image resource ids (`int`) or resource-backed `Image` objects.
-- Detached `Image(...)` / `Image.fromImage(...)` objects should be used via `image.blt(...)`.
+- Global `blt(...)` accepts image resource ids (`int`), resource-backed `Image` objects, and detached `Image` objects.
+- Detached `Image(...)` / `Image.fromImage(...)` / `Image.fromBytes(...)` sources use the compatibility screen-local blit path.
 - Resource-image mutations in native mode (`pset`, `cls`, `set`, `load`) are synchronized to the native core image bank used by global `blt(...)`.
 
 ## Runtime Backend Mode and Capabilities

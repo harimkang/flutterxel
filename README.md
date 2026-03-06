@@ -180,8 +180,8 @@ flutter run
 
 ## Compatibility Notes
 
-- Global `blt(...)` currently supports image resource ids (`int`) and resource-backed `Image` handles only.
-- For detached `Image(...)` / `Image.fromImage(...)` objects, use `image.blt(...)` instead of global `blt(...)`.
+- Global `blt(...)` accepts image resource ids (`int`), resource-backed `Image` handles, and detached `Image` instances.
+- Detached `Image(...)` / `Image.fromImage(...)` / `Image.fromBytes(...)` sources use the compatibility screen-local blit path.
 - Built-in `text(...)` rendering currently supports ASCII code points `32..127`; unsupported code points are skipped.
 - In native-binding mode, resource image mutations (`images[n].pset/cls/set/load`) are synchronized to native core image banks and are reflected by subsequent global `blt(...)` rendering.
 

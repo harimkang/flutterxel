@@ -2425,6 +2425,45 @@ void blt(
 }) {
   _ensureInitialized('blt');
 
+  if (img is Image && !img._isScreen && img._resourceImageId() == null) {
+    final widthPixels = w.abs().round();
+    final heightPixels = h.abs().round();
+    if (widthPixels <= 0 || heightPixels <= 0) {
+      return;
+    }
+
+    final dstX = x.round();
+    final dstY = y.round();
+    final srcX = u.round();
+    final srcY = v.round();
+    final flipX = w < 0;
+    final flipY = h < 0;
+    final sampled = List<int>.filled(
+      widthPixels * heightPixels,
+      0,
+      growable: false,
+    );
+
+    for (var dy = 0; dy < heightPixels; dy++) {
+      for (var dx = 0; dx < widthPixels; dx++) {
+        final sx = srcX + (flipX ? (widthPixels - 1 - dx) : dx);
+        final sy = srcY + (flipY ? (heightPixels - 1 - dy) : dy);
+        sampled[dy * widthPixels + dx] = img._getLocalPixel(sx, sy);
+      }
+    }
+
+    for (var dy = 0; dy < heightPixels; dy++) {
+      for (var dx = 0; dx < widthPixels; dx++) {
+        final color = sampled[dy * widthPixels + dx];
+        if (colkey != null && color == colkey) {
+          continue;
+        }
+        pset(dstX + dx, dstY + dy, color);
+      }
+    }
+    return;
+  }
+
   final imageId = switch (img) {
     int value => value,
     Image value => value._resourceImageId(),
