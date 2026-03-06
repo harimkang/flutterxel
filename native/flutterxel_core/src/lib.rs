@@ -14,6 +14,7 @@ const ABI_VERSION_PATCH: u32 = 0;
 const BACKEND_KIND_NATIVE_CORE: i32 = 1;
 const COLOR_MODE_INDEXED: i32 = 0;
 const COLOR_MODE_TRUECOLOR: i32 = 1;
+const DEFAULT_COLOR_MODE: i32 = COLOR_MODE_INDEXED;
 const DEFAULT_NUM_COLORS: i32 = 16;
 const MAX_NUM_COLORS: usize = 256;
 const OPTIONAL_I32_NONE: i32 = i32::MIN;
@@ -163,6 +164,7 @@ struct RuntimeState {
     clip_y: i32,
     clip_w: i32,
     clip_h: i32,
+    color_mode: i32,
     num_colors: i32,
     palette_map: [i32; MAX_NUM_COLORS],
     pressed_keys: HashSet<i32>,
@@ -216,6 +218,7 @@ impl Default for RuntimeState {
             clip_y: 0,
             clip_w: 0,
             clip_h: 0,
+            color_mode: DEFAULT_COLOR_MODE,
             num_colors: DEFAULT_NUM_COLORS,
             palette_map: palette_identity_map(DEFAULT_NUM_COLORS as usize),
             pressed_keys: HashSet::new(),
@@ -309,6 +312,22 @@ fn is_supported_num_colors(num_colors: i32) -> bool {
     matches!(num_colors, 16 | 64 | 256)
 }
 
+fn is_supported_color_mode(color_mode: i32) -> bool {
+    matches!(color_mode, COLOR_MODE_INDEXED | COLOR_MODE_TRUECOLOR)
+}
+
+fn is_truecolor_mode(color_mode: i32) -> bool {
+    color_mode == COLOR_MODE_TRUECOLOR
+}
+
+fn runtime_color_mode(color_mode: i32) -> i32 {
+    if is_supported_color_mode(color_mode) {
+        color_mode
+    } else {
+        DEFAULT_COLOR_MODE
+    }
+}
+
 fn runtime_num_colors(num_colors: i32) -> usize {
     if is_supported_num_colors(num_colors) {
         num_colors as usize
@@ -319,6 +338,18 @@ fn runtime_num_colors(num_colors: i32) -> usize {
 
 fn reset_palette_map(palette_map: &mut [i32; MAX_NUM_COLORS], num_colors: i32) {
     *palette_map = palette_identity_map(runtime_num_colors(num_colors));
+}
+
+fn normalize_rgb24(col: i32) -> i32 {
+    col & 0x00FF_FFFF
+}
+
+fn normalize_resource_color(color_mode: i32, col: i32) -> i32 {
+    if is_truecolor_mode(runtime_color_mode(color_mode)) {
+        normalize_rgb24(col)
+    } else {
+        col
+    }
 }
 
 fn noise_fade(t: f64) -> f64 {
@@ -438,9 +469,15 @@ fn ensure_default_image_bank(state: &mut RuntimeState) {
 
     let size = state.image_bank_size.max(1) as usize;
     let mut bank = vec![0; size * size];
+    let color_mode = runtime_color_mode(state.color_mode);
+    let num_colors = runtime_num_colors(state.num_colors).max(1);
     for y in 0..size {
         for x in 0..size {
-            bank[y * size + x] = ((x + y) % 16) as i32;
+            bank[y * size + x] = if is_truecolor_mode(color_mode) {
+                (((x as i32) & 0xFF) << 16) | (((y as i32) & 0xFF) << 8) | (((x + y) as i32) & 0xFF)
+            } else {
+                ((x + y) % num_colors) as i32
+            };
         }
     }
 
@@ -1271,9 +1308,13 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
     let clip_h = state.clip_h;
     let frame_width = state.width;
     let frame_height = state.height;
+    let color_mode = runtime_color_mode(state.color_mode);
     let num_colors = runtime_num_colors(state.num_colors);
     let palette_map = state.palette_map;
     let frame_buffer = &mut state.frame_buffer;
+    let normalized_colkey = call
+        .colkey
+        .map(|value| normalize_resource_color(color_mode, value));
 
     let flip_x = call.w < 0.0;
     let flip_y = call.h < 0.0;
@@ -1293,7 +1334,7 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
             let Some(color) = source.get(src_index).copied() else {
                 continue;
             };
-            if call.colkey == Some(color) {
+            if normalized_colkey == Some(color) {
                 continue;
             }
 
@@ -1309,6 +1350,7 @@ fn draw_blt(state: &mut RuntimeState, call: &BltCall) -> bool {
                 clip_y,
                 clip_w,
                 clip_h,
+                color_mode,
                 &palette_map,
                 num_colors,
                 dst_x,
@@ -1373,9 +1415,11 @@ fn draw_bltm(
     let clip_h = state.clip_h;
     let frame_width = state.width;
     let frame_height = state.height;
+    let color_mode = runtime_color_mode(state.color_mode);
     let num_colors = runtime_num_colors(state.num_colors);
     let palette_map = state.palette_map;
     let frame_buffer = &mut state.frame_buffer;
+    let normalized_colkey = colkey.map(|value| normalize_resource_color(color_mode, value));
 
     for dy in 0..tiles_h {
         for dx in 0..tiles_w {
@@ -1401,7 +1445,7 @@ fn draw_bltm(
 
                     let src_index = src_y as usize * source_size_usize + src_x as usize;
                     let color = source_bank[src_index];
-                    if colkey == Some(color) {
+                    if normalized_colkey == Some(color) {
                         continue;
                     }
 
@@ -1417,6 +1461,7 @@ fn draw_bltm(
                         clip_y,
                         clip_w,
                         clip_h,
+                        color_mode,
                         &palette_map,
                         num_colors,
                         dst_x,
@@ -1442,6 +1487,20 @@ fn map_palette_color(palette_map: &[i32], num_colors: usize, col: i32) -> i32 {
 }
 
 #[inline]
+fn resolve_draw_color_for_mode(
+    color_mode: i32,
+    palette_map: &[i32],
+    num_colors: usize,
+    col: i32,
+) -> i32 {
+    if is_truecolor_mode(runtime_color_mode(color_mode)) {
+        normalize_rgb24(col)
+    } else {
+        map_palette_color(palette_map, num_colors, col)
+    }
+}
+
+#[inline]
 fn set_frame_pixel_raw(
     frame_buffer: &mut [i32],
     frame_width: i32,
@@ -1452,6 +1511,7 @@ fn set_frame_pixel_raw(
     clip_y: i32,
     clip_w: i32,
     clip_h: i32,
+    color_mode: i32,
     palette_map: &[i32],
     num_colors: usize,
     x: i32,
@@ -1474,11 +1534,12 @@ fn set_frame_pixel_raw(
     if index >= frame_buffer.len() {
         return;
     }
-    frame_buffer[index] = map_palette_color(palette_map, num_colors, col);
+    frame_buffer[index] = resolve_draw_color_for_mode(color_mode, palette_map, num_colors, col);
 }
 
-fn apply_palette(state: &RuntimeState, col: i32) -> i32 {
-    map_palette_color(
+fn resolve_draw_color(state: &RuntimeState, col: i32) -> i32 {
+    resolve_draw_color_for_mode(
+        state.color_mode,
         &state.palette_map,
         runtime_num_colors(state.num_colors),
         col,
@@ -1500,7 +1561,7 @@ fn set_frame_pixel(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
     }
 
     let index = sy as usize * state.width as usize + sx as usize;
-    state.frame_buffer[index] = apply_palette(state, col);
+    state.frame_buffer[index] = resolve_draw_color(state, col);
 }
 
 fn get_frame_pixel(state: &RuntimeState, x: i32, y: i32) -> i32 {
@@ -1685,7 +1746,7 @@ fn draw_fill(state: &mut RuntimeState, x: i32, y: i32, col: i32) {
     let width = state.width as usize;
     let start_index = sy as usize * width + sx as usize;
     let target_color = state.frame_buffer[start_index];
-    let fill_color = apply_palette(state, col);
+    let fill_color = resolve_draw_color(state, col);
     if target_color == fill_color {
         return;
     }
@@ -1848,12 +1909,22 @@ pub extern "C" fn flutterxel_core_num_colors() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn flutterxel_core_set_color_mode(color_mode: i32) -> bool {
-    matches!(color_mode, COLOR_MODE_INDEXED | COLOR_MODE_TRUECOLOR)
+    if !is_supported_color_mode(color_mode) {
+        return false;
+    }
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if state.initialized {
+        return false;
+    }
+    state.color_mode = color_mode;
+    true
 }
 
 #[no_mangle]
 pub extern "C" fn flutterxel_core_color_mode() -> i32 {
-    COLOR_MODE_INDEXED
+    let state = runtime_state().lock().expect("runtime state poisoned");
+    runtime_color_mode(state.color_mode)
 }
 
 #[no_mangle]
@@ -1904,6 +1975,7 @@ pub extern "C" fn flutterxel_core_init(
     state.clip_y = 0;
     state.clip_w = width;
     state.clip_h = height;
+    state.color_mode = runtime_color_mode(state.color_mode);
     if !is_supported_num_colors(state.num_colors) {
         state.num_colors = DEFAULT_NUM_COLORS;
     }
@@ -1966,6 +2038,7 @@ pub extern "C" fn flutterxel_core_quit() -> bool {
     state.clip_y = 0;
     state.clip_w = 0;
     state.clip_h = 0;
+    state.color_mode = DEFAULT_COLOR_MODE;
     state.num_colors = DEFAULT_NUM_COLORS;
     let runtime_num_colors = state.num_colors;
     reset_palette_map(&mut state.palette_map, runtime_num_colors);
@@ -2107,6 +2180,7 @@ pub extern "C" fn flutterxel_core_reset() -> bool {
     state.clip_y = 0;
     state.clip_w = 0;
     state.clip_h = 0;
+    state.color_mode = DEFAULT_COLOR_MODE;
     state.num_colors = DEFAULT_NUM_COLORS;
     let runtime_num_colors = state.num_colors;
     reset_palette_map(&mut state.palette_map, runtime_num_colors);
@@ -2343,8 +2417,9 @@ pub extern "C" fn flutterxel_core_cls(col: i32) -> bool {
     if !state.initialized {
         return false;
     }
-    state.clear_color = col;
-    state.frame_buffer.fill(col);
+    let clear_color = resolve_draw_color(&state, col);
+    state.clear_color = clear_color;
+    state.frame_buffer.fill(clear_color);
     true
 }
 
@@ -2394,6 +2469,9 @@ pub extern "C" fn flutterxel_core_pal(col1: i32, col2: i32) -> bool {
     let mut state = runtime_state().lock().expect("runtime state poisoned");
     if !state.initialized {
         return false;
+    }
+    if is_truecolor_mode(runtime_color_mode(state.color_mode)) {
+        return true;
     }
 
     let opt_col1 = decode_optional_i32(col1);
@@ -2460,6 +2538,7 @@ pub extern "C" fn flutterxel_core_image_pset(img: i32, x: i32, y: i32, col: i32)
     if !state.initialized {
         return false;
     }
+    let color_mode = state.color_mode;
     let Some(index) = image_bank_pixel_index(state.image_bank_size, x, y) else {
         return true;
     };
@@ -2467,7 +2546,7 @@ pub extern "C" fn flutterxel_core_image_pset(img: i32, x: i32, y: i32, col: i32)
         return false;
     };
     if index < bank.len() {
-        bank[index] = col;
+        bank[index] = normalize_resource_color(color_mode, col);
     }
     true
 }
@@ -2502,10 +2581,11 @@ pub extern "C" fn flutterxel_core_image_cls(img: i32, col: i32) -> bool {
     if !state.initialized {
         return false;
     }
+    let color_mode = state.color_mode;
     let Some(bank) = ensure_image_bank_mut(&mut state, img) else {
         return false;
     };
-    bank.fill(col);
+    bank.fill(normalize_resource_color(color_mode, col));
     true
 }
 
@@ -2515,6 +2595,7 @@ pub extern "C" fn flutterxel_core_image_replace(img: i32, data: *const i32, len:
     if !state.initialized {
         return false;
     }
+    let color_mode = state.color_mode;
     let Some(bank) = ensure_image_bank_mut(&mut state, img) else {
         return false;
     };
@@ -2528,7 +2609,13 @@ pub extern "C" fn flutterxel_core_image_replace(img: i32, data: *const i32, len:
         return false;
     }
     let incoming = unsafe { std::slice::from_raw_parts(data, len) };
-    bank.copy_from_slice(incoming);
+    if is_truecolor_mode(runtime_color_mode(color_mode)) {
+        for (dst, src) in bank.iter_mut().zip(incoming.iter()) {
+            *dst = normalize_rgb24(*src);
+        }
+    } else {
+        bank.copy_from_slice(incoming);
+    }
     true
 }
 
@@ -3494,6 +3581,15 @@ pub extern "C" fn flutterxel_core_load_pal(filename: *const c_char) -> bool {
     if filename.is_null() {
         return false;
     }
+
+    let mut state = runtime_state().lock().expect("runtime state poisoned");
+    if !state.initialized {
+        return false;
+    }
+    if is_truecolor_mode(runtime_color_mode(state.color_mode)) {
+        return true;
+    }
+
     let c_str = unsafe { CStr::from_ptr(filename) };
     let Ok(path) = c_str.to_str() else {
         return false;
@@ -3502,11 +3598,6 @@ pub extern "C" fn flutterxel_core_load_pal(filename: *const c_char) -> bool {
     let Ok(text) = fs::read_to_string(path) else {
         return false;
     };
-
-    let mut state = runtime_state().lock().expect("runtime state poisoned");
-    if !state.initialized {
-        return false;
-    }
 
     let palette_len = runtime_num_colors(state.num_colors);
     for (index, line) in text.lines().take(palette_len).enumerate() {
@@ -3522,17 +3613,20 @@ pub extern "C" fn flutterxel_core_save_pal(filename: *const c_char) -> bool {
     if filename.is_null() {
         return false;
     }
-    let c_str = unsafe { CStr::from_ptr(filename) };
-    let Ok(path) = c_str.to_str() else {
-        return false;
-    };
-
     let (palette, palette_len) = {
         let state = runtime_state().lock().expect("runtime state poisoned");
         if !state.initialized {
             return false;
         }
+        if is_truecolor_mode(runtime_color_mode(state.color_mode)) {
+            return true;
+        }
         (state.palette_map, runtime_num_colors(state.num_colors))
+    };
+
+    let c_str = unsafe { CStr::from_ptr(filename) };
+    let Ok(path) = c_str.to_str() else {
+        return false;
     };
 
     let Ok(mut file) = File::create(path) else {
@@ -3686,6 +3780,7 @@ mod tests {
     #[test]
     fn truecolor_set_color_mode_accepts_supported_values_only() {
         let _guard = test_lock();
+        assert!(flutterxel_core_quit());
         assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
         assert_eq!(flutterxel_core_color_mode(), COLOR_MODE_INDEXED);
         assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
@@ -3698,6 +3793,7 @@ mod tests {
     #[test]
     fn truecolor_set_color_mode_rejects_changes_after_init() {
         let _guard = test_lock();
+        assert!(flutterxel_core_quit());
         assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
         init_runtime(8, 8);
         assert!(!flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
@@ -3709,6 +3805,7 @@ mod tests {
     #[test]
     fn truecolor_pset_pget_roundtrip_preserves_rgb24() {
         let _guard = test_lock();
+        assert!(flutterxel_core_quit());
         assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
         init_runtime(8, 8);
         assert!(flutterxel_core_pset(0, 0, 0x12AB34));
@@ -3720,11 +3817,74 @@ mod tests {
     #[test]
     fn truecolor_pal_is_noop_for_pixel_results() {
         let _guard = test_lock();
+        assert!(flutterxel_core_quit());
         assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
         init_runtime(8, 8);
         assert!(flutterxel_core_pal(1, 2));
         assert!(flutterxel_core_pset(0, 0, 1));
         assert_eq!(flutterxel_core_pget(0, 0), 1);
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+    }
+
+    #[test]
+    fn truecolor_cls_preserves_rgb24() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        init_runtime(4, 4);
+        assert!(flutterxel_core_cls(0x12AB34));
+
+        let frame_buffer = {
+            let state = runtime_state().lock().expect("runtime state poisoned");
+            state.frame_buffer.clone()
+        };
+        assert!(frame_buffer.iter().all(|pixel| *pixel == 0x12AB34));
+
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+    }
+
+    #[test]
+    fn truecolor_line_preserves_rgb24() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        init_runtime(4, 4);
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_line(0, 0, 3, 0, 0x223344));
+        assert_eq!(flutterxel_core_pget(0, 0), 0x223344);
+        assert_eq!(flutterxel_core_pget(1, 0), 0x223344);
+        assert_eq!(flutterxel_core_pget(2, 0), 0x223344);
+        assert_eq!(flutterxel_core_pget(3, 0), 0x223344);
+
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
+    }
+
+    #[test]
+    fn truecolor_blt_preserves_rgb24_from_source_bank() {
+        let _guard = test_lock();
+        assert!(flutterxel_core_quit());
+        assert!(flutterxel_core_set_color_mode(COLOR_MODE_TRUECOLOR));
+        init_runtime(4, 4);
+        assert!(flutterxel_core_image_cls(0, 0));
+        assert!(flutterxel_core_image_pset(0, 0, 0, 0x56C0FF));
+        assert!(flutterxel_core_cls(0));
+        assert!(flutterxel_core_blt(
+            1.0,
+            1.0,
+            0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            OPTIONAL_I32_NONE,
+            f64::NAN,
+            f64::NAN
+        ));
+        assert_eq!(flutterxel_core_pget(1, 1), 0x56C0FF);
+
         assert!(flutterxel_core_quit());
         assert!(flutterxel_core_set_color_mode(COLOR_MODE_INDEXED));
     }
