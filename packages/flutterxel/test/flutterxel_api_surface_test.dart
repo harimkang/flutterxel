@@ -1,5 +1,6 @@
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutterxel/flutterxel.dart' as flutterxel;
@@ -119,6 +120,30 @@ String _writeTestRgbaPng(
   file.writeAsBytesSync(img.encodePng(image), flush: true);
   return file.path;
 }
+
+Uint8List _encodeTestPngBytes({
+  required int width,
+  required int height,
+  required List<int> rgb24Pixels,
+}) {
+  final image = img.Image(width: width, height: height);
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      final rgb = rgb24Pixels[y * width + x];
+      image.setPixelRgb(
+        x,
+        y,
+        (rgb >> 16) & 0xFF,
+        (rgb >> 8) & 0xFF,
+        rgb & 0xFF,
+      );
+    }
+  }
+  return Uint8List.fromList(img.encodePng(image));
+}
+
+String _flutterxelLibrarySource() =>
+    File('lib/flutterxel.dart').readAsStringSync();
 
 bool _hasCommand(String command) {
   final result = Platform.isWindows
@@ -1353,6 +1378,64 @@ void main() {
       expect(loaded.pget(1, 1), flutterxel.COLOR_PINK);
     },
   );
+
+  test('global blt accepts detached image sources', () {
+    flutterxel.init(16, 16);
+    flutterxel.cls(0);
+
+    final src = flutterxel.Image(4, 4);
+    src.pset(0, 0, 7);
+
+    expect(() => flutterxel.blt(0, 0, src, 0, 0, 1, 1), returnsNormally);
+    expect(flutterxel.pget(0, 0), 7);
+  });
+
+  test('bltEx and Image.bltEx symbols exist in the public library source', () {
+    final source = _flutterxelLibrarySource();
+
+    expect(RegExp(r'\bvoid\s+bltEx\s*\(').hasMatch(source), isTrue);
+    expect(RegExp(r'\bvoid\s+blt_ex\s*\(').hasMatch(source), isTrue);
+    expect(
+      RegExp(r'class Image[\s\S]*\bvoid\s+bltEx\s*\(').hasMatch(source),
+      isTrue,
+    );
+    expect(
+      RegExp(r'class Image[\s\S]*\bvoid\s+blt_ex\s*\(').hasMatch(source),
+      isTrue,
+    );
+  });
+
+  test('Image.fromBytes symbol exists for decoded PNG bytes contract', () {
+    final bytes = _encodeTestPngBytes(
+      width: 2,
+      height: 1,
+      rgb24Pixels: const <int>[0x123456, 0xABCDEF],
+    );
+    final decoded = img.decodePng(bytes);
+    final source = _flutterxelLibrarySource();
+
+    expect(decoded, isNotNull);
+    expect(decoded!.width, 2);
+    expect(decoded.height, 1);
+    expect(RegExp(r'static Image\s+fromBytes\s*\(').hasMatch(source), isTrue);
+    expect(RegExp(r'static Image\s+from_bytes\s*\(').hasMatch(source), isTrue);
+  });
+
+  test('Image.loadBytes symbol exists for decoded PNG bytes contract', () {
+    final bytes = _encodeTestPngBytes(
+      width: 2,
+      height: 1,
+      rgb24Pixels: const <int>[0x010203, 0x040506],
+    );
+    final decoded = img.decodePng(bytes);
+    final source = _flutterxelLibrarySource();
+
+    expect(decoded, isNotNull);
+    expect(decoded!.width, 2);
+    expect(decoded.height, 1);
+    expect(RegExp(r'\bvoid\s+loadBytes\s*\(').hasMatch(source), isTrue);
+    expect(RegExp(r'\bvoid\s+load_bytes\s*\(').hasMatch(source), isTrue);
+  });
 
   test(
     'Image.load decodes PNG into an existing image at the requested offset',

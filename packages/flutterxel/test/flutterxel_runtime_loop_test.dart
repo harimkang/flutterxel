@@ -133,4 +133,56 @@ void main() {
     expect(flutterxel.btnv(flutterxel.MOUSE_WHEEL_Y), 0);
     flutterxel.stopRunLoop();
   });
+
+  testWidgets(
+    'FlutterxelView emits pointer sample with button and wheel state',
+    (tester) async {
+      flutterxel.init(16, 16, fps: 30);
+
+      Object? captured;
+      final view =
+          Function.apply(
+                flutterxel.FlutterxelView.new,
+                const <Object?>[],
+                <Symbol, Object?>{
+                  #pixelScale: 2.0,
+                  #onPointerSample: (dynamic sample) {
+                    captured = sample;
+                  },
+                },
+              )
+              as Widget;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: Center(child: view)),
+        ),
+      );
+
+      final viewFinder = find.byType(flutterxel.FlutterxelView);
+      expect(viewFinder, findsOneWidget);
+
+      final center = tester.getCenter(viewFinder);
+      final gesture = await tester.startGesture(center);
+      await tester.pump();
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: center,
+          kind: PointerDeviceKind.mouse,
+          scrollDelta: const Offset(3, -9),
+        ),
+      );
+      await tester.pump();
+
+      final dynamic sample = captured;
+      expect(sample, isNotNull);
+      expect(sample.localPosition, isA<Offset>());
+      expect(sample.pixelPosition, isA<Offset>());
+      expect(sample.buttonMask, greaterThan(0));
+      expect(sample.wheelDelta, const Offset(3, -9));
+
+      await gesture.up();
+      await tester.pump();
+    },
+  );
 }
