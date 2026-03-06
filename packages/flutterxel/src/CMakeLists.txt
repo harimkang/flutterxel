@@ -3,7 +3,7 @@
 # the plugin to fail to compile for some customers of the plugin.
 cmake_minimum_required(VERSION 3.10)
 
-project(flutterxel_library VERSION 0.0.12 LANGUAGES C)
+project(flutterxel_library VERSION 0.0.13 LANGUAGES C)
 
 add_library(flutterxel SHARED
   "flutterxel.c"

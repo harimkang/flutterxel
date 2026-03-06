@@ -1,5 +1,17 @@
 ## Unreleased
 
+## 0.0.13
+
+- Added bytes-based detached image APIs:
+  - `Image.fromBytes(...)` / `Image.from_bytes(...)`
+  - `image.loadBytes(...)` / `image.load_bytes(...)`
+- Added detached image support to global `blt(...)`, including `Image.fromBytes(...)` atlases.
+- Added destination-rect nearest-neighbor blit APIs:
+  - `bltEx(...)` / `blt_ex(...)`
+  - `Image.bltEx(...)` / `Image.blt_ex(...)`
+- Added `FlutterxelView.onPointerSample` with `FlutterxelPointerSample` for widget-layer pointer observation.
+- Updated package release metadata to `0.0.13`.
+
 ## 0.0.12
 
 - Added runtime `truecolor` configuration support in `init(...)` with snake/camel aliases:

@@ -1,5 +1,14 @@
 ## Unreleased
 
+## 0.0.13
+
+- Added agent-map/editor-friendly rendering primitives to `flutterxel`:
+  - bytes-based detached image loading (`Image.fromBytes`, `image.loadBytes`)
+  - global detached-image `blt(...)`
+  - destination-rect nearest-neighbor blits (`bltEx`, `Image.bltEx`)
+  - `FlutterxelView.onPointerSample`
+- Updated release metadata and docs for `0.0.13`.
+
 ## 0.0.12
 
 - Added runtime `truecolor` (`0xRRGGBB`) mode across Rust core, C fallback, Dart API, raster import, and `FlutterxelView`.
