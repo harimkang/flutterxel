@@ -142,6 +142,28 @@ Uint8List _encodeTestPngBytes({
   return Uint8List.fromList(img.encodePng(image));
 }
 
+Uint8List _encodeTestRgbaPngBytes({
+  required int width,
+  required int height,
+  required List<int> rgba32Pixels,
+}) {
+  final image = img.Image(width: width, height: height, numChannels: 4);
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      final rgba = rgba32Pixels[y * width + x];
+      image.setPixelRgba(
+        x,
+        y,
+        (rgba >> 24) & 0xFF,
+        (rgba >> 16) & 0xFF,
+        (rgba >> 8) & 0xFF,
+        rgba & 0xFF,
+      );
+    }
+  }
+  return Uint8List.fromList(img.encodePng(image));
+}
+
 bool _hasCommand(String command) {
   final result = Platform.isWindows
       ? Process.runSync('where', <String>[command], runInShell: true)
@@ -1616,6 +1638,79 @@ void main() {
 
       expect(flutterxel.pget(0, 0), flutterxel.COLOR_PINK);
       expect(flutterxel.pget(1, 0), flutterxel.COLOR_NAVY);
+    },
+  );
+
+  test(
+    'Image.fromBytes maps transparent pixels to transparentIndex in truecolor mode',
+    () {
+      flutterxel.init(8, 8, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+
+      final rgbaFixtureBytes = _encodeTestRgbaPngBytes(
+        width: 2,
+        height: 1,
+        rgba32Pixels: const <int>[0xD4186C00, 0x2B335FFF],
+      );
+      final image = flutterxel.Image.fromBytes(
+        rgbaFixtureBytes,
+        preserveTransparent: true,
+        transparentIndex: 0x00FF00FF,
+        alphaThreshold: 0,
+      );
+
+      expect(image.pget(0, 0), 0x00FF00FF);
+      expect(image.pget(1, 0), 0x2B335F);
+    },
+  );
+
+  test(
+    'Image.loadBytes keeps colkey-safe transparent pixels in truecolor mode',
+    () {
+      flutterxel.init(8, 8, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+
+      final rgbaFixtureBytes = _encodeTestRgbaPngBytes(
+        width: 2,
+        height: 1,
+        rgba32Pixels: const <int>[0xD4186C00, 0x2B335FFF],
+      );
+      final image = flutterxel.Image(2, 1);
+      image.cls(0x00112233);
+      image.loadBytes(
+        0,
+        0,
+        rgbaFixtureBytes,
+        preserveTransparent: true,
+        transparentIndex: 0x00FF00FF,
+        alphaThreshold: 0,
+      );
+
+      expect(image.pget(0, 0), 0x00FF00FF);
+      expect(image.pget(1, 0), 0x2B335F);
+    },
+  );
+
+  test(
+    'truecolor detached image blt with colkey removes transparent background',
+    () {
+      flutterxel.init(8, 8, colorMode: flutterxel.COLOR_MODE_TRUECOLOR);
+
+      final rgbaFixtureBytes = _encodeTestRgbaPngBytes(
+        width: 2,
+        height: 1,
+        rgba32Pixels: const <int>[0xD4186C00, 0x2B335FFF],
+      );
+      final src = flutterxel.Image.fromBytes(
+        rgbaFixtureBytes,
+        preserveTransparent: true,
+        transparentIndex: 0x00FF00FF,
+        alphaThreshold: 0,
+      );
+
+      flutterxel.cls(0x00010203);
+      flutterxel.blt(0, 0, src, 0, 0, 2, 1, colkey: 0x00FF00FF);
+
+      expect(flutterxel.pget(0, 0), 0x00010203);
+      expect(flutterxel.pget(1, 0), 0x2B335F);
     },
   );
 
